@@ -50,19 +50,22 @@ await p.waitForTimeout(1800);
 const wires = await p.evaluate(() => [...document.querySelectorAll('#cyd2 .wire .wire-name')].map((e) => e.textContent.toLowerCase()));
 const reds = wires.map((w, i) => (w === 'rouge' ? i : -1)).filter((i) => i >= 0);
 const unique = wires.findIndex((w) => wires.filter((x) => x === w).length === 1);
-const wireIdx = reds.length > 1 ? reds[reds.length - 1] : d[3] % 2 === 0 ? 1 : unique;
-solved.wires = wires; solved.wireIdx = wireIdx;
 const status4 = await text('#status');
+const evenBranch = /pair → le 2e/.test(status4); // la règle affichée dit s'il y a la branche « pair »
+const wireIdx = reds.length > 1 ? reds[reds.length - 1] : evenBranch && d[3] % 2 === 0 ? 1 : unique;
+solved.wires = wires; solved.wireIdx = wireIdx;
 await p.waitForTimeout(700); // défilement doux vers le haut
 const wireView = await p.evaluate(() => {
   const H = innerHeight, els = [...document.querySelectorAll('#cyd2 .wire')];
   const st = document.querySelector('#status').getBoundingClientRect();
   return { inLoupe: !!document.querySelector('#loupe #cyd2'), allVisible: els.every((e) => { const r = e.getBoundingClientRect(); const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return r.top >= 0 && r.bottom <= H && t && e.contains(t); }), minH: Math.round(Math.min(...els.map((e) => e.getBoundingClientRect().height))), ruleVisible: st.top >= 0 && st.bottom <= H };
 });
-await p.screenshot({ path: out + 'v014-02-fils-portrait-412.png' });
+await p.screenshot({ path: out + `v014-02-fils-portrait-412-s${SEED}.png` });
 await p.tap(`#cyd2 .wire[data-i="${wireIdx}"]`); await p.waitForTimeout(900);
 // 6) code : 1er = dernier chiffre ; 3e = somme mod 10 ; 2e et 4e = fragment
-const code = `${d[3]}${frag[1]}${(d[0] + d[1] + d[2] + d[3]) % 10}${frag[3]}`;
+const status5 = await text('#status');
+const third = /somme/.test(status5) ? (d[0] + d[1] + d[2] + d[3]) % 10 : /1er chiffre ;/.test(status5) ? d[0] : NaN;
+const code = `${d[3]}${frag[1]}${third}${frag[3]}`;
 solved.code = code;
 for (const c of code) await p.tap(`.kp:text-is("${c}")`);
 await p.waitForTimeout(3200);
@@ -71,10 +74,10 @@ const box = await p.locator('#bigbtn').boundingBox();
 await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await p.mouse.down(); await p.waitForTimeout(1700); await p.mouse.up();
 await p.waitForTimeout(3600);
 await p.evaluate(() => scrollTo(0, 0));
-await p.screenshot({ path: out + 'v014-03-victoire-412.png' });
-const st = await p.evaluate(() => { const g = window.__game; return { result: g.result, code: g.code, order: g.order, wireIdx: g.wireIdx, serial: g.serial }; });
+await p.screenshot({ path: out + `v014-03-victoire-412-s${SEED}.png` });
+const st = await p.evaluate(() => { const g = window.__game; return { tier: g.tier, score: g.score, result: g.result, code: g.code, order: g.order, wireIdx: g.wireIdx, serial: g.serial }; });
 const agree = st.code === code && st.order.join() === order.join() && st.wireIdx === wireIdx && st.serial === serial;
 // une autre graine donne d'autres valeurs
 const other = await p.evaluate(() => { const r = window.__makeRun(2024); return { serial: r.serial, code: r.code, order: r.order, wireIdx: r.wireIdx, first: r.first }; });
-console.log(JSON.stringify({ seed: SEED, solved, status0, lie, truthFrag, penalty, status4, wireView, sceller, result: st.result, agree, other, logs }, null, 1));
+console.log(JSON.stringify({ seed: SEED, solved, status0, lie, truthFrag, penalty, tier: st.tier, score: st.score, status4, status5, wireView, sceller, result: st.result, agree, other, logs }, null, 1));
 await b.close();

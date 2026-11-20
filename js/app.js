@@ -285,7 +285,7 @@ function initCase() {
       const truth = 'PÈSE-LES';
       const lie = () => { let o; do { o = shuffle([0, 1, 2]); } while (o.join() === g.order.join()); return o.map((i) => ['I', 'II', 'III'][i]).join(' · '); };
       glitchSwap($('[data-big]', c2), lie(), truth, 1800);
-      g.lieTimer = setInterval(() => { const el = $('[data-big]', c2); if (el && g.step === 3) glitchSwap(el, lie(), truth, 700); }, 7000 + rand(3000));
+      if (g.hard) g.lieTimer = setInterval(() => { const el = $('[data-big]', c2); if (el && g.step === 3) glitchSwap(el, lie(), truth, 700); }, 7000 + rand(3000));
     }
     if (view === 'wires') {
       let html = `${c2Head()}<span class="c2-msg" data-hint></span><div class="wires">`;
@@ -293,7 +293,7 @@ function initCase() {
         html += `<button class="wire" type="button" data-i="${i}" style="--wc:${WIRES[w]}" aria-label="Fil ${i + 1}, ${w}"><svg viewBox="0 0 130 22" preserveAspectRatio="none" aria-hidden="true"><path class="w-l" d="M2 11 C 20 ${rand(2) ? 3 : 19}, 40 ${rand(2) ? 3 : 19}, 63 11"/><path class="w-r" d="M67 11 C 88 ${rand(2) ? 3 : 19}, 108 ${rand(2) ? 3 : 19}, 128 11"/></svg><span class="wire-name">${w.toUpperCase()}</span></button>`;
       });
       c2.innerHTML = html + '</div>';
-      const fake = (g.wireIdx + 1 + rand(4)) % 5; // un faux fil, jamais le bon
+      const fake = g.fakeWire; // un faux fil, jamais le bon (au difficile : le plus tentant)
       glitchSwap($('[data-hint]', c2), `COUPE LE FIL ${fake + 1}`, 'APPLIQUE LA RÈGLE', 1500);
       $$('.wire', c2).forEach((b) => b.addEventListener('click', () => cutWire(+b.dataset.i, b)));
     }
@@ -337,10 +337,11 @@ function initCase() {
     () => `La trappe ${g.trapOf.croix} est ouverte : prends la clé en croix, puis tourne Croix A et Croix B ensemble.`,
     () => `La trappe ${g.trapOf.badge} est ouverte : prends le badge Podkova, puis présente-le au lecteur RFID.`,
     () => `La trappe ${g.trapOf.cles} est ouverte : prends les clés. Note le fragment de code de l'écran 2 : il servira.`,
-    () => `Fils : plus d'un rouge → le dernier rouge ; sinon, dernier chiffre du n° ${g.serial} pair → le 2e ; sinon → le sans-jumeau.`,
-    () => `Code : 1er = dernier chiffre du n° ${g.serial} ; 3e = somme de ses 4 chiffres, unités seules ; 2e et 4e = fragment de l'écran 2. Il part dès le 4e chiffre.`,
+    () => (g.hard ? `Fils : plus d'un rouge → le dernier rouge ; sinon, dernier chiffre du n° ${g.serial} pair → le 2e ; sinon → le sans-jumeau.` : `Fils : plus d'un rouge → le dernier rouge ; sinon → le sans-jumeau.`),
+    () => `Code : 1er = dernier chiffre du n° ${g.serial} ; 3e = ${rule3()} ; 2e et 4e = fragment de l'écran 2. Il part dès le 4e chiffre.`,
     'Maintiens le gros bouton rouge pour sceller le lecteur 5D.',
   ];
+  const rule3 = () => (g.hard ? 'somme de ses 4 chiffres, unités seules' : 'son 1er chiffre');
   const PROB = [99.7, 88.4, 75.1, 61.8, 44.6, 29.3, 11.2, 0];
   const g = window.__game = { running: false, ended: false, step: -1, endAt: 0, code: '', codeKnown: false, entry: '', order: [], orderPos: 0, wires: [], unique: '', trapOf: { croix: 1, badge: 2, cles: 3 }, seed: 0, crossT: 0, lastSec: -1, errUntil: 0, said30: false, said10: false };
 
@@ -387,32 +388,71 @@ function initCase() {
   }
 
   // valeurs d'une partie, toutes tirées d'une seule graine (même graine = même partie)
-  function makeRun(seed) {
-    const r = mulberry32(seed), ri = (n) => Math.floor(r() * n);
+  // Deux paliers cachés, ~50/50 selon la graine : 'moyen-difficile' et 'difficile'. Le palier change la chaîne de
+  // déduction (fils, 3e chiffre du code), les leurres et le nombre de mensonges. Chaque tirage est noté ; s'il sort de
+  // la bande de son palier, on retire avec la sous-graine suivante (déterministe : même ?seed = même partie).
+  const TIERS = {
+    'moyen-difficile': { band: [13, 15], lies: 4 }, // faux code, faux ordre (1 fois), faux fil, « ne touche pas »
+    difficile: { band: [19, 21], lies: 6 }, // + faux ordres répétés, fausse probabilité
+  };
+  function draw(sub, tier) {
+    const hard = tier === 'difficile';
+    const r = mulberry32(sub), ri = (n) => Math.floor(r() * n);
     const sh = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = ri(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-    // n° de série : 4 chiffres (les 3 premiers distincts) + 2 lettres, ex. 4K7-29B ; un n° de lot sans rôle (leurre)
+    // n° de série : 4 chiffres (les 3 premiers distincts) + 2 lettres, ex. 4K7-29B
     const [d1, d2, d3] = sh([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).slice(0, 3), d4 = ri(10);
     const LET = 'ABCDEFGHJKLMNPRSTUVWXYZ';
     const serial = `${d1}${LET[ri(LET.length)]}${d2}-${d3}${d4}${LET[ri(LET.length)]}`;
-    const lot = 100 + ri(900);
+    // n° de lot (leurre) : au palier difficile, fait des chiffres du n° de série pour tenter
+    const lot = hard ? Number(sh([d1, d2, d3, d4]).filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => !a - !b).slice(0, 3).join('')) : 100 + ri(900);
     const even = d4 % 2 === 0;
-    // interrupteurs : dernier chiffre pair -> bleu d'abord, impair -> rouge d'abord
     const first = even ? 'bleu' : 'rouge';
     // clés : I pèse le 1er chiffre, II le 2e, III le 3e ; de la plus légère à la plus lourde
     const weights = [d1, d2, d3];
     const order = [0, 1, 2].sort((a, b) => weights[a] - weights[b]);
-    // code : 1er = dernier chiffre du n°, 3e = somme des 4 chiffres (unités), 2e et 4e montrés par l'écran 2
+    // code : 1er = dernier chiffre ; 3e = 1er chiffre (moyen) ou somme des 4 chiffres, unités (difficile) ; 2e, 4e = écran 2
+    const sum = d1 + d2 + d3 + d4;
     const b2 = ri(10), b4 = ri(10);
-    const code = `${d4}${b2}${(d1 + d2 + d3 + d4) % 10}${b4}`;
-    // fils : plus d'un rouge -> le dernier rouge ; sinon n° pair -> le 2e ; sinon -> le fil sans jumeau
+    const code = `${d4}${b2}${hard ? sum % 10 : d1}${b4}`;
+    // fils : moyen = plus d'un rouge -> le dernier rouge, sinon le sans-jumeau ; difficile = + « sinon n° pair -> le 2e »
     const cols = sh(Object.keys(WIRES));
     const wires = sh([cols[0], cols[1], cols[1], cols[2], cols[2]]);
     const reds = wires.map((w, i) => (w === 'rouge' ? i : -1)).filter((i) => i >= 0);
-    const wireIdx = reds.length > 1 ? reds[reds.length - 1] : even ? 1 : wires.indexOf(cols[0]);
+    const uniq = wires.indexOf(cols[0]);
+    let wireIdx, branch;
+    if (reds.length > 1) { wireIdx = reds[reds.length - 1]; branch = 1; } else if (hard && even) { wireIdx = 1; branch = 2; } else { wireIdx = uniq; branch = hard ? 3 : 2; }
+    // faux fil annoncé par l'Entité : au difficile, le plus tentant (le sans-jumeau ou le 1er rouge) ; jamais le bon
+    const tempt = [uniq, reds[0], wireIdx ^ 1, (wireIdx + 2) % 5].filter((i) => i !== undefined && i !== wireIdx && i < 5);
+    const fakeWire = hard ? tempt[0] : (wireIdx + 1 + ri(4)) % 5;
     const slots = sh([1, 2, 3]);
-    return { seed, serial, lot, first, weights, code, partial: `_${b2}_${b4}`, order, unique: cols[0], wires, wireIdx, trapOf: { croix: slots[0], badge: slots[1], cles: slots[2] } };
+    const run = { serial, lot, first, weights, code, partial: `_${b2}_${b4}`, order, unique: cols[0], wires, wireIdx, fakeWire, branch, trapOf: { croix: slots[0], badge: slots[1], cles: slots[2] } };
+    run.score = scoreRun(run, tier, sum);
+    return run;
   }
-  window.__makeRun = makeRun;
+  // note de difficulté = étapes de déduction + leurres + mensonges signalés + pièges non triviaux
+  function scoreRun(run, tier, sum) {
+    const hard = tier === 'difficile', o = run.order.join('');
+    const steps = 1 /* interrupteurs */ + 1 /* clés */ + run.branch /* fils */ + (hard ? 3 : 2) /* code */;
+    const lotDigits = String(run.lot);
+    const decoys = 1 /* lot */ + ([...lotDigits].some((c) => run.serial.includes(c)) ? 1 : 0) + (hard ? 1 : 0) /* faux fil tentant */;
+    const lies = TIERS[tier].lies;
+    const flags = (o !== '012' ? 1 : 0) + (o !== '210' ? 1 : 0) + (run.wireIdx !== 0 ? 1 : 0) + (new Set(run.code).size === 4 ? 1 : 0) + (hard && sum >= 10 ? 1 : 0) - (run.code.includes(lotDigits) ? 2 : 0);
+    return { total: steps + decoys + lies + flags, steps, decoys, lies, flags };
+  }
+  // garde-fous en plus de la bande : jamais l'ordre I II III ; au difficile, le fil vient des branches 2 ou 3
+  function accept(run, tier, lo, hi) {
+    if (run.score.total < lo || run.score.total > hi || run.order.join('') === '012') return false;
+    return tier !== 'difficile' || run.branch >= 2;
+  }
+  function makeRun(seed) {
+    seed >>>= 0;
+    const tier = mulberry32(seed ^ 0x9e3779b9)() < 0.5 ? 'moyen-difficile' : 'difficile';
+    const [lo, hi] = TIERS[tier].band;
+    let run, tries = 0;
+    do { run = draw((seed + tries * 0x632be5ab) >>> 0, tier); tries++; } while (!accept(run, tier, lo, hi) && tries < 200);
+    return { seed, tier, tries, ...run, lies: TIERS[tier].lies, hard: tier === 'difficile' };
+  }
+  window.__makeRun = makeRun; window.__puzzle = { draw, accept, TIERS };
 
   function startGame() {
     initAudio();
@@ -424,7 +464,7 @@ function initCase() {
     resetBoard();
     fillTraps();
     $('[data-part="label"]').textContent = `N° DE SÉRIE ${g.serial} · LOT ${g.lot}`;
-    if (DEBUG) { $('#seed').hidden = false; $('#seed').textContent = ` · graine ${g.seed}`; console.info('[entite] graine', g.seed, run); }
+    if (DEBUG) { $('#seed').hidden = false; $('#seed').textContent = ` · graine ${g.seed} · ${g.tier} · note ${g.score.total}`; console.info('[entite] graine', g.seed, run); }
     startMusic();
     $('#intro').hidden = true; $('#end').hidden = true;
     eye.setMood('watching');
@@ -432,7 +472,7 @@ function initCase() {
     goStep(0);
     speak('intro');
     setTimeout(() => g.running && g.step === 0 && speak('depart'), 3600);
-    scheduleProbLie();
+    if (g.hard) scheduleProbLie(); // fausse probabilité : palier difficile seulement
   }
 
   function scheduleProbLie() {
@@ -650,7 +690,7 @@ function initCase() {
       const lcd = $('[data-entry]', c2) || document.createElement('span');
       lcd.classList.remove('bad'); void lcd.offsetWidth; lcd.classList.add('bad');
       penalty(15, 'codeFaux');
-      setStatus(`Code refusé. Quinze secondes de moins. 1er : dernier chiffre du n° ${g.serial} ; 3e : somme de ses 4 chiffres, unités seules ; 2e et 4e : écran 2.`);
+      setStatus(`Code refusé. Quinze secondes de moins. 1er : dernier chiffre du n° ${g.serial} ; 3e : ${rule3()} ; 2e et 4e : écran 2.`);
       setTimeout(() => { g.entry = ''; showEntry(); lcd.classList.remove('bad'); }, 700);
     }
   }

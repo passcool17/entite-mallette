@@ -76,6 +76,15 @@ Les règles sont dans le texte d'étape ; aucune réponse n'est affichée telle 
 - **Mensonges** : l'écran 2 affiche parfois un faux code, un faux ordre ou un faux fil ; à chaque mensonge
   (et quand le % ment), l'œil et le CYD 1 grésillent en rouge. Ce qui s'affiche pendant le grésillement est faux.
 - Croix A et B : toujours à moins d'une seconde d'écart.
+- **Deux paliers cachés**, tirés ~50/50 par la graine (jamais affichés, sauf avec `?debug=1`) :
+  - *moyen-difficile* : fils « plus d'un rouge → le dernier rouge ; sinon → le sans-jumeau » ; 3e chiffre du code = 1er
+    chiffre du n° ; 4 mensonges (faux code, faux ordre une fois, faux fil, « ne touche pas »).
+  - *difficile* : chaîne des fils complète (+ « dernier chiffre pair → le 2e ») et réponse toujours en branche 2 ou 3 ;
+    3e chiffre = somme des 4 chiffres (unités) ; n° de lot fait des chiffres du n° de série (leurre) ; faux fil le plus
+    tentant ; 6 mensonges (+ faux ordres répétés, fausse probabilité).
+  - Chaque tirage est noté (étapes de déduction + leurres + mensonges + pièges non triviaux). Bandes : moyen 13–15,
+    difficile 19–21 ; l'ordre des clés n'est jamais I II III. Hors bande : on retire avec une sous-graine dérivée,
+    donc même `?seed` = même partie. `node tests/paliers.mjs` vérifie 1000 graines (répartition, bandes, temps).
 - Le n° de série est aussi rappelé dans chaque texte d'étape qui s'en sert (la plaque peut être sous le pli).
 - Clés : on compte les **chiffres** du n° (les lettres sont ignorées). Le code part dès le 4e chiffre (pas de #).
 - Au gros bouton, l'Entité dit « Ne touche pas au bouton rouge » : c'est un mensonge, signalé (œil rouge + sous-titre
