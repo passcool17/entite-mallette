@@ -23,6 +23,18 @@ export const LINES = {
   pasEncore:  "Pas encore.",
   trappe:     "Une trappe s'ouvre. Je l'ai permis.",
   tropLent:   "Trop lent. Les deux moitiés, ensemble.",
+  // 0.1.5
+  depart8:    "Huit minutes. Deux couches de verrous. Quatre-vingt-dix-neuf virgule sept pour cent d'échec.",
+  ordreFaux5: "Mauvais ordre. Je t'ai menti. Cinq secondes de moins.",
+  trappeVide: "Vide. Je t'avais prévenu.",
+  clones:     "Trois Podkova. Un seul est vrai.",
+  badgeFaux:  "Un clone. Tu crois tout ce qu'on te montre.",
+  mentFini:   "C'est fini. Tu as gagné. Pose la mallette.",
+  couche2:    "Tu croyais avoir fini ? Je redémarre une seconde couche de verrous.",
+  menteBleu:  "Le bleu d'abord. Crois-moi.",
+  menteRouge: "Le rouge d'abord. Crois-moi.",
+  fils2:      "Un second panneau. Une autre règle.",
+  code2:      "Le code, encore. Tu t'en souviens ?",
 };
 
 // Fichiers enregistrés : voix/<id>.mp3, listés dans voix/voix.json ({ "files": ["intro", "depart", ...] }).

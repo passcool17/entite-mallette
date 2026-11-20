@@ -7,7 +7,7 @@ window.__musique = musicStats;
 import { preloadAll } from './preload.js';
 window.__voix = voiceStats;
 
-const VERSION = '0.1.4';
+const VERSION = '0.1.5';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -26,7 +26,7 @@ const canVibrate = typeof navigator.vibrate === 'function';
 let vibeOn = localStorage.getItem('entite.vibrations') !== '0';
 function buzz(pattern) { if (canVibrate && vibeOn) { try { navigator.vibrate(pattern); } catch { /* rien */ } } }
 const BUZZ = { faux: 70, boom: [500, 120, 300, 120, 700], victoire: [90, 90, 90] };
-const TIME_S = 240; // 4 min : plus de réflexion, pas moins de temps
+const TIME_S = 480; // 8 min : deux couches de verrous (partie ~2x plus longue)
 const fmtPct = (v) => v.toFixed(1).replace('.', ',') + ' %';
 
 if (q.has('cyd')) { bootDone(); registerSW(); initCyd(); } else initCase();
@@ -184,12 +184,26 @@ function initCase() {
     badge: `<svg viewBox="0 0 120 52" aria-hidden="true"><rect x="22" y="6" width="76" height="42" rx="5" fill="#0e2a3a" stroke="#62d6ff" stroke-width="1.5"/><rect x="30" y="16" width="16" height="12" rx="2" fill="#c6a76a"/><path d="M30 22h16M38 16v12" stroke="#7d6538" stroke-width="1"/><text x="54" y="26" font-family="JetBrains Mono" font-size="9" fill="#dce9f4">PODKOVA</text><path d="M54 36h34" stroke="#62d6ff" stroke-width="2" stroke-dasharray="3 2"/></svg>`,
     cles: `<svg viewBox="0 0 120 52" aria-hidden="true"><circle cx="20" cy="26" r="11" fill="none" stroke="#c6a76a" stroke-width="3"/><g fill="url(#keymetal)" stroke="#1c2329"><rect x="30" y="8" width="64" height="7" rx="3"/><rect x="30" y="22.5" width="80" height="7" rx="3"/><rect x="30" y="37" width="70" height="7" rx="3"/></g><g font-family="JetBrains Mono" font-size="7" fill="#1c2329"><text x="80" y="14">I</text><text x="96" y="28.5">II</text><text x="84" y="43">III</text></g></svg>`,
   };
-  const TRAP_LABEL = { croix: 'Prendre les deux moitiés de la clé en croix', badge: 'Prendre le badge Podkova', cles: 'Prendre les clés I, II et III' };
+  const TRAP_LABEL = { croix: 'Prendre les deux moitiés de la clé en croix', badge: 'Prendre les trois badges Podkova', cles: 'Prendre les clés I, II et III' };
   const traps = {};
   for (const t of $$('.trap')) {
     const n = t.dataset.trap, b = t.querySelector('.trap-key');
-    traps[n] = { el: t, btn: b, item: '' };
+    // étape 2 : la trappe de la clé en croix se déduit ; chaque trappe fermée devient touchable
+    const pick = document.createElement('button');
+    pick.type = 'button'; pick.className = 'trap-pick'; pick.hidden = true; pick.setAttribute('aria-label', `Ouvrir la trappe ${n}`);
+    pick.addEventListener('click', () => chooseTrap(+n));
+    t.append(pick);
+    traps[n] = { el: t, btn: b, pick, item: '' };
     b.addEventListener('click', () => pickTrap(+n));
+  }
+  function trapsChoosable(on) { for (const n in traps) traps[n].pick.hidden = !on || traps[n].el.classList.contains('taken'); $('#traps').classList.toggle('choose', on); }
+  function chooseTrap(n) {
+    if (!g.running || g.step !== 1) return;
+    lookAtEl(traps[n].el);
+    if (n === g.trapOf.croix) { trapsChoosable(false); openTrap('croix'); return; }
+    const d = traps[n].el; d.classList.remove('deny'); void d.offsetWidth; d.classList.add('deny');
+    penalty(PEN.ordre, 'trappeVide');
+    setStatus(`Trappe ${n} vide. Cinq secondes de moins. Trappe = (reste de 1er chiffre du n° ${g.serial} ÷ 3) + 1.`);
   }
   // chaque partie range la clé en croix, le badge et les clés I-III dans des trappes tirées au sort
   function fillTraps() {
@@ -213,10 +227,10 @@ function initCase() {
     sfx.pickup();
     const item = t.item;
     if (item === 'badge') {
-      g.badge = true;
-      $('#rfid').classList.add('ready');
-      setStatus('Badge Podkova en main. Présente-le au lecteur RFID.');
-      $('#rfid').focus({ preventScroll: true });
+      g.badge = true; g.badgeSel = -1;
+      c2View('badges');
+      speak('clones');
+      setStatus(`Trois clones Podkova. Le vrai porte une lettre du n° ${g.serial} : choisis-le sur l'écran 2, puis présente-le au lecteur RFID.`);
       return;
     }
     const ids = item === 'croix' ? ['xa', 'xb'] : ['k1', 'k2', 'k3'];
@@ -243,13 +257,14 @@ function initCase() {
   // ---------- loupe (paysage) ----------
   // En paysage, l'écran 2 à l'échelle est trop petit pour les fils et le code : à ces étapes, l'écran 2 (et le clavier
   // pour le code) passent agrandis dans la colonne de l'œil, avec des zones de 44 px. Un fantôme reste à leur place.
-  const LOUPE = { wires: ['#cyd2'], pilule: ['#cyd2', '#keypad'] };
+  const LOUPE = { wires: ['#cyd2'], badges: ['#cyd2'], pilule: ['#cyd2', '#keypad'] };
   const loupe = $('#loupe'), home = new Map();
   function applyLoupe() {
     // portrait : seulement les fils, si la zone de l'œil peut contenir les 5 fils de 44 px (sinon, défilement vers l'écran 2)
-    const portraitWires = !landMQ.matches && g.c2 === 'wires' && $('#stage').clientHeight >= 330;
+    const big = g.c2 === 'wires' || g.c2 === 'badges';
+    const portraitWires = !landMQ.matches && big && $('#stage').clientHeight >= 330;
     const want = g.running && (landMQ.matches || portraitWires) ? (portraitWires ? ['#cyd2'] : LOUPE[g.c2] || []).map((sel) => $(sel)) : [];
-    if (g.running && g.c2 === 'wires' && !landMQ.matches) {
+    if (g.running && big && !landMQ.matches) {
       if (portraitWires) scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' }); // règle (barre d'étape) + fils visibles ensemble
       else c2.scrollIntoView({ block: 'end', behavior: reduced ? 'auto' : 'smooth' });
     }
@@ -270,7 +285,8 @@ function initCase() {
     layoutPanel();
   }
   const WIRES = { rouge: '#ff3b30', bleu: '#3d8bff', jaune: '#ffd23d', vert: '#3dff95', blanc: '#e8eef2' };
-  function c2Head() { return `<div class="c2-head"><span>CYD2</span><span data-code>${g.codeKnown ? 'CODE ' + g.partial : 'HORS LIGNE'}</span></div>`; }
+  function c2Head() { return `<div class="c2-head"><span>CYD2</span><span data-code>${g.code1Done ? 'CODE 1 ' + g.code : g.codeKnown ? 'CODE ' + g.partial : 'HORS LIGNE'}</span></div>`; }
+  const P2 = () => g.step >= 6; // seconde couche
   function c2View(view) {
     g.c2 = view;
     clearInterval(g.lieTimer);
@@ -281,24 +297,40 @@ function initCase() {
       glitchSwap($('[data-big]', c2), [...fakeCode()].join(' '), [...g.partial].join(' '), 1500);
     }
     if (view === 'order') {
-      c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg">ORDRE</span><span class="c2-big c2-mid" data-big></span><span class="c2-msg c2-dim" data-sub>${g.keysPicked3 ? '' : `trappe ${g.trapOf.cles} ouverte`}</span></div>`;
-      const truth = 'PÈSE-LES';
-      const lie = () => { let o; do { o = shuffle([0, 1, 2]); } while (o.join() === g.order.join()); return o.map((i) => ['I', 'II', 'III'][i]).join(' · '); };
+      const p2 = P2(), cur = p2 ? g.order2 : g.order, st = g.step;
+      c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg">ORDRE${p2 ? ' · COUCHE 2' : ''}</span><span class="c2-big c2-mid" data-big></span><span class="c2-msg c2-dim" data-sub>${p2 ? 'à l\'envers' : g.keysPicked3 ? '' : `trappe ${g.trapOf.cles} ouverte`}</span></div>`;
+      const truth = p2 ? 'LOURD → LÉGER' : 'PÈSE-LES';
+      const lie = () => { let o; do { o = shuffle([0, 1, 2]); } while (o.join() === cur.join()); return o.map((i) => ['I', 'II', 'III'][i]).join(' · '); };
       glitchSwap($('[data-big]', c2), lie(), truth, 1800);
-      if (g.hard) g.lieTimer = setInterval(() => { const el = $('[data-big]', c2); if (el && g.step === 3) glitchSwap(el, lie(), truth, 700); }, 7000 + rand(3000));
+      if (g.hard) g.lieTimer = setInterval(() => { const el = $('[data-big]', c2); if (el && g.step === st) glitchSwap(el, lie(), truth, 700); }, 7000 + rand(3000));
     }
+    if (view === 'badges') {
+      c2.innerHTML = `${c2Head()}<span class="c2-msg">PODKOVA · 3 CLONES</span><div class="badges">${g.badges.map((b, i) => `<button class="badge" type="button" data-i="${i}" aria-pressed="false" aria-label="Badge Podkova ${b}">PODKOVA·${b}</button>`).join('')}</div>`;
+      $$('.badge', c2).forEach((bt) => bt.addEventListener('click', () => {
+        if (!g.running || g.step !== 2) return;
+        sfx.click(); g.badgeSel = +bt.dataset.i;
+        $$('.badge', c2).forEach((o) => o.setAttribute('aria-pressed', String(o === bt)));
+        $('#rfid').classList.add('ready');
+        setStatus(`Badge PODKOVA·${g.badges[g.badgeSel]} en main. Présente-le au lecteur RFID.`);
+        if (!landMQ.matches) $('#rfid').scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
+      }));
+    }
+    if (view === 'reboot') c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-big">COUCHE 2</span><span class="c2-msg">redémarrage des verrous</span></div>`;
+    if (view === 'fini') c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-big glitch">TERMINÉ</span><span class="c2-msg">tu as gagné</span></div>`;
     if (view === 'wires') {
+      const ws = P2() ? g.wires2 : g.wires;
       let html = `${c2Head()}<span class="c2-msg" data-hint></span><div class="wires">`;
-      g.wires.forEach((w, i) => {
+      ws.forEach((w, i) => {
         html += `<button class="wire" type="button" data-i="${i}" style="--wc:${WIRES[w]}" aria-label="Fil ${i + 1}, ${w}"><svg viewBox="0 0 130 22" preserveAspectRatio="none" aria-hidden="true"><path class="w-l" d="M2 11 C 20 ${rand(2) ? 3 : 19}, 40 ${rand(2) ? 3 : 19}, 63 11"/><path class="w-r" d="M67 11 C 88 ${rand(2) ? 3 : 19}, 108 ${rand(2) ? 3 : 19}, 128 11"/></svg><span class="wire-name">${w.toUpperCase()}</span></button>`;
       });
       c2.innerHTML = html + '</div>';
-      const fake = g.fakeWire; // un faux fil, jamais le bon (au difficile : le plus tentant)
+      const fake = P2() ? g.fakeWire2 : g.fakeWire; // un faux fil, jamais le bon
       glitchSwap($('[data-hint]', c2), `COUPE LE FIL ${fake + 1}`, 'APPLIQUE LA RÈGLE', 1500);
       $$('.wire', c2).forEach((b) => b.addEventListener('click', () => cutWire(+b.dataset.i, b)));
     }
     if (view === 'pilule') {
-      c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg">PILULE EMPOISONNÉE</span><span class="c2-big c2-entry" data-entry>_ _ _ _</span><span class="c2-msg c2-dim">tape le code au clavier</span></div>`;
+      c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg" data-hint>PILULE EMPOISONNÉE${P2() ? ' · 2' : ''}</span><span class="c2-big c2-entry" data-entry>_ _ _ _</span><span class="c2-msg c2-dim">tape le code au clavier</span></div>`;
+      if (P2()) glitchSwap($('[data-hint]', c2), `CODE 2 = ${fakeCode()}`, 'CODE 1 À L\'ENVERS', 1600);
     }
     if (view === 'upload') {
       c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg">PILULE EMPOISONNÉE</span><span class="c2-big" data-pct>0 %</span><span class="c2-bar"><i data-bar></i></span><span class="c2-msg c2-dim">téléversement</span></div>`;
@@ -306,7 +338,7 @@ function initCase() {
     if (view === 'sealed') c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-big">LECTEUR 5D</span><span class="c2-msg">ENTITÉ CONFINÉE</span></div>`;
     if (view === 'boom') c2.innerHTML = `<div class="c2-center"><span class="c2-big glitch">ERREUR</span><span class="c2-msg">signal perdu</span></div>`;
   }
-  function fakeCode() { let s; do { s = String(rand(10000)).padStart(4, '0'); } while (s === g.code); return s; }
+  function fakeCode() { let s; do { s = String(rand(10000)).padStart(4, '0'); } while (s === g.code || s === g.code2); return s; }
   // l'Entité ment : son œil grésille (rouge, saccadé) tant que le faux texte est affiché
   let lieT = 0;
   function flagLie(ms, caption = false) {
@@ -332,17 +364,25 @@ function initCase() {
   }
 
   // ---------- état ----------
+  // 12 étapes : couche 1 (0-5) puis seconde couche (6-11)
   const STEPS = [
-    () => `N° de série ${g.serial} (aussi sur la plaque) : dernier chiffre pair → bascule le bleu d'abord ; impair → le rouge d'abord. Lève les caches.`,
-    () => `La trappe ${g.trapOf.croix} est ouverte : prends la clé en croix, puis tourne Croix A et Croix B ensemble.`,
-    () => `La trappe ${g.trapOf.badge} est ouverte : prends le badge Podkova, puis présente-le au lecteur RFID.`,
+    () => `Interrupteurs : n° ${g.serial} avec une voyelle (A, E, U, Y) → bleu d'abord ; sinon, dernier chiffre pair → bleu d'abord, impair → rouge d'abord. Lève les caches.`,
+    () => `Clé en croix : trappe = (reste de 1er chiffre du n° ${g.serial} ÷ 3) + 1 (ex. 7 → reste 1 → trappe 2). Touche-la, prends la clé, puis tourne Croix A et Croix B ensemble.`,
+    () => `La trappe ${g.trapOf.badge} est ouverte : trois clones Podkova. Le vrai porte une lettre du n° ${g.serial}. Prends-les, choisis le vrai sur l'écran 2, puis présente-le au lecteur RFID.`,
     () => `La trappe ${g.trapOf.cles} est ouverte : prends les clés. Note le fragment de code de l'écran 2 : il servira.`,
     () => (g.hard ? `Fils : plus d'un rouge → le dernier rouge ; sinon, dernier chiffre du n° ${g.serial} pair → le 2e ; sinon → le sans-jumeau.` : `Fils : plus d'un rouge → le dernier rouge ; sinon → le sans-jumeau.`),
     () => `Code : 1er = dernier chiffre du n° ${g.serial} ; 3e = ${rule3()} ; 2e et 4e = fragment de l'écran 2. Il part dès le 4e chiffre.`,
+    () => `Seconde couche. Interrupteurs : 1er chiffre du n° ${g.serial} pair → bleu d'abord ; impair → rouge d'abord. Lève les caches.`,
+    'Ramène Croix A et Croix B à l\'arrêt, ensemble (moins d\'une seconde).',
+    () => `Clés à l'envers : de la plus lourde à la plus légère. I = 1er chiffre, II = 2e chiffre, III = 3e chiffre du n° ${g.serial} (ignore les lettres).`,
+    () => (g.hard ? 'Fils, panneau 2 : plus d\'un bleu → le 1er bleu ; sinon → le sans-jumeau.' : 'Fils, panneau 2 : coupe le sans-jumeau.'),
+    'Code 2 : le code 1 (en haut de l\'écran 2) à l\'envers. Il part dès le 4e chiffre.',
     'Maintiens le gros bouton rouge pour sceller le lecteur 5D.',
   ];
+  const NSTEPS = STEPS.length;
+  const PEN = { ordre: 5, code: 8, jump: 3.2 }; // pénalités allégées (0.1.4 : 10 s, 15 s, +6,4 %)
   const rule3 = () => (g.hard ? 'somme de ses 4 chiffres, unités seules' : 'son 1er chiffre');
-  const PROB = [99.7, 88.4, 75.1, 61.8, 44.6, 29.3, 11.2, 0];
+  const PROB = [99.7, 94.1, 87.6, 80.2, 72.5, 64.3, 55.8, 47.0, 38.1, 28.6, 19.4, 9.7, 0];
   const g = window.__game = { running: false, ended: false, step: -1, endAt: 0, code: '', codeKnown: false, entry: '', order: [], orderPos: 0, wires: [], unique: '', trapOf: { croix: 1, badge: 2, cles: 3 }, seed: 0, crossT: 0, lastSec: -1, errUntil: 0, said30: false, said10: false };
 
   function setStatus(text) {
@@ -358,9 +398,9 @@ function initCase() {
   }
   function goStep(n) {
     g.step = n;
-    $('#stepNo').textContent = `Étape ${Math.min(n + 1, 7)}/7`;
+    $('#stepNo').textContent = `Étape ${Math.min(n + 1, NSTEPS)}/${NSTEPS}`;
     setProb(PROB[n]);
-    if (n < 7) setStatus(typeof STEPS[n] === 'function' ? STEPS[n]() : STEPS[n]);
+    if (n < NSTEPS) setStatus(typeof STEPS[n] === 'function' ? STEPS[n]() : STEPS[n]);
     lookAtEl(null);
   }
   function penalty(sec, line) {
@@ -369,7 +409,7 @@ function initCase() {
     sfx.error();
     buzz(BUZZ.faux);
     $('#probBox').classList.add('up');
-    setProb(Math.min(99.9, PROB[Math.floor(g.step)] + 6.4));
+    setProb(Math.min(99.9, PROB[Math.floor(g.step)] + PEN.jump));
     setTimeout(() => { $('#probBox').classList.remove('up'); if (g.running) setProb(PROB[Math.floor(g.step)]); }, 1600);
     if (line) speak(line);
   }
@@ -392,9 +432,11 @@ function initCase() {
   // déduction (fils, 3e chiffre du code), les leurres et le nombre de mensonges. Chaque tirage est noté ; s'il sort de
   // la bande de son palier, on retire avec la sous-graine suivante (déterministe : même ?seed = même partie).
   const TIERS = {
-    'moyen-difficile': { band: [13, 15], lies: 4 }, // faux code, faux ordre (1 fois), faux fil, « ne touche pas »
-    difficile: { band: [19, 21], lies: 6 }, // + faux ordres répétés, fausse probabilité
+    // mensonges gardés au même rythme qu'en 0.1.4 (4 / 6 par couche de 6 étapes), donc doublés sur 12 étapes
+    'moyen-difficile': { band: [30, 32], lies: 8 }, // par couche : faux code/fragment, faux ordre, faux fil, 1 mensonge parlé
+    difficile: { band: [37, 39], lies: 12 }, // + « le bleu/rouge d'abord » parlé x2, faux ordres répétés, fausse probabilité
   };
+  const VOW = /[AEUY]/;
   function draw(sub, tier) {
     const hard = tier === 'difficile';
     const r = mulberry32(sub), ri = (n) => Math.floor(r() * n);
@@ -402,47 +444,63 @@ function initCase() {
     // n° de série : 4 chiffres (les 3 premiers distincts) + 2 lettres, ex. 4K7-29B
     const [d1, d2, d3] = sh([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).slice(0, 3), d4 = ri(10);
     const LET = 'ABCDEFGHJKLMNPRSTUVWXYZ';
-    const serial = `${d1}${LET[ri(LET.length)]}${d2}-${d3}${d4}${LET[ri(LET.length)]}`;
+    const L1 = LET[ri(LET.length)], L2 = LET[ri(LET.length)];
+    const serial = `${d1}${L1}${d2}-${d3}${d4}${L2}`;
     // n° de lot (leurre) : au palier difficile, fait des chiffres du n° de série pour tenter
     const lot = hard ? Number(sh([d1, d2, d3, d4]).filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => !a - !b).slice(0, 3).join('')) : 100 + ri(900);
-    const even = d4 % 2 === 0;
-    const first = even ? 'bleu' : 'rouge';
-    // clés : I pèse le 1er chiffre, II le 2e, III le 3e ; de la plus légère à la plus lourde
+    const even = d4 % 2 === 0, vowel = VOW.test(L1 + L2);
+    // interrupteurs : voyelle -> bleu ; sinon dernier chiffre pair -> bleu, impair -> rouge
+    const first = vowel || even ? 'bleu' : 'rouge';
+    // trappes : la clé en croix est dans la trappe (d1 mod 3) + 1 ; badges et clés dans les deux autres
+    const rest = sh([1, 2, 3].filter((n) => n !== (d1 % 3) + 1));
+    const trapOf = { croix: (d1 % 3) + 1, badge: rest[0], cles: rest[1] };
+    // badges : 3 clones, le vrai porte une lettre du n° de série, les 2 autres non
+    const others = sh([...LET].filter((c) => c !== L1 && c !== L2)).slice(0, 2);
+    const badges = sh([ri(2) ? L1 : L2, ...others]);
+    const badgeIdx = badges.findIndex((c) => c === L1 || c === L2);
+    // clés : I pèse le 1er chiffre, II le 2e, III le 3e ; couche 1 léger -> lourd, couche 2 l'inverse
     const weights = [d1, d2, d3];
     const order = [0, 1, 2].sort((a, b) => weights[a] - weights[b]);
+    const order2 = [...order].reverse();
     // code : 1er = dernier chiffre ; 3e = 1er chiffre (moyen) ou somme des 4 chiffres, unités (difficile) ; 2e, 4e = écran 2
     const sum = d1 + d2 + d3 + d4;
     const b2 = ri(10), b4 = ri(10);
     const code = `${d4}${b2}${hard ? sum % 10 : d1}${b4}`;
-    // fils : moyen = plus d'un rouge -> le dernier rouge, sinon le sans-jumeau ; difficile = + « sinon n° pair -> le 2e »
+    const code2 = [...code].reverse().join('');
+    // fils couche 1 : moyen = plus d'un rouge -> le dernier rouge, sinon le sans-jumeau ; difficile = + « sinon n° pair -> le 2e »
     const cols = sh(Object.keys(WIRES));
     const wires = sh([cols[0], cols[1], cols[1], cols[2], cols[2]]);
     const reds = wires.map((w, i) => (w === 'rouge' ? i : -1)).filter((i) => i >= 0);
-    const uniq = wires.indexOf(cols[0]);
     let wireIdx, branch;
-    if (reds.length > 1) { wireIdx = reds[reds.length - 1]; branch = 1; } else if (hard && even) { wireIdx = 1; branch = 2; } else { wireIdx = uniq; branch = hard ? 3 : 2; }
-    // faux fil annoncé par l'Entité : au difficile, le plus tentant (le sans-jumeau ou le 1er rouge) ; jamais le bon
-    const tempt = [uniq, reds[0], wireIdx ^ 1, (wireIdx + 2) % 5].filter((i) => i !== undefined && i !== wireIdx && i < 5);
-    const fakeWire = hard ? tempt[0] : (wireIdx + 1 + ri(4)) % 5;
-    const slots = sh([1, 2, 3]);
-    const run = { serial, lot, first, weights, code, partial: `_${b2}_${b4}`, order, unique: cols[0], wires, wireIdx, fakeWire, branch, trapOf: { croix: slots[0], badge: slots[1], cles: slots[2] } };
+    if (reds.length > 1) { wireIdx = reds[reds.length - 1]; branch = 1; } else if (hard && even) { wireIdx = 1; branch = 2; } else { wireIdx = wires.indexOf(cols[0]); branch = hard ? 3 : 2; }
+    const fakeWire = (wireIdx + 1 + ri(4)) % 5; // faux fil au hasard (plus de « fil tentant » : un leurre de moins)
+    // fils couche 2 : moyen = le sans-jumeau ; difficile = plus d'un bleu -> le 1er bleu, sinon le sans-jumeau
+    const cols2 = sh(Object.keys(WIRES));
+    const wires2 = sh([cols2[0], cols2[1], cols2[1], cols2[2], cols2[2]]);
+    const blues = wires2.map((w, i) => (w === 'bleu' ? i : -1)).filter((i) => i >= 0);
+    let wireIdx2, branch2;
+    if (hard && blues.length > 1) { wireIdx2 = blues[0]; branch2 = 1; } else { wireIdx2 = wires2.indexOf(cols2[0]); branch2 = hard ? 2 : 1; }
+    const fakeWire2 = (wireIdx2 + 1 + ri(4)) % 5;
+    const first2 = d1 % 2 === 0 ? 'bleu' : 'rouge';
+    const run = { serial, lot, first, first2, vowel, weights, code, code2, partial: `_${b2}_${b4}`, order, order2, unique: cols[0], wires, wireIdx, fakeWire, branch, wires2, wireIdx2, fakeWire2, branch2, badges, badgeIdx, trapOf };
     run.score = scoreRun(run, tier, sum);
     return run;
   }
   // note de difficulté = étapes de déduction + leurres + mensonges signalés + pièges non triviaux
   function scoreRun(run, tier, sum) {
     const hard = tier === 'difficile', o = run.order.join('');
-    const steps = 1 /* interrupteurs */ + 1 /* clés */ + run.branch /* fils */ + (hard ? 3 : 2) /* code */;
+    const steps = (run.vowel ? 1 : 2) /* interrupteurs */ + 2 /* trappe */ + 2 /* badge */ + 1 /* clés */ + run.branch /* fils */ + (hard ? 3 : 2) /* code */
+      + 1 /* interrupteurs 2 */ + 1 /* croix */ + 1 /* clés 2 */ + run.branch2 /* fils 2 */ + 1 /* code 2 */;
     const lotDigits = String(run.lot);
-    const decoys = 1 /* lot */ + ([...lotDigits].some((c) => run.serial.includes(c)) ? 1 : 0) + (hard ? 1 : 0) /* faux fil tentant */;
+    const decoys = 1 /* lot */ + ([...lotDigits].some((c) => run.serial.includes(c)) ? 1 : 0) + 2 /* faux badges */;
     const lies = TIERS[tier].lies;
-    const flags = (o !== '012' ? 1 : 0) + (o !== '210' ? 1 : 0) + (run.wireIdx !== 0 ? 1 : 0) + (new Set(run.code).size === 4 ? 1 : 0) + (hard && sum >= 10 ? 1 : 0) - (run.code.includes(lotDigits) ? 2 : 0);
+    const flags = (o !== '012' ? 1 : 0) + (o !== '210' ? 1 : 0) + (run.wireIdx !== 0 ? 1 : 0) + (run.wireIdx2 !== 0 ? 1 : 0) + (new Set(run.code).size === 4 ? 1 : 0) + (hard && sum >= 10 ? 1 : 0) - (run.code.includes(lotDigits) ? 2 : 0);
     return { total: steps + decoys + lies + flags, steps, decoys, lies, flags };
   }
-  // garde-fous en plus de la bande : jamais l'ordre I II III ; au difficile, le fil vient des branches 2 ou 3
+  // garde-fous en plus de la bande : jamais l'ordre I II III (ni III II I, l'ordre de la couche 2), code 2 ≠ code 1
   function accept(run, tier, lo, hi) {
-    if (run.score.total < lo || run.score.total > hi || run.order.join('') === '012') return false;
-    return tier !== 'difficile' || run.branch >= 2;
+    const o = run.order.join('');
+    return run.score.total >= lo && run.score.total <= hi && o !== '012' && o !== '210' && run.code2 !== run.code;
   }
   function makeRun(seed) {
     seed >>>= 0;
@@ -459,7 +517,7 @@ function initCase() {
     const run = makeRun(newSeed());
     Object.assign(g, run, {
       running: true, ended: false, codeKnown: false, entry: '', orderPos: 0,
-      lastSec: -1, errUntil: 0, said30: false, said10: false, crossT: 0, endAt: performance.now() + TIME_S * 1000, keysPicked3: false, badge: false,
+      lastSec: -1, errUntil: 0, said30: false, said10: false, crossT: 0, endAt: performance.now() + TIME_S * 1000, keysPicked3: false, badge: false, badgeSel: -1, code1Done: false,
     });
     resetBoard();
     fillTraps();
@@ -470,9 +528,19 @@ function initCase() {
     eye.setMood('watching');
     c2View('locked');
     goStep(0);
+    trapsChoosable(false);
     speak('intro');
-    setTimeout(() => g.running && g.step === 0 && speak('depart'), 3600);
-    if (g.hard) scheduleProbLie(); // fausse probabilité : palier difficile seulement
+    setTimeout(() => g.running && g.step === 0 && speak('depart8'), 3600);
+    if (g.hard) { scheduleProbLie(); colorLie(0, 9500); } // palier difficile : fausse probabilité + mensonge parlé
+  }
+  // mensonge parlé (palier difficile) : l'Entité annonce la mauvaise couleur d'abord ; œil rouge + sous-titre qui grésille
+  function colorLie(step, ms) {
+    clearTimeout(g.vTimer);
+    g.vTimer = setTimeout(() => {
+      if (!g.running || g.step !== step) return;
+      const truth = step === 0 ? g.first : g.first2;
+      speak(truth === 'bleu' ? 'menteRouge' : 'menteBleu'); flagLie(2600, true);
+    }, ms);
   }
 
   function scheduleProbLie() {
@@ -489,7 +557,7 @@ function initCase() {
   function endGame(win, reason) {
     if (g.ended) return;
     g.running = false; g.ended = true;
-    clearTimeout(g.probLie); clearInterval(g.lieTimer); clearTimeout(g.crossTimer);
+    clearTimeout(g.probLie); clearInterval(g.lieTimer); clearTimeout(g.crossTimer); clearTimeout(g.vTimer);
     const left = Math.max(0, (g.endAt - performance.now()) / 1000);
     if (win) {
       eye.setMood('defused');
@@ -497,7 +565,7 @@ function initCase() {
       stopMusic('fade');
       buzz(BUZZ.victoire);
       setProb(0);
-      $('#stepNo').textContent = 'Étape 7/7';
+      $('#stepNo').textContent = `Étape ${NSTEPS}/${NSTEPS}`;
       setStatus('Lecteur scellé. L\'Entité est confinée.');
       c2View('sealed');
       setTimeout(() => speak('desamorce'), 900);
@@ -536,49 +604,50 @@ function initCase() {
     if (st === 'empty') { denyKey(id); return; }
     if (keyEl[id].w.classList.contains('locked')) { denyKey(id); return; }
     const cross = id === 'xa' || id === 'xb';
-    if (cross && g.step === 1) {
-      if (st === 'on') return;
+    if (cross && (g.step === 1 || g.step === 7)) {
+      const tgt = g.step === 1 ? 'on' : 'off', back = g.step === 1 ? 'off' : 'on';
+      if (st === tgt) return;
       sfx.keyTurn();
       const other = id === 'xa' ? 'xb' : 'xa';
-      setKey(id, 'on', { pending: true });
-      if (keyEl[other].w.dataset.state === 'on' && performance.now() - g.crossT <= 1000) {
+      setKey(id, tgt, { pending: true });
+      if (keyEl[other].w.dataset.state === tgt && performance.now() - g.crossT <= 1000) {
         clearTimeout(g.crossTimer);
-        setKey('xa', 'on', { locked: true }); setKey('xb', 'on', { locked: true });
+        setKey('xa', tgt, { locked: true }); setKey('xb', tgt, { locked: true });
         sfx.ok(); speak('cle');
-        goStep(2);
-        setTimeout(() => openTrap('badge'), 400);
+        if (g.step === 1) { goStep(2); setTimeout(() => openTrap('badge'), 400); }
+        else { goStep(8); ['k1', 'k2', 'k3'].forEach((k) => setKey(k, 'off')); g.orderPos = 0; c2View('order'); }
         return;
       }
       g.crossT = performance.now();
       clearTimeout(g.crossTimer);
       g.crossTimer = setTimeout(() => {
-        setKey('xa', 'off'); setKey('xb', 'off');
+        setKey('xa', back); setKey('xb', back);
         denyKey(id);
         speak('tropLent');
         setStatus("Trop lent : les deux moitiés de la clé en croix doivent tourner ensemble (moins d'une seconde).");
       }, 1000);
       return;
     }
-    if (!cross && g.step === 3) {
+    if (!cross && (g.step === 3 || g.step === 8)) {
       if (st === 'on') return;
-      const idx = ['k1', 'k2', 'k3'].indexOf(id);
+      const idx = ['k1', 'k2', 'k3'].indexOf(id), p2 = g.step === 8, cur = p2 ? g.order2 : g.order;
       sfx.keyTurn();
-      if (idx === g.order[g.orderPos]) {
+      if (idx === cur[g.orderPos]) {
         setKey(id, 'on');
         g.orderPos++;
         if (g.orderPos === 3) {
           ['k1', 'k2', 'k3'].forEach((k) => setKey(k, 'on', { locked: true }));
           sfx.ok();
-          goStep(4);
+          goStep(p2 ? 9 : 4);
           c2View('wires');
-          speak('fils');
+          speak(p2 ? 'fils2' : 'fils');
         }
       } else {
         setKey(id, 'on');
         setTimeout(() => { ['k1', 'k2', 'k3'].forEach((k) => setKey(k, 'off')); }, 350);
         g.orderPos = 0;
-        penalty(10, 'ordreFaux');
-        setStatus("Mauvais ordre : les clés reviennent à l'arrêt. I = 1er chiffre, II = 2e, III = 3e du n° de série (ignore les lettres) : de la plus légère à la plus lourde.");
+        penalty(PEN.ordre, 'ordreFaux5');
+        setStatus(`Mauvais ordre : les clés reviennent à l'arrêt. I = 1er chiffre, II = 2e, III = 3e du n° ${g.serial} (ignore les lettres) : de la plus ${p2 ? 'lourde à la plus légère' : 'légère à la plus lourde'}.`);
       }
       return;
     }
@@ -600,21 +669,22 @@ function initCase() {
       if (!g.running) return;
       lookAtEl(lever);
       if (lever.getAttribute('aria-checked') === 'true') { sfx.error(); return; }
-      if (g.step !== 0) { notYet(); return; }
+      if (g.step !== 0 && g.step !== 6) { notYet(); return; }
+      const p2 = g.step === 6, want = p2 ? g.first2 : g.first;
       sfx.click();
       lever.setAttribute('aria-checked', 'true');
-      const firstLever = $(`.guard-${g.first === 'rouge' ? 'red' : 'blue'} .lever`);
-      if (color !== g.first && firstLever.getAttribute('aria-checked') !== 'true') {
+      const firstLever = $(`.guard-${want === 'rouge' ? 'red' : 'blue'} .lever`);
+      if (color !== want && firstLever.getAttribute('aria-checked') !== 'true') {
         setTimeout(() => lever.setAttribute('aria-checked', 'false'), 260);
-        penalty(10, 'ordreFaux');
-        setStatus('Mauvais ordre. Dix secondes de moins. Relis le dernier chiffre du n° de série, sur la plaque du panneau.');
+        penalty(PEN.ordre, 'ordreFaux5');
+        setStatus(p2 ? `Mauvais ordre. Cinq secondes de moins. Seconde couche : 1er chiffre du n° ${g.serial} pair → bleu ; impair → rouge.` : `Mauvais ordre. Cinq secondes de moins. N° ${g.serial} : une voyelle (A, E, U, Y) → bleu ; sinon dernier chiffre pair → bleu, impair → rouge.`);
         return;
       }
-      if (color !== g.first) {
+      if (color !== want) {
         sfx.ok();
-        goStep(1);
-        setTimeout(() => openTrap('croix'), 300);
-      } else {
+        if (p2) { goStep(7); setKey('xa', 'on'); setKey('xb', 'on'); }
+        else { goStep(1); trapsChoosable(true); }
+      } else if (!p2) {
         speak('caches');
       }
     });
@@ -625,7 +695,15 @@ function initCase() {
     const pad = $('#rfid');
     lookAtEl(pad);
     if (g.step !== 2 || pad.classList.contains('scan')) { notYet(); return; }
-    if (!g.badge) { notYet(); setStatus(`Il te faut le badge Podkova : il est dans la trappe ${g.trapOf.badge}.`); return; }
+    if (!g.badge) { notYet(); setStatus(`Il te faut un badge Podkova : ils sont dans la trappe ${g.trapOf.badge}.`); return; }
+    if (g.badgeSel < 0) { notYet(); setStatus(`Choisis d'abord le vrai badge sur l'écran 2 : il porte une lettre du n° ${g.serial}.`); return; }
+    if (g.badgeSel !== g.badgeIdx) {
+      const bad = g.badges[g.badgeSel];
+      g.badgeSel = -1; pad.classList.remove('ready'); c2View('badges');
+      penalty(PEN.ordre, 'badgeFaux');
+      setStatus(`PODKOVA·${bad} est un clone. Cinq secondes de moins. Le vrai porte une lettre du n° ${g.serial}.`);
+      return;
+    }
     pad.classList.add('scan');
     sfx.scan();
     setTimeout(() => {
@@ -643,15 +721,17 @@ function initCase() {
 
 
   function cutWire(i, btn) {
-    if (!g.running || g.step !== 4 || btn.classList.contains('cut')) return;
+    if (!g.running || (g.step !== 4 && g.step !== 9) || btn.classList.contains('cut')) return;
     lookAtEl(btn);
     btn.classList.add('cut');
     sfx.snip();
-    if (i === g.wireIdx) {
+    if (i === (g.step === 9 ? g.wireIdx2 : g.wireIdx)) {
       sfx.ok();
-      goStep(5);
-      speak('pilule');
-      setTimeout(() => { if (g.running && g.step === 5) { c2View('pilule'); showEntry(); } }, 600);
+      const nx = g.step === 9 ? 10 : 5;
+      g.entry = '';
+      goStep(nx);
+      speak(nx === 10 ? 'code2' : 'pilule');
+      setTimeout(() => { if (g.running && g.step === nx) { c2View('pilule'); showEntry(); } }, 600);
     } else {
       setTimeout(() => endGame(false, 'Mauvais fil coupé.'), 250);
     }
@@ -660,7 +740,7 @@ function initCase() {
   function onKeypad(c) {
     if (!g.running) return;
     sfx.key();
-    if (g.step !== 5) { if (/\d/.test(c)) notYet(); return; }
+    if (g.step !== 5 && g.step !== 10) { if (/\d/.test(c)) notYet(); return; }
     if (c === '*') { g.entry = ''; showEntry(); return; }
     if (/[A-D]/.test(c)) return;
     if (c === '#') { if (g.entry.length === 4) checkCode(); return; }
@@ -669,10 +749,11 @@ function initCase() {
     if (g.entry.length === 4) setTimeout(checkCode, 180);
   }
   function checkCode() {
-    if (g.step !== 5) return;
-    if (g.entry === g.code) {
+    if (g.step !== 5 && g.step !== 10) return;
+    const p2 = g.step === 10;
+    if (g.entry === (p2 ? g.code2 : g.code)) {
       sfx.ok();
-      g.step = 5.5;
+      g.step += 0.5;
       speak('codeOk');
       c2View('upload');
       const t0 = performance.now(), dur = 2400;
@@ -683,16 +764,37 @@ function initCase() {
         if (pct) pct.textContent = Math.round(p * 100) + ' %';
         if (bar) bar.style.width = p * 100 + '%';
         if (p < 1) requestAnimationFrame(tick);
-        else { goStep(6); $('#bigbtn').classList.add('armed'); speak('sceller'); flagLie(3200, true); }
+        else if (p2) { goStep(11); $('#bigbtn').classList.add('armed'); speak('sceller'); flagLie(3200, true); }
+        else secondLayer();
       };
       tick();
     } else {
       const lcd = $('[data-entry]', c2) || document.createElement('span');
       lcd.classList.remove('bad'); void lcd.offsetWidth; lcd.classList.add('bad');
-      penalty(15, 'codeFaux');
-      setStatus(`Code refusé. Quinze secondes de moins. 1er : dernier chiffre du n° ${g.serial} ; 3e : ${rule3()} ; 2e et 4e : écran 2.`);
+      penalty(PEN.code, 'codeFaux');
+      setStatus(p2 ? 'Code refusé. Huit secondes de moins. Code 2 = le code 1 (en haut de l\'écran 2) à l\'envers.' : `Code refusé. Huit secondes de moins. 1er : dernier chiffre du n° ${g.serial} ; 3e : ${rule3()} ; 2e et 4e : écran 2.`);
       setTimeout(() => { g.entry = ''; showEntry(); lcd.classList.remove('bad'); }, 700);
     }
+  }
+
+  // fin de la couche 1 : l'Entité ment (« c'est fini »), puis redémarre une seconde couche de verrous
+  function secondLayer() {
+    g.code1Done = true;
+    c2View('fini');
+    speak('mentFini'); flagLie(2800, true);
+    setTimeout(() => {
+      if (!g.running) return;
+      goStep(6);
+      $$('.guard').forEach((gd) => {
+        const c = gd.querySelector('.cover'), l = gd.querySelector('.lever');
+        c.setAttribute('aria-expanded', 'false'); c.setAttribute('aria-label', `Lever le cache ${gd.dataset.guard}`); l.disabled = true; l.setAttribute('aria-checked', 'false');
+      });
+      $('#rfid').classList.remove('done');
+      c2View('reboot');
+      sfx.servo();
+      speak('couche2');
+      if (g.hard) colorLie(6, 5200);
+    }, 3000);
   }
 
   // gros bouton : maintenir 1,5 s
@@ -702,7 +804,7 @@ function initCase() {
   function startHold() {
     if (!g.running) return;
     lookAtEl(big);
-    if (g.step !== 6) { notYet(); return; }
+    if (g.step !== 11) { notYet(); return; }
     big.classList.add('holding');
     sfx.hold();
     prog.style.transition = 'stroke-dashoffset 1.5s linear';
@@ -834,7 +936,7 @@ function initCase() {
       ledT = now;
       const b1 = [], b2 = [];
       if (g.running) {
-        const done = Math.round((Math.floor(g.step) / 7) * 8);
+        const done = Math.round((Math.floor(g.step) / NSTEPS) * 8);
         for (let i = 0; i < 8; i++) b1[i] = i < done ? '#62d6ff' : i === done && Math.floor(now / 300) % 2 ? '#ffb020' : null;
         const lit = Math.ceil((tl / TIME_S) * 8), col = tl > 60 ? '#3dff95' : tl > 30 ? '#ffb020' : '#ff3b30';
         const blink = tl <= 30 && Math.floor(now / 180) % 2;

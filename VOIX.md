@@ -37,6 +37,25 @@ Elle parle comme une machine qui a déjà calculé la suite. Pas de nom de film,
 | `secousse` | Explosion par secousse | Tu m'as secouée. Erreur fatale. |
 | `pasEncore` | (réserve) | Pas encore. |
 
+### Nouvelles répliques 0.1.5 (seconde couche)
+
+`depart8` et `ordreFaux5` remplacent `depart` (« Trois minutes ») et `ordreFaux` (« Dix secondes ») qui ne sont plus
+dites. Les répliques marquées *mensonge* s'affichent avec l'œil rouge et le sous-titre qui grésille.
+
+| id | Quand | Texte |
+|---|---|---|
+| `depart8` | 3,6 s après l'intro | Huit minutes. Deux couches de verrous. Quatre-vingt-dix-neuf virgule sept pour cent d'échec. |
+| `ordreFaux5` | Mauvais ordre (interrupteurs ou clés) | Mauvais ordre. Je t'ai menti. Cinq secondes de moins. |
+| `trappeVide` | Mauvaise trappe touchée (étape 2) | Vide. Je t'avais prévenu. |
+| `clones` | Badges pris : 3 clones à l'écran 2 | Trois Podkova. Un seul est vrai. |
+| `badgeFaux` | Faux badge présenté au lecteur | Un clone. Tu crois tout ce qu'on te montre. |
+| `mentFini` | Code 1 accepté (*mensonge*) | C'est fini. Tu as gagné. Pose la mallette. |
+| `couche2` | Début de la seconde couche | Tu croyais avoir fini ? Je redémarre une seconde couche de verrous. |
+| `menteBleu` | Palier difficile, interrupteurs (*mensonge*, quand c'est le rouge d'abord) | Le bleu d'abord. Crois-moi. |
+| `menteRouge` | Palier difficile, interrupteurs (*mensonge*, quand c'est le bleu d'abord) | Le rouge d'abord. Crois-moi. |
+| `fils2` | Second panneau de fils | Un second panneau. Une autre règle. |
+| `code2` | Code 2 à taper | Le code, encore. Tu t'en souviens ? |
+
 ## Signature sonore
 
 L'Entité a une signature : un grondement grave (deux dents de scie à 55 et 82 Hz, filtre passe-bande 260-640 Hz)

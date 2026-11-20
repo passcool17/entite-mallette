@@ -232,6 +232,16 @@ svg { display: block; }
 .trap-n { position: absolute; left: 50%; top: 50%; translate: -50% -50%; font: 500 max(10px, calc(3.4 * var(--mm))) var(--mono); letter-spacing: 0.16em; color: rgb(220 233 244 / 0.45); }
 .trap-screw { position: absolute; top: 4px; width: 5px; height: 5px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #bfc8cf, #3d454c); }
 .trap-screw:first-child { left: 4px; } .trap-screw:nth-child(2) { right: 4px; }
+/* 0.1.5 : trappe à déduire (étape 2) et clones Podkova sur l'écran 2 */
+.trap-pick { position: absolute; inset: 0; z-index: 2; border: 0; background: none; cursor: pointer; border-radius: 4px; }
+.trap-pick:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.traps.choose .trap:not(.taken) .trap-door { box-shadow: 0 0 0 2px rgb(98 214 255 / 0.55), 0 0 12px rgb(98 214 255 / 0.35); }
+.trap.deny .trap-door { animation: deny 0.35s; }
+.badges { display: grid; gap: 3px; flex: 1; align-content: center; }
+.badge { border: 1px solid rgb(98 214 255 / 0.45); border-radius: 3px; background: rgb(14 42 58 / 0.8); color: #dce9f4; font: 500 max(9px, calc(2.8 * var(--mm))) var(--mono); letter-spacing: 0.08em; padding: 1px 4px; cursor: pointer; }
+.badge[aria-pressed="true"] { background: #62d6ff; color: #061018; box-shadow: 0 0 10px rgb(98 214 255 / 0.8); }
+.loupe .badges { flex: none; gap: 6px; }
+.loupe .badge { min-height: 44px; font-size: 15px; }
 .trap.open .trap-door, .trap.taken .trap-door { transform: rotateX(-104deg); opacity: 0.3; }
 
 /* interrupteurs à cache */

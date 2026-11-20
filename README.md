@@ -6,7 +6,12 @@ Lien prévu : https://passcool17.github.io/entite-mallette/ (publié seulement a
 
 ## État
 
-Version 0.1.4 (locale, pas encore publiée ; la 0.1.3 est en ligne).
+Version 0.1.5 (locale, pas encore publiée ; la 0.1.4 est en ligne).
+
+- 0.1.5 : partie ~2x plus longue mais pas plus difficile : 12 étapes en deux couches de verrous, 8 minutes.
+  Le début demande maintenant de vraies déductions (interrupteurs à deux indices, trappe à trouver, vrai badge Podkova
+  parmi 3 clones). Moins de leurres et pénalités allégées (5 s / 8 s, +3,2 %) ; mensonges de l'Entité gardés au même
+  rythme (8 ou 12 par partie, toujours signalés par l'œil rouge). Voir « Règles 0.1.5 » plus bas.
 
 - 0.1.4 : plus difficile, par la réflexion : tout se déduit du n° de série et des écrans, l'Entité ment (œil qui
   grésille), 4 minutes. Un seul mode (pas de mode facile).
@@ -60,6 +65,26 @@ Version 0.1.4 (locale, pas encore publiée ; la 0.1.3 est en ligne).
 ## Séquence de désamorçage (ordre final)
 
 Minuterie : 4:00. Erreurs : -10 s (ordre) ou -15 s (code), et la probabilité d'échec remonte.
+
+### Règles 0.1.5 : deux couches, 12 étapes
+
+Couche 1
+1. Interrupteurs : n° avec une voyelle (A, E, U, Y) → bleu d'abord ; sinon dernier chiffre pair → bleu, impair → rouge.
+2. Clé en croix : trappe = (reste de 1er chiffre ÷ 3) + 1 (mauvaise trappe : vide, −5 s). Puis Croix A + B ensemble.
+3. Badges : 3 clones Podkova sur l'écran 2 (agrandi) ; le vrai porte une lettre du n° de série (clone : −5 s).
+4. Clés I-III : de la plus légère à la plus lourde (poids = 1er, 2e, 3e chiffre). Fragment de code noté.
+5. Fils : règle du palier (2 ou 3 cas). 6. Code 1 : comme en 0.1.4. L'Entité ment : « C'est fini. Tu as gagné. »
+
+Couche 2 (« je redémarre une seconde couche »)
+7. Interrupteurs : 1er chiffre pair → bleu d'abord ; impair → rouge. 8. Croix A + B ramenées à l'arrêt ensemble.
+9. Clés I-III à l'envers (de la plus lourde à la plus légère). 10. Fils, panneau 2 : moyen = le sans-jumeau ;
+   difficile = plus d'un bleu → le 1er bleu, sinon le sans-jumeau. 11. Code 2 = code 1 (affiché en haut de l'écran 2)
+   à l'envers. 12. Gros bouton (« Ne touche pas au bouton rouge » : mensonge signalé).
+
+Mensonges (œil rouge) : moyen 8 = par couche faux fragment/code, faux ordre, faux fil, 1 mensonge parlé ; difficile 12
+= + « Le bleu/rouge d'abord. Crois-moi. » à chaque couche, faux ordres répétés, fausse probabilité. Bandes de note :
+moyen 30–32, difficile 37–39 (`node tests/paliers.mjs`). Partie complète : `node tests/v015.mjs [base] [graine]`
+(`tests/v014.mjs` suit l'ancien déroulé 0.1.4 et ne s'applique plus).
 
 ### Règles à déduire (0.1.4, mode unique)
 
