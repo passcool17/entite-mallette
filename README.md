@@ -76,6 +76,12 @@ Les règles sont dans le texte d'étape ; aucune réponse n'est affichée telle 
 - **Mensonges** : l'écran 2 affiche parfois un faux code, un faux ordre ou un faux fil ; à chaque mensonge
   (et quand le % ment), l'œil et le CYD 1 grésillent en rouge. Ce qui s'affiche pendant le grésillement est faux.
 - Croix A et B : toujours à moins d'une seconde d'écart.
+- Le n° de série est aussi rappelé dans chaque texte d'étape qui s'en sert (la plaque peut être sous le pli).
+- Clés : on compte les **chiffres** du n° (les lettres sont ignorées). Le code part dès le 4e chiffre (pas de #).
+- Au gros bouton, l'Entité dit « Ne touche pas au bouton rouge » : c'est un mensonge, signalé (œil rouge + sous-titre
+  qui grésille).
+- Portrait : à l'étape des fils, l'écran 2 passe agrandi dans la zone de l'œil (5 fils de 44 px) et la page remonte,
+  pour voir la règle et les fils ensemble (si la zone de l'œil fait moins de 330 px : défilement jusqu'à l'écran 2).
 
 | # | Étape | Pièce | Ouvre | Échec |
 |---|---|---|---|---|

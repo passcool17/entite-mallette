@@ -223,7 +223,7 @@ function initCase() {
     ids.forEach((id) => setKey(id, 'off'));
     keyEl[ids[0]].btn.focus({ preventScroll: true });
     if (item === 'cles') { g.keysPicked3 = true; const sub = $('[data-sub]', c2); if (sub) sub.textContent = ''; }
-    setStatus(item === 'croix' ? 'Clés insérées. Tourne Croix A et Croix B ensemble, à moins d\'une seconde d\'écart (deux doigts, ou l\'une puis l\'autre très vite).' : 'Clés insérées. Chaque clé pèse un chiffre du n° de série (I = 1er, II = 2e, III = 3e) : tourne-les de la plus légère à la plus lourde.');
+    setStatus(item === 'croix' ? 'Clés insérées. Tourne Croix A et Croix B ensemble, à moins d\'une seconde d\'écart (deux doigts, ou l\'une puis l\'autre très vite).' : `Clés insérées. I = 1er chiffre, II = 2e chiffre, III = 3e chiffre du n° ${g.serial} (ignore les lettres) : tourne de la plus légère à la plus lourde.`);
   }
 
   // ---------- clavier ----------
@@ -246,7 +246,13 @@ function initCase() {
   const LOUPE = { wires: ['#cyd2'], pilule: ['#cyd2', '#keypad'] };
   const loupe = $('#loupe'), home = new Map();
   function applyLoupe() {
-    const want = landMQ.matches && g.running ? (LOUPE[g.c2] || []).map((sel) => $(sel)) : [];
+    // portrait : seulement les fils, si la zone de l'œil peut contenir les 5 fils de 44 px (sinon, défilement vers l'écran 2)
+    const portraitWires = !landMQ.matches && g.c2 === 'wires' && $('#stage').clientHeight >= 330;
+    const want = g.running && (landMQ.matches || portraitWires) ? (portraitWires ? ['#cyd2'] : LOUPE[g.c2] || []).map((sel) => $(sel)) : [];
+    if (g.running && g.c2 === 'wires' && !landMQ.matches) {
+      if (portraitWires) scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' }); // règle (barre d'étape) + fils visibles ensemble
+      else c2.scrollIntoView({ block: 'end', behavior: reduced ? 'auto' : 'smooth' });
+    }
     for (const [el, h] of home) {
       if (want.includes(el)) continue;
       h.ghost.replaceWith(el); home.delete(el);
@@ -303,11 +309,12 @@ function initCase() {
   function fakeCode() { let s; do { s = String(rand(10000)).padStart(4, '0'); } while (s === g.code); return s; }
   // l'Entité ment : son œil grésille (rouge, saccadé) tant que le faux texte est affiché
   let lieT = 0;
-  function flagLie(ms) {
-    const st = $('#stage'), p1 = $('[data-part="cyd1"]');
+  function flagLie(ms, caption = false) {
+    const st = $('#stage'), p1 = $('[data-part="cyd1"]'), cap = $('#caption');
     st.classList.add('liar'); p1.classList.add('liar');
+    if (caption) cap.classList.add('glitch'); // la réplique elle-même est un mensonge
     clearTimeout(lieT);
-    lieT = setTimeout(() => { st.classList.remove('liar'); p1.classList.remove('liar'); }, ms);
+    lieT = setTimeout(() => { st.classList.remove('liar'); p1.classList.remove('liar'); cap.classList.remove('glitch'); }, ms);
   }
   function glitchSwap(el, lie, truth, ms) {
     if (!el) return;
@@ -326,12 +333,12 @@ function initCase() {
 
   // ---------- état ----------
   const STEPS = [
-    () => `Lève les caches et bascule les 2 interrupteurs. Dernier chiffre du n° de série (plaque du panneau) pair : bleu d'abord ; impair : rouge d'abord.`,
+    () => `N° de série ${g.serial} (aussi sur la plaque) : dernier chiffre pair → bascule le bleu d'abord ; impair → le rouge d'abord. Lève les caches.`,
     () => `La trappe ${g.trapOf.croix} est ouverte : prends la clé en croix, puis tourne Croix A et Croix B ensemble.`,
     () => `La trappe ${g.trapOf.badge} est ouverte : prends le badge Podkova, puis présente-le au lecteur RFID.`,
     () => `La trappe ${g.trapOf.cles} est ouverte : prends les clés. Note le fragment de code de l'écran 2 : il servira.`,
-    "Règle des fils : plus d'un fil rouge → coupe le dernier rouge ; sinon, dernier chiffre du n° pair → le 2e fil ; sinon → le fil sans jumeau.",
-    'Code : 1er chiffre = dernier chiffre du n° de série ; 3e = somme des 4 chiffres du n°, unités seules ; 2e et 4e = fragment de l\'écran 2. Puis # pour valider.',
+    () => `Fils : plus d'un rouge → le dernier rouge ; sinon, dernier chiffre du n° ${g.serial} pair → le 2e ; sinon → le sans-jumeau.`,
+    () => `Code : 1er = dernier chiffre du n° ${g.serial} ; 3e = somme de ses 4 chiffres, unités seules ; 2e et 4e = fragment de l'écran 2. Il part dès le 4e chiffre.`,
     'Maintiens le gros bouton rouge pour sceller le lecteur 5D.',
   ];
   const PROB = [99.7, 88.4, 75.1, 61.8, 44.6, 29.3, 11.2, 0];
@@ -531,7 +538,7 @@ function initCase() {
         setTimeout(() => { ['k1', 'k2', 'k3'].forEach((k) => setKey(k, 'off')); }, 350);
         g.orderPos = 0;
         penalty(10, 'ordreFaux');
-        setStatus("Mauvais ordre : les clés reviennent à l'arrêt. I pèse le 1er chiffre du n° de série, II le 2e, III le 3e : de la plus légère à la plus lourde.");
+        setStatus("Mauvais ordre : les clés reviennent à l'arrêt. I = 1er chiffre, II = 2e, III = 3e du n° de série (ignore les lettres) : de la plus légère à la plus lourde.");
       }
       return;
     }
@@ -636,14 +643,14 @@ function initCase() {
         if (pct) pct.textContent = Math.round(p * 100) + ' %';
         if (bar) bar.style.width = p * 100 + '%';
         if (p < 1) requestAnimationFrame(tick);
-        else { goStep(6); $('#bigbtn').classList.add('armed'); speak('sceller'); }
+        else { goStep(6); $('#bigbtn').classList.add('armed'); speak('sceller'); flagLie(3200, true); }
       };
       tick();
     } else {
       const lcd = $('[data-entry]', c2) || document.createElement('span');
       lcd.classList.remove('bad'); void lcd.offsetWidth; lcd.classList.add('bad');
       penalty(15, 'codeFaux');
-      setStatus('Code refusé. Quinze secondes de moins. 1er chiffre : dernier du n° de série ; 3e : somme des 4 chiffres du n°, unités seules ; 2e et 4e : écran 2.');
+      setStatus(`Code refusé. Quinze secondes de moins. 1er : dernier chiffre du n° ${g.serial} ; 3e : somme de ses 4 chiffres, unités seules ; 2e et 4e : écran 2.`);
       setTimeout(() => { g.entry = ''; showEntry(); lcd.classList.remove('bad'); }, 700);
     }
   }
