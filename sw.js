@@ -1,0 +1,36 @@
+// sw.js : service worker versionné, écrit à la main. Changer VERSION à chaque publication.
+const VERSION = '0.1.0';
+const CACHE = `entite-mallette-${VERSION}`;
+const ASSETS = [
+  './', './index.html', './manifest.webmanifest',
+  './css/app.css?v=0.1.0', './js/app.js?v=0.1.0',
+  './js/eye.js', './js/eye-config.js', './js/panel-config.js', './js/audio.js', './js/voix.js',
+  './fonts/chakra-petch-latin-500-normal.woff2', './fonts/chakra-petch-latin-700-normal.woff2', './fonts/jetbrains-mono-latin-500-normal.woff2',
+  './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
+];
+
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
+});
+self.addEventListener('message', (e) => { if (e.data === 'SKIP_WAITING') self.skipWaiting(); });
+self.addEventListener('activate', (e) => {
+  e.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter((k) => k.startsWith('entite-mallette-') && k !== CACHE).map((k) => caches.delete(k)));
+    await self.clients.claim();
+  })());
+});
+self.addEventListener('fetch', (e) => {
+  const req = e.request;
+  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  if (req.mode === 'navigate') {
+    // page : réseau d'abord (nouvelle version visible), cache si hors ligne
+    e.respondWith(fetch(req).then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put('./index.html', copy)); return res; })
+      .catch(() => caches.match('./index.html')));
+    return;
+  }
+  e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+    if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
+    return res;
+  })));
+});

@@ -1,0 +1,4 @@
+# image de référence (photogramme de film) : usage interne, pas publiée
+ref/
+shots/comparaison-*.png
+node_modules/
