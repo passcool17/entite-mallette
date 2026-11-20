@@ -356,18 +356,22 @@ function initCase() {
   }
   function fakeCode() { let s; do { s = String(rand(10000)).padStart(4, '0'); } while (s === g.code || s === g.code2); return s; }
   // l'Entité ment : son œil grésille (rouge, saccadé) tant que le faux texte est affiché
-  let lieT = 0;
+  // un seul minuteur partagé, mais on ne le raccourcit jamais : l'œil reste rouge jusqu'à la fin du mensonge le plus long
+  let lieT = 0, lieUntil = 0;
   function flagLie(ms, caption = false) {
     const st = $('#stage'), p1 = $('[data-part="cyd1"]'), cap = $('#caption');
     st.classList.add('liar'); p1.classList.add('liar');
     if (caption) cap.classList.add('glitch'); // la réplique elle-même est un mensonge
+    const until = performance.now() + ms;
+    if (until <= lieUntil) return;
+    lieUntil = until;
     clearTimeout(lieT);
-    lieT = setTimeout(() => { st.classList.remove('liar'); p1.classList.remove('liar'); cap.classList.remove('glitch'); }, ms);
+    lieT = setTimeout(() => { lieUntil = 0; st.classList.remove('liar'); p1.classList.remove('liar'); cap.classList.remove('glitch'); }, ms);
   }
   function glitchSwap(el, lie, truth, ms) {
     if (!el) return;
     el.textContent = lie; el.classList.add('glitch');
-    flagLie(reduced ? Math.min(ms, 900) : ms);
+    flagLie((reduced ? Math.min(ms, 900) : ms) + 420); // + brouillage (6 x 60 ms) : rouge tant que le texte grésille
     const chars = '█▓▒░#%&@0123456789';
     const keep = (c) => c === ' ' || c === '·' || c === '\n';
     setTimeout(() => {

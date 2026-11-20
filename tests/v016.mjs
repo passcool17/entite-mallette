@@ -53,6 +53,7 @@ const results = [];
 const VP = (process.env.VP || '412x915').split('x').map(Number), land = VP[0] > VP[1];
 let shot = !land;
 for (const [tier, SEED] of Object.entries(seeds)) {
+  if (process.env.TIER && tier !== process.env.TIER) continue;
   if (land && tier !== 'difficile') continue;
   const ctx = await b.newContext({ viewport: { width: VP[0], height: VP[1] }, deviceScaleFactor: 2.625, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
   const p = await ctx.newPage();
@@ -64,6 +65,18 @@ for (const [tier, SEED] of Object.entries(seeds)) {
   const press = (id) => p.evaluate((k) => document.querySelector(`[data-key="${k}"] button`).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })), id);
   const liar = () => p.evaluate(() => ({ glitch: document.querySelector('#caption').classList.contains('glitch'), red: document.querySelector('#stage').classList.contains('liar') }));
   const readSeq = () => p.evaluate(() => document.querySelector('#cyd2 .seq').getAttribute('aria-label').replace('Suite : ', '').split(', ').map((c) => (c === 'case vide' ? null : c)));
+  // mensonge de l'ordre des clés : tant que le faux ordre est affiché, l'œil doit être rouge (stage.liar + filtre sur #eye)
+  const orderLie = () => p.evaluate(() => new Promise((res) => {
+    const out = { samples: 0, flagged: 0 }, t0 = performance.now();
+    const iv = setInterval(() => {
+      const big = document.querySelector('#cyd2 [data-big]');
+      if (big && big.classList.contains('glitch') && !/[█▓▒░]/.test(big.textContent)) {
+        out.samples++;
+        if (document.querySelector('#stage').classList.contains('liar') && getComputedStyle(document.querySelector('#eye')).filter !== 'none') out.flagged++;
+      }
+      if (performance.now() - t0 > 2600) { clearInterval(iv); out.ok = out.samples > 0 && out.flagged === out.samples; res(out); }
+    }, 50);
+  }));
   const clean = async (sel) => { await p.waitForFunction((x) => { const e = document.querySelector(x); return e && !e.classList.contains('glitch') && !/[█▓▒░]/.test(e.textContent); }, sel, { timeout: 8000 }); return text(sel); };
   const flip = async (first) => { for (const c of first === 'bleu' ? ['blue', 'red'] : ['red', 'blue']) { await p.tap(`.guard-${c} .cover`); await W(250); await p.tap(`.guard-${c} .lever`); await W(250); } };
   const S = {}, checks = { lies: {} };
@@ -71,14 +84,14 @@ for (const [tier, SEED] of Object.entries(seeds)) {
   // 1 suite
   checks.t1 = await text('#status');
   S.first = P.solveSeq(await readSeq()).val;
-  if (shot) await p.screenshot({ path: shots + `01-suite-interrupteurs-412-s${SEED}.png` });
+  if (shot && process.env.SHOTS) await p.screenshot({ path: shots + `01-suite-interrupteurs-412-s${SEED}.png` });
   await flip(S.first); await W(700);
   // 2 trappes
   checks.t2 = await text('#status');
   const rule = await text('#cyd2 .c2-center > .c2-msg');
   const stmts = await p.evaluate(() => [...document.querySelectorAll('#cyd2 [data-stmt]')].map((e) => e.textContent));
   S.croix = P.solveTraps(stmts.map(P.parseTrap), /DIT VRAI/.test(rule) ? 1 : 2);
-  if (shot) await p.screenshot({ path: shots + `02-trappes-cle-en-croix-412-s${SEED}.png` });
+  if (shot && process.env.SHOTS) await p.screenshot({ path: shots + `02-trappes-cle-en-croix-412-s${SEED}.png` });
   await p.tap(`.trap[data-trap="${S.croix}"] .trap-pick`); await W(900);
   await p.tap(`.trap[data-trap="${S.croix}"] .trap-key`); await W(300);
   await press('xa'); await press('xb'); await W(1300);
@@ -94,8 +107,10 @@ for (const [tier, SEED] of Object.entries(seeds)) {
   // 4 clés
   checks.t4 = await text('#status');
   await p.tap(`.trap[data-trap="${+checks.t4.match(/Trappe (\d)/)[1]}"] .trap-key`); await W(300);
-  await p.waitForFunction(() => window.__game.c2 === 'order', null, { timeout: 8000 }); await W(200);
-  checks.lies.ordre = await liar();
+  await p.waitForFunction(() => window.__game.c2 === 'order', null, { polling: 20, timeout: 8000 });
+  const lieP = orderLie(); await W(500);
+  if (shot) await p.screenshot({ path: shots + 'fix-ordre-liar.png' });
+  checks.ordreLie = await lieP;
   const clues = (await clean('#cyd2 [data-big]')).split('\n');
   S.order = P.solveKeys(clues.map(P.parseKeyClue));
   for (const i of S.order) await press('k' + (i + 1));
@@ -114,7 +129,7 @@ for (const [tier, SEED] of Object.entries(seeds)) {
   const head = (await text('#cyd2 [data-code]')).replace('BADGE ', '');
   const rev = /droite à gauche/.test(checks.t6);
   S.code = P.solveCode(head, await readGrid(), rev);
-  if (shot) await p.screenshot({ path: shots + `03-grille-code-412-s${SEED}.png` });
+  if (shot && process.env.SHOTS) await p.screenshot({ path: shots + `03-grille-code-412-s${SEED}.png` });
   if (land) await p.screenshot({ path: `/tmp/land-grille-s${SEED}.png` });
   checks.keys44 = await p.evaluate(() => [...document.querySelectorAll('.kp')].every((e) => { const r = e.getBoundingClientRect(); return r.width >= 36 && r.top >= 0 && r.bottom <= innerHeight; })); // 38 px + 3 px de marge tactile de chaque côté
   for (const c of S.code) await p.tap(`.kp:text-is("${c}")`);
@@ -127,7 +142,7 @@ for (const [tier, SEED] of Object.entries(seeds)) {
   await flip(S.first2); await W(500);
   await press('xa'); await press('xb'); await W(900);
   // 9 clés couche 2
-  checks.lies.ordre2 = await liar();
+  checks.ordreLie2 = await orderLie();
   const clues2 = (await clean('#cyd2 [data-big]')).split('\n');
   S.order2 = P.solveKeys(clues2.map(P.parseKeyClue));
   for (const i of S.order2) await press('k' + (i + 1));
@@ -151,4 +166,4 @@ for (const [tier, SEED] of Object.entries(seeds)) {
 }
 await b.close();
 console.log(JSON.stringify({ B: results }, null, 1));
-process.exit(fail.length || formula.length || results.some((r) => r.result !== 'win' || r.logs.length) ? 1 : 0);
+process.exit(fail.length || formula.length || results.some((r) => r.result !== 'win' || r.logs.length || !r.checks.ordreLie.ok || !r.checks.ordreLie2.ok) ? 1 : 0);
