@@ -1,5 +1,6 @@
 // audio.js : sons synthétisés (WebAudio) + voix de l'Entité routée dans un AnalyserNode pour animer l'œil.
 import { LINES, VOICE_LIST, voiceUrl } from './voix.js';
+import { takePreloaded, preloadedVoiceList, MUSIC_URL } from './preload.js';
 
 let ac = null, master, sfxBus, voiceBus, analyser, data, muted = false;
 let musicBus, musicDuck, musicLP, music = null, musicBuf = null, musicLoad = null;
@@ -201,9 +202,9 @@ function loadVoiceList() {
 }
 async function fetchVoiceList() {
   try {
-    const res = await fetch(VOICE_LIST, { cache: 'no-cache' });
-    if (!res.ok) return;
-    const data = await res.json();
+    // liste déjà lue par l'écran de chargement : on la réutilise
+    let data = await preloadedVoiceList();
+    if (!data) { const res = await fetch(VOICE_LIST, { cache: 'no-cache' }); if (!res.ok) return; data = await res.json(); }
     for (const id of data.files || []) if (LINES[id]) voiceAvail.add(id);
     // préchargement doux des premières répliques
     ['intro', 'depart'].forEach((id) => voiceAvail.has(id) && loadVoice(id).catch(() => voiceFailed.add(id)));
@@ -213,9 +214,8 @@ function loadVoice(id) {
   if (buffers.has(id)) return Promise.resolve(buffers.get(id));
   if (!loading.has(id)) {
     loading.set(id, (async () => {
-      const res = await fetch(voiceUrl(id));
-      if (!res.ok) throw new Error('voix absente');
-      const ab = await res.arrayBuffer();
+      let ab = await takePreloaded(voiceUrl(id));
+      if (!ab) { const res = await fetch(voiceUrl(id)); if (!res.ok) throw new Error('voix absente'); ab = await res.arrayBuffer(); }
       const buf = await ac.decodeAudioData(ab);
       buffers.set(id, buf);
       return buf;
@@ -234,13 +234,12 @@ export function stopVoice() { speakToken++; speaking = false; stopBed(); duck(fa
 
 // ---------- musique de tension ----------
 // Boucle MusicGen (audio/tension.mp3) + une couche synthétisée (basse pulsée) qui monte avec l'intensité.
-const MUSIC_URL = 'audio/tension.mp3';
 const MUSIC_VOL = 0.42;
 const MUSIC_LOOP_S = 16;
 export const musicStats = { etat: 'arret', fichier: false, intensite: 0, vitesse: 1, sousVoix: false };
 function loadMusic() {
   if (!musicLoad) {
-    musicLoad = fetch(MUSIC_URL).then((r) => { if (!r.ok) throw new Error('musique absente'); return r.arrayBuffer(); })
+    musicLoad = Promise.resolve(takePreloaded(MUSIC_URL)).then((ab) => ab || fetch(MUSIC_URL).then((r) => { if (!r.ok) throw new Error('musique absente'); return r.arrayBuffer(); }))
       .then((ab) => ac.decodeAudioData(ab)).then((b) => { musicBuf = b; return b; })
       .catch(() => { musicLoad = null; return null; });
   }

@@ -10,12 +10,89 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="preload" href="fonts/chakra-petch-latin-500-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="fonts/jetbrains-mono-latin-500-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/app.css?v=0.1.3">
+  <!-- Écran de chargement : CSS en ligne, visible dès le premier octet, avant la feuille de style, le JS, les polices et le SW -->
+  <style>
+    #boot { position: fixed; inset: 0; z-index: 1000; display: grid; place-content: center; justify-items: center; gap: 14px; padding: 24px;
+      background: radial-gradient(circle at 50% 40%, #04182a 0, #02070d 62%); color: #dce9f4; font: 500 15px/1.4 system-ui, sans-serif; text-align: center;
+      transition: opacity .35s ease-out; }
+    #boot.gone { opacity: 0; pointer-events: none; }
+    #boot[hidden] { display: none; }
+    .b-eye { position: relative; width: 132px; height: 132px; margin-bottom: 8px; }
+    .b-eye i { position: absolute; inset: 0; border-radius: 50%; border: 3px dotted #62d6ff; opacity: .85; animation: b-spin 6s linear infinite; }
+    .b-eye i:nth-child(2) { inset: 16px; border-width: 2px; opacity: .6; animation-duration: 4s; animation-direction: reverse; }
+    .b-eye i:nth-child(3) { inset: 32px; border-width: 4px; border-style: dotted; opacity: .9; animation-duration: 2.6s; }
+    .b-eye b { position: absolute; inset: 50px; border-radius: 50%; background: #000; box-shadow: 0 0 0 3px #0e3a55, 0 0 22px 6px rgb(98 214 255 / .55); animation: b-pulse 1.6s ease-in-out infinite; }
+    .b-title { margin: 0; font-size: 17px; letter-spacing: .04em; }
+    .b-bar { position: relative; width: min(78vw, 300px); height: 10px; border-radius: 6px; overflow: hidden;
+      background: radial-gradient(circle, rgb(98 214 255 / .22) 1.6px, transparent 2px) 0 50% / 8px 8px repeat-x, #031422; box-shadow: inset 0 0 0 1px rgb(98 214 255 / .25); }
+    .b-fill { position: absolute; inset: 0; transform-origin: 0 50%; transform: scaleX(0); transition: transform .3s ease-out;
+      background: radial-gradient(circle, #9ee8ff 1.8px, transparent 2.3px) 0 50% / 8px 8px repeat-x, rgb(98 214 255 / .35); box-shadow: 0 0 12px #62d6ff; }
+    .b-scan { position: absolute; top: 0; bottom: 0; width: 34%; background: linear-gradient(90deg, transparent, rgb(200 245 255 / .55), transparent); animation: b-scan 1.3s linear infinite; }
+    .b-pct { margin: 0; font: 500 22px/1 ui-monospace, monospace; color: #62d6ff; font-variant-numeric: tabular-nums; min-height: 22px; }
+    .b-sub { margin: 0; font-size: 13px; color: #8aa4b8; min-height: 18px; }
+    .b-err { margin: 0; color: #ffb3ab; max-width: 30ch; }
+    .b-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    .b-actions[hidden], .b-err[hidden] { display: none; }
+    .b-btn { min-height: 44px; padding: 0 18px; border-radius: 22px; border: 1px solid #62d6ff; background: rgb(98 214 255 / .12); color: #e9f8ff; font: inherit; cursor: pointer; }
+    .b-btn.alt { border-color: rgb(220 233 244 / .3); background: none; color: #b7c8d6; }
+    @keyframes b-spin { to { transform: rotate(1turn); } }
+    @keyframes b-pulse { 50% { transform: scale(.82); } }
+    @keyframes b-scan { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+    @media (prefers-reduced-motion: reduce) { .b-eye i { animation-duration: 30s; } .b-scan { animation-duration: 3s; } .b-eye b { animation: none; } }
+  </style>
+  <!-- feuille de style non bloquante (l'écran de chargement la recouvre) ; modules en parallèle au lieu d'une cascade -->
+  <link rel="stylesheet" href="css/app.css?v=0.1.3" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="css/app.css?v=0.1.3"></noscript>
+  <link rel="modulepreload" href="js/eye.js">
+  <link rel="modulepreload" href="js/eye-config.js">
+  <link rel="modulepreload" href="js/panel-config.js">
+  <link rel="modulepreload" href="js/audio.js">
+  <link rel="modulepreload" href="js/voix.js">
+  <link rel="modulepreload" href="js/preload.js">
   <script type="module" src="js/app.js?v=0.1.3"></script>
 </head>
 <body>
+  <div id="boot" aria-live="polite">
+    <div class="b-eye" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
+    <p class="b-title" id="bootTitle">Chargement de l'Entité…</p>
+    <div class="b-bar" id="bootBar" role="progressbar" aria-labelledby="bootTitle" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="b-fill" id="bootFill"></span><span class="b-scan"></span></div>
+    <p class="b-pct"><span id="bootPct">0</span> %</p>
+    <p class="b-sub" id="bootSub">code de la mallette</p>
+    <p class="b-err" id="bootErr" hidden></p>
+    <div class="b-actions" id="bootActions" hidden>
+      <button class="b-btn" id="bootRetry" type="button">Réessayer</button>
+      <button class="b-btn alt" id="bootSkip" type="button">Continuer sans</button>
+    </div>
+  </div>
+  <script>
+    // % réel en deux phases : code (CSS + modules, 15 %) mesuré par PerformanceObserver, puis médias (85 %) par preload.js
+    (function () {
+      var CODE_BYTES = 124711, $ = function (id) { return document.getElementById(id); };
+      var B = window.__boot = { code: 0, asset: 0, shown: 0, ready: false };
+      B.paint = function () {
+        var f = Math.min(1, B.code * 0.15 + B.asset * 0.85);
+        if (f < B.shown) f = B.shown; // jamais de recul
+        B.shown = f;
+        var p = Math.floor(f * 100);
+        $('bootPct').textContent = p; $('bootBar').setAttribute('aria-valuenow', p);
+        $('bootFill').style.transform = 'scaleX(' + f + ')';
+      };
+      B.problem = function (msg, canSkip) {
+        $('bootErr').textContent = msg; $('bootErr').hidden = false;
+        $('bootActions').hidden = false; $('bootSkip').hidden = !canSkip;
+      };
+      $('bootRetry').onclick = function () { location.reload(); }; // remplacé par app.js quand il est chargé
+      try {
+        var seen = 0;
+        new PerformanceObserver(function (list) {
+          list.getEntries().forEach(function (e) { if (/\/(css|js)\//.test(e.name)) seen += e.encodedBodySize || e.transferSize || 0; });
+          if (!B.ready) { B.code = Math.min(0.99, seen / CODE_BYTES); B.paint(); }
+        }).observe({ type: 'resource', buffered: true });
+      } catch (e) { /* vieux navigateur : l'animation suffit */ }
+      // le code n'arrive pas du tout (réseau coupé) : message + Réessayer
+      setTimeout(function () { if (!B.ready) B.problem('Le réseau est très lent ou coupé : le code de la mallette n\'arrive pas.', false); }, 25000);
+    })();
+  </script>
   <a class="skip" href="#case">Aller au panneau</a>
 
   <div class="app" id="app">

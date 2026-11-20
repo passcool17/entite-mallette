@@ -9,7 +9,8 @@ Lien prévu : https://passcool17.github.io/entite-mallette/ (publié seulement a
 Version 0.1.3 (locale, pas encore publiée ; la 0.1.2 est en ligne).
 
 - 0.1.3 : correctif paysage (téléphone couché, avec ou sans barres du navigateur) : panneau entier toujours visible,
-  fils et code agrandis dans une loupe, bouton son qui n'est plus coupé.
+  fils et code agrandis dans une loupe, bouton son qui n'est plus coupé. Écran de chargement avec vrai pourcentage,
+  et correction du blocage à la 1re visite (rechargement provoqué par le service worker).
 
 - 0.1.2 : musique de tension qui accélère avec le compte à rebours, parties tirées au sort (code, ordre des clés,
   bon fil, trappes) avec graine reproductible, vibrations (réglage à côté du son).
@@ -82,6 +83,27 @@ les textes d'étape suivent ces valeurs.
 Tant qu'une clé n'est pas ramassée dans sa trappe, sa serrure est vide et refuse le geste.
 Explosion : temps écoulé, mauvais fil ou secousse.
 
+## Chargement (0.1.3)
+
+- L'écran de chargement est en HTML/CSS dans `index.html` : il s'affiche dès le premier octet, avant la feuille de style,
+  le JS, les polices et le service worker. Anneaux de points cyan et balayage de la barre animés en continu (CSS,
+  sur le compositeur) : rien ne paraît figé même si le réseau cale ou si le JS calcule.
+- **Pourcentage réel**, en deux phases : code (CSS + modules, 15 %), mesuré en octets par `PerformanceObserver` ;
+  puis médias (85 %) : `audio/tension.mp3`, les voix listées dans `voix/voix.json` et les 3 polices, en octets reçus
+  (flux `fetch`) sur octets attendus (`Content-Length`). Le % ne recule jamais. `role="progressbar"` + `aria-valuenow`.
+- « Ouvrir la mallette » reste désactivé jusqu'à 100 %. Après 8 s : bouton « Ouvrir sans attendre » (le chargement
+  continue). Fichier en échec : message + **Réessayer** (ou jouer sans). Code qui n'arrive pas en 25 s : message + Réessayer.
+- Pas de double téléchargement : `js/preload.js` garde les fichiers, `audio.js` les reprend (décodage seulement au
+  toucher) ; le service worker précache les médias depuis le cache HTTP.
+- **Cause du « plus rien ne bouge » à la 1re visite** : le service worker s'installait pendant le chargement
+  (il re-téléchargeait tout, musique comprise, en concurrence), puis `clients.claim()` déclenchait `controllerchange`
+  et l'app **rechargeait la page** (prévu pour les mises à jour, pas pour la 1re visite). Ajoutez à ça une cascade de
+  modules JS (3 allers-retours) et une feuille de style bloquante. Corrigé : rechargement seulement s'il y avait déjà
+  un SW, SW enregistré après le préchargement, `modulepreload` pour les modules, CSS non bloquante derrière l'écran
+  de chargement, polices sorties du chemin critique.
+- Mesuré (`tests/v013-chargement.mjs`, contexte neuf, Fast 3G + CPU x4) : écran de chargement à 0,8 s, prêt à 5,0 s,
+  une seule navigation, musique et voix téléchargées une fois ; revisite prête en 1,3 s.
+
 ## Paysage sur téléphone (0.1.3)
 
 Testé à 915x412, 915x340 (barres du navigateur visibles) et 800x360.
@@ -111,7 +133,7 @@ zone utile 273 x 169 mm, base 83 mm, couvercle 17 mm, encombrement de chaque pi�
 
 - `index.html`, `css/app.css`, `js/app.js` (logique et panneau), `js/eye.js` (rendu), `js/eye-config.js` (tous les
   paramètres de l'œil), `js/panel-config.js` (cotes réelles), `js/audio.js`, `js/voix.js`, `sw.js`, `manifest.webmanifest`.
-- `tests/v013.mjs` (test léger 0.1.3 : paysage 915x412, 915x340, 800x360, toutes les étapes), `tests/v012.mjs` (test léger 0.1.2 : graine, indices, musique, vibrations, `?cyd=1`), `tests/v011.mjs` (test léger 0.1.1 : plein écran, voix fichier + repli, zones tactiles, paysage),
+- `tests/v013-chargement.mjs` (1re visite à froid en Fast 3G, revisite, échec + Réessayer), `tests/v013.mjs` (test léger 0.1.3 : paysage 915x412, 915x340, 800x360, toutes les étapes), `tests/v012.mjs` (test léger 0.1.2 : graine, indices, musique, vibrations, `?cyd=1`), `tests/v011.mjs` (test léger 0.1.1 : plein écran, voix fichier + repli, zones tactiles, paysage),
   `tests/voix-liste.mjs` (liste des voix), `tests/run.mjs` (test léger : séquence complète jusqu'à la victoire, console, captures), `tests/fps.mjs` (une mesure d'fps),
   `tests/eye.html` (œil seul, `?ref=1` = cadrage de la référence).
 - Polices auto-hébergées : Chakra Petch et JetBrains Mono (licence OFL, `fonts/OFL.txt`).

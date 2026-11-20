@@ -1,16 +1,20 @@
 // sw.js : service worker versionné, écrit à la main. Changer VERSION à chaque publication.
 const VERSION = '0.1.3';
 const CACHE = `entite-mallette-${VERSION}`;
+const MEDIA = ['./audio/tension.mp3', './fonts/chakra-petch-latin-500-normal.woff2', './fonts/chakra-petch-latin-700-normal.woff2', './fonts/jetbrains-mono-latin-500-normal.woff2'];
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
-  './css/app.css?v=0.1.3', './js/app.js?v=0.1.3', './voix/voix.json', './audio/tension.mp3',
-  './js/eye.js', './js/eye-config.js', './js/panel-config.js', './js/audio.js', './js/voix.js',
-  './fonts/chakra-petch-latin-500-normal.woff2', './fonts/chakra-petch-latin-700-normal.woff2', './fonts/jetbrains-mono-latin-500-normal.woff2',
+  './css/app.css?v=0.1.3', './js/app.js?v=0.1.3', './voix/voix.json',
+  './js/eye.js', './js/eye-config.js', './js/panel-config.js', './js/audio.js', './js/voix.js', './js/preload.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' })))));
+  // code : forcé depuis le réseau ; médias : cache HTTP accepté (déjà téléchargés par l'écran de chargement, pas de 2e téléchargement)
+  e.waitUntil(caches.open(CACHE).then((c) => Promise.all([
+    c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' }))),
+    c.addAll(MEDIA),
+  ])));
 });
 self.addEventListener('message', (e) => { if (e.data === 'SKIP_WAITING') self.skipWaiting(); });
 self.addEventListener('activate', (e) => {

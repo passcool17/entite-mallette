@@ -4,6 +4,7 @@ import { EYE, CYD, deepMerge } from './eye-config.js';
 import { LAYOUT } from './panel-config.js';
 import { initAudio, sfx, speak, voiceLevel, setMuted, isMuted, setCaptionHandler, stopVoice, voiceStats, startMusic, setMusicIntensity, stopMusic, musicStats } from './audio.js';
 window.__musique = musicStats;
+import { preloadAll } from './preload.js';
 window.__voix = voiceStats;
 
 const VERSION = '0.1.3';
@@ -27,12 +28,50 @@ function buzz(pattern) { if (canVibrate && vibeOn) { try { navigator.vibrate(pat
 const BUZZ = { faux: 70, boom: [500, 120, 300, 120, 700], victoire: [90, 90, 90] };
 const fmtPct = (v) => v.toFixed(1).replace('.', ',') + ' %';
 
-registerSW();
-if (q.has('cyd')) initCyd(); else initCase();
+if (q.has('cyd')) { bootDone(); registerSW(); initCyd(); } else initCase();
+
+// ================= Écran de chargement =================
+// Le cadre est dans index.html (visible avant tout JS) ; ici : pourcentage des médias, erreurs, fin.
+function bootDone() {
+  const el = document.getElementById('boot'), b = window.__boot;
+  if (b) { b.ready = true; b.code = 1; b.asset = 1; b.paint(); }
+  if (!el || el.hidden) return;
+  el.classList.add('gone');
+  setTimeout(() => { el.hidden = true; }, 380);
+}
+function runBoot(onReady) {
+  const b = window.__boot || { paint() {}, problem() {} };
+  b.ready = true; b.code = 1; b.paint();
+  const $id = (id) => document.getElementById(id), t0 = performance.now();
+  let finished = false;
+  const finish = () => { if (finished) return; finished = true; clearTimeout(slow); bootDone(); onReady(); };
+  const start = () => {
+    $id('bootErr').hidden = true; $id('bootActions').hidden = true; $id('bootSub').textContent = 'musique et voix';
+    preloadAll((f, done, n) => { b.asset = f; b.paint(); $id('bootSub').textContent = `musique, voix et polices · ${done}/${n}`; })
+      .then(({ failed }) => {
+        if (finished) return;
+        if (!failed.length) { finish(); return; }
+        $id('bootRetry').hidden = false;
+        b.problem(`${failed.length} fichier${failed.length > 1 ? 's' : ''} n'${failed.length > 1 ? 'ont' : 'a'} pas pu être chargé${failed.length > 1 ? 's' : ''}. Tu peux réessayer, ou jouer sans (voix du téléphone, sans musique).`, true);
+      });
+  };
+  $id('bootRetry').onclick = () => { b.asset = 0; b.shown = Math.min(b.shown, 0.15); start(); };
+  $id('bootSkip').onclick = finish;
+  // filet : après 8 s, on peut ouvrir sans attendre (le chargement continue en arrière-plan)
+  const slow = setTimeout(() => {
+    if (finished) return;
+    if ($id('bootActions').hidden) { $id('bootSkip').textContent = 'Ouvrir sans attendre'; b.problem('Réseau lent : le chargement continue.', true); $id('bootRetry').hidden = true; }
+  }, 8000);
+  start();
+  return () => performance.now() - t0;
+}
 
 // ================= Mallette =================
 function initCase() {
   $('#ver').textContent = VERSION;
+  $('#btnStart').disabled = true;
+  // le service worker ne s'installe qu'après le préchargement : il ne lui vole pas la bande passante
+  runBoot(() => { $('#btnStart').disabled = false; $('#btnStart').focus({ preventScroll: true }); registerSW(); });
   const eye = createEye($('#eye'), { config: deepMerge(EYE, { radiusOfMin: 0.25, center: { x: 0.5, y: 0.53 } }), reducedMotion: reduced });
   window.__eye = eye;
   eye.start();
@@ -768,7 +807,10 @@ function initCyd() {
 // ================= Service worker =================
 function registerSW() {
   if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
-  addEventListener('load', async () => {
+  // recharger seulement pour une MISE À JOUR (il y avait déjà un SW) ; à la 1re visite, clients.claim() déclenchait
+  // un controllerchange qui rechargeait la page au milieu du chargement (cause du « plus rien ne bouge »)
+  const hadController = !!navigator.serviceWorker.controller;
+  const go = async () => {
     try {
       const reg = await navigator.serviceWorker.register('./sw.js');
       reg.addEventListener('updatefound', () => {
@@ -777,9 +819,10 @@ function registerSW() {
       });
       let reloaded = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (reloaded || window.__game?.running) return;
+        if (!hadController || reloaded || window.__game?.running) return;
         reloaded = true; location.reload();
       });
     } catch { /* hors ligne non disponible */ }
-  });
+  };
+  if (document.readyState === 'complete') go(); else addEventListener('load', go, { once: true });
 }

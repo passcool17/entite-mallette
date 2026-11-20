@@ -323,6 +323,7 @@ svg { display: block; }
   background: linear-gradient(180deg, #8fe3ff, #45bff0); box-shadow: 0 6px 18px -6px rgb(69 191 240 / 0.7);
   transition: transform 0.15s var(--ease-out), box-shadow 0.15s;
 }
+.primary-btn:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
 .primary-btn:hover { box-shadow: 0 8px 24px -6px rgb(69 191 240 / 0.95); }
 .primary-btn:active { transform: translateY(1px) scale(0.99); }
 .end.lose .end-title { color: #ffd9d5; text-shadow: 0 0 24px rgb(255 59 48 / 0.6); }
