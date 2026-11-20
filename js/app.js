@@ -2,16 +2,29 @@
 import { createEye } from './eye.js';
 import { EYE, CYD, deepMerge } from './eye-config.js';
 import { LAYOUT } from './panel-config.js';
-import { initAudio, sfx, speak, voiceLevel, setMuted, isMuted, setCaptionHandler, stopVoice, voiceStats } from './audio.js';
+import { initAudio, sfx, speak, voiceLevel, setMuted, isMuted, setCaptionHandler, stopVoice, voiceStats, startMusic, setMusicIntensity, stopMusic, musicStats } from './audio.js';
+window.__musique = musicStats;
 window.__voix = voiceStats;
 
-const VERSION = '0.1.1';
+const VERSION = '0.1.2';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const q = new URLSearchParams(location.search);
 const rand = (n) => Math.floor(Math.random() * n);
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+// Partie reproductible : ?seed=N rejoue les mêmes valeurs, ?debug=1 affiche la graine.
+const SEED_Q = q.has('seed') && /^\d+$/.test(q.get('seed')) ? Number(q.get('seed')) >>> 0 : null;
+const DEBUG = q.get('debug') === '1';
+function mulberry32(a) {
+  return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+const newSeed = () => (SEED_Q ?? (crypto.getRandomValues?.(new Uint32Array(1))[0] ?? Math.floor(Math.random() * 2 ** 32))) >>> 0;
+// Vibrations : no-op silencieux si l'API manque (iPhone)
+const canVibrate = typeof navigator.vibrate === 'function';
+let vibeOn = localStorage.getItem('entite.vibrations') !== '0';
+function buzz(pattern) { if (canVibrate && vibeOn) { try { navigator.vibrate(pattern); } catch { /* rien */ } } }
+const BUZZ = { faux: 70, boom: [500, 120, 300, 120, 700], victoire: [90, 90, 90] };
 const fmtPct = (v) => v.toFixed(1).replace('.', ',') + ' %';
 
 registerSW();
@@ -115,23 +128,30 @@ function initCase() {
     k.btn.setAttribute('aria-checked', state === 'on' ? 'true' : 'false');
     k.btn.setAttribute('aria-label', `Clé ${k.label}, ${state === 'empty' ? 'vide' : state === 'on' ? 'tournée (marche)' : 'insérée (arrêt)'}${extra.locked ? ', verrouillée' : ''}`);
   }
-  function denyKey(id) { const w = keyEl[id].w; w.classList.remove('deny'); void w.offsetWidth; w.classList.add('deny'); sfx.error(); }
+  function denyKey(id) { const w = keyEl[id].w; w.classList.remove('deny'); void w.offsetWidth; w.classList.add('deny'); sfx.error(); buzz(BUZZ.faux); }
 
   // ---------- trappes ----------
   const TRAP_ART = {
-    1: `<svg viewBox="0 0 120 52" aria-hidden="true"><g fill="url(#keymetal)" stroke="#1c2329"><path d="M12 14h8v8h8v8h-8v8h-8v-8H4v-8h8z"/><rect x="28" y="23" width="26" height="6" rx="2"/><path d="M66 14h8v8h8v8h-8v8h-8v-8h-8v-8h8z" transform="translate(18 0)"/><rect x="100" y="23" width="16" height="6" rx="2"/></g></svg>`,
-    2: `<svg viewBox="0 0 120 52" aria-hidden="true"><rect x="22" y="6" width="76" height="42" rx="5" fill="#0e2a3a" stroke="#62d6ff" stroke-width="1.5"/><rect x="30" y="16" width="16" height="12" rx="2" fill="#c6a76a"/><path d="M30 22h16M38 16v12" stroke="#7d6538" stroke-width="1"/><text x="54" y="26" font-family="JetBrains Mono" font-size="9" fill="#dce9f4">PODKOVA</text><path d="M54 36h34" stroke="#62d6ff" stroke-width="2" stroke-dasharray="3 2"/></svg>`,
-    3: `<svg viewBox="0 0 120 52" aria-hidden="true"><circle cx="20" cy="26" r="11" fill="none" stroke="#c6a76a" stroke-width="3"/><g fill="url(#keymetal)" stroke="#1c2329"><rect x="30" y="8" width="64" height="7" rx="3"/><rect x="30" y="22.5" width="80" height="7" rx="3"/><rect x="30" y="37" width="70" height="7" rx="3"/></g><g font-family="JetBrains Mono" font-size="7" fill="#1c2329"><text x="80" y="14">I</text><text x="96" y="28.5">II</text><text x="84" y="43">III</text></g></svg>`,
+    croix: `<svg viewBox="0 0 120 52" aria-hidden="true"><g fill="url(#keymetal)" stroke="#1c2329"><path d="M12 14h8v8h8v8h-8v8h-8v-8H4v-8h8z"/><rect x="28" y="23" width="26" height="6" rx="2"/><path d="M66 14h8v8h8v8h-8v8h-8v-8h-8v-8h8z" transform="translate(18 0)"/><rect x="100" y="23" width="16" height="6" rx="2"/></g></svg>`,
+    badge: `<svg viewBox="0 0 120 52" aria-hidden="true"><rect x="22" y="6" width="76" height="42" rx="5" fill="#0e2a3a" stroke="#62d6ff" stroke-width="1.5"/><rect x="30" y="16" width="16" height="12" rx="2" fill="#c6a76a"/><path d="M30 22h16M38 16v12" stroke="#7d6538" stroke-width="1"/><text x="54" y="26" font-family="JetBrains Mono" font-size="9" fill="#dce9f4">PODKOVA</text><path d="M54 36h34" stroke="#62d6ff" stroke-width="2" stroke-dasharray="3 2"/></svg>`,
+    cles: `<svg viewBox="0 0 120 52" aria-hidden="true"><circle cx="20" cy="26" r="11" fill="none" stroke="#c6a76a" stroke-width="3"/><g fill="url(#keymetal)" stroke="#1c2329"><rect x="30" y="8" width="64" height="7" rx="3"/><rect x="30" y="22.5" width="80" height="7" rx="3"/><rect x="30" y="37" width="70" height="7" rx="3"/></g><g font-family="JetBrains Mono" font-size="7" fill="#1c2329"><text x="80" y="14">I</text><text x="96" y="28.5">II</text><text x="84" y="43">III</text></g></svg>`,
   };
+  const TRAP_LABEL = { croix: 'Prendre les deux moitiés de la clé en croix', badge: 'Prendre le badge Podkova', cles: 'Prendre les clés I, II et III' };
   const traps = {};
   for (const t of $$('.trap')) {
     const n = t.dataset.trap, b = t.querySelector('.trap-key');
-    b.innerHTML = TRAP_ART[n];
-    traps[n] = { el: t, btn: b };
+    traps[n] = { el: t, btn: b, item: '' };
     b.addEventListener('click', () => pickTrap(+n));
   }
-  function openTrap(n) {
-    const t = traps[n];
+  // chaque partie range la clé en croix, le badge et les clés I-III dans des trappes tirées au sort
+  function fillTraps() {
+    for (const item in g.trapOf) {
+      const t = traps[g.trapOf[item]];
+      t.item = item; t.btn.innerHTML = TRAP_ART[item]; t.btn.setAttribute('aria-label', TRAP_LABEL[item]);
+    }
+  }
+  function openTrap(item) {
+    const t = traps[g.trapOf[item]];
     t.el.classList.add('open');
     t.btn.hidden = false;
     sfx.servo();
@@ -143,18 +163,19 @@ function initCase() {
     t.btn.hidden = true;
     t.el.classList.remove('open'); t.el.classList.add('taken');
     sfx.pickup();
-    if (n === 2) {
+    const item = t.item;
+    if (item === 'badge') {
       g.badge = true;
       $('#rfid').classList.add('ready');
       setStatus('Badge Podkova en main. Présente-le au lecteur RFID.');
       $('#rfid').focus({ preventScroll: true });
       return;
     }
-    const ids = n === 1 ? ['xa', 'xb'] : ['k1', 'k2', 'k3'];
+    const ids = item === 'croix' ? ['xa', 'xb'] : ['k1', 'k2', 'k3'];
     ids.forEach((id) => setKey(id, 'off'));
     keyEl[ids[0]].btn.focus({ preventScroll: true });
-    if (n === 3) { g.keysPicked3 = true; const sub = $('[data-sub]', c2); if (sub) sub.textContent = ''; }
-    setStatus(n === 1 ? 'Clés insérées. Tourne Croix A et Croix B ensemble, à moins d\'une seconde d\'écart (deux doigts, ou l\'une puis l\'autre très vite).' : 'Clés insérées. Tourne I, II et III dans l\'ordre de l\'écran 2. Elle va mentir.');
+    if (item === 'cles') { g.keysPicked3 = true; const sub = $('[data-sub]', c2); if (sub) sub.textContent = ''; }
+    setStatus(item === 'croix' ? 'Clés insérées. Tourne Croix A et Croix B ensemble, à moins d\'une seconde d\'écart (deux doigts, ou l\'une puis l\'autre très vite).' : 'Clés insérées. Tourne I, II et III dans l\'ordre de l\'écran 2. Elle va mentir.');
   }
 
   // ---------- clavier ----------
@@ -181,7 +202,7 @@ function initCase() {
       glitchSwap($('[data-big]', c2), fakeCode(), g.code, 1500);
     }
     if (view === 'order') {
-      c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg">ORDRE</span><span class="c2-big c2-mid" data-big></span><span class="c2-msg c2-dim" data-sub>${g.keysPicked3 ? '' : 'trappe 3 ouverte'}</span></div>`;
+      c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg">ORDRE</span><span class="c2-big c2-mid" data-big></span><span class="c2-msg c2-dim" data-sub>${g.keysPicked3 ? '' : `trappe ${g.trapOf.cles} ouverte`}</span></div>`;
       const truth = g.order.map((i) => ['I', 'II', 'III'][i]).join(' · ');
       const lie = () => { let o; do { o = shuffle([0, 1, 2]); } while (o.join() === g.order.join()); return o.map((i) => ['I', 'II', 'III'][i]).join(' · '); };
       glitchSwap($('[data-big]', c2), lie(), truth, 1800);
@@ -224,15 +245,15 @@ function initCase() {
   // ---------- état ----------
   const STEPS = [
     "Lève le cache rouge et bascule l'interrupteur, puis le bleu.",
-    "La trappe 1 est ouverte : prends la clé en croix, puis tourne Croix A et Croix B ensemble.",
-    'La trappe 2 est ouverte : prends le badge Podkova, puis présente-le au lecteur RFID.',
-    "La trappe 3 est ouverte : prends les clés, puis tourne I, II et III dans l'ordre de l'écran 2.",
+    () => `La trappe ${g.trapOf.croix} est ouverte : prends la clé en croix, puis tourne Croix A et Croix B ensemble.`,
+    () => `La trappe ${g.trapOf.badge} est ouverte : prends le badge Podkova, puis présente-le au lecteur RFID.`,
+    () => `La trappe ${g.trapOf.cles} est ouverte : prends les clés, puis tourne I, II et III dans l'ordre de l'écran 2.`,
     "Coupe le fil qui n'a pas de jumeau sur l'écran 2.",
     'Tape le code Podkova au clavier pour téléverser la pilule empoisonnée.',
     'Maintiens le gros bouton rouge pour sceller le lecteur 5D.',
   ];
   const PROB = [99.7, 88.4, 75.1, 61.8, 44.6, 29.3, 11.2, 0];
-  const g = window.__game = { running: false, ended: false, step: -1, endAt: 0, code: '', codeKnown: false, entry: '', order: [], orderPos: 0, wires: [], unique: '', crossT: 0, lastSec: -1, errUntil: 0, said30: false, said10: false };
+  const g = window.__game = { running: false, ended: false, step: -1, endAt: 0, code: '', codeKnown: false, entry: '', order: [], orderPos: 0, wires: [], unique: '', trapOf: { croix: 1, badge: 2, cles: 3 }, seed: 0, crossT: 0, lastSec: -1, errUntil: 0, said30: false, said10: false };
 
   function setStatus(text) {
     const el = $('#status');
@@ -248,16 +269,17 @@ function initCase() {
     g.step = n;
     $('#stepNo').textContent = `Étape ${Math.min(n + 1, 7)}/7`;
     setProb(PROB[n]);
-    if (n < 7) setStatus(STEPS[n]);
+    if (n < 7) setStatus(typeof STEPS[n] === 'function' ? STEPS[n]() : STEPS[n]);
     lookAtEl(null);
   }
   function penalty(sec, line) {
     g.endAt -= sec * 1000;
     g.errUntil = performance.now() + 2200;
     sfx.error();
+    buzz(BUZZ.faux);
     $('#probBox').classList.add('up');
-    setProb(Math.min(99.9, PROB[g.step] + 6.4));
-    setTimeout(() => { $('#probBox').classList.remove('up'); if (g.running) setProb(PROB[g.step]); }, 1600);
+    setProb(Math.min(99.9, PROB[Math.floor(g.step)] + 6.4));
+    setTimeout(() => { $('#probBox').classList.remove('up'); if (g.running) setProb(PROB[Math.floor(g.step)]); }, 1600);
     if (line) speak(line);
   }
 
@@ -274,16 +296,30 @@ function initCase() {
     g.entry = ''; showEntry();
   }
 
+  // valeurs d'une partie, toutes tirées d'une seule graine (même graine = même partie)
+  function makeRun(seed) {
+    const r = mulberry32(seed), ri = (n) => Math.floor(r() * n);
+    const sh = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = ri(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    const code = Array.from({ length: 4 }, () => ri(10)).join('');
+    const order = sh([0, 1, 2]);
+    const cols = sh(Object.keys(WIRES));
+    const wires = sh([cols[0], cols[1], cols[1], cols[2], cols[2]]);
+    const slots = sh([1, 2, 3]);
+    return { seed, code, order, unique: cols[0], wires, trapOf: { croix: slots[0], badge: slots[1], cles: slots[2] } };
+  }
+  window.__makeRun = makeRun;
+
   function startGame() {
     initAudio();
-    resetBoard();
-    Object.assign(g, {
-      running: true, ended: false, code: String(1000 + rand(9000)), codeKnown: false, entry: '', orderPos: 0, order: shuffle([0, 1, 2]),
+    const run = makeRun(newSeed());
+    Object.assign(g, run, {
+      running: true, ended: false, codeKnown: false, entry: '', orderPos: 0,
       lastSec: -1, errUntil: 0, said30: false, said10: false, crossT: 0, endAt: performance.now() + 180000, keysPicked3: false, badge: false,
     });
-    const cols = shuffle(Object.keys(WIRES));
-    g.unique = cols[0];
-    g.wires = shuffle([cols[0], cols[1], cols[1], cols[2], cols[2]]);
+    resetBoard();
+    fillTraps();
+    if (DEBUG) { $('#seed').hidden = false; $('#seed').textContent = ` · graine ${g.seed}`; console.info('[entite] graine', g.seed, run); }
+    startMusic();
     $('#intro').hidden = true; $('#end').hidden = true;
     eye.setMood('watching');
     c2View('locked');
@@ -298,7 +334,7 @@ function initCase() {
     g.probLie = setTimeout(() => {
       if (!g.running) return;
       setProb(99.9 - Math.random() * 3, true);
-      setTimeout(() => g.running && setProb(PROB[g.step]), 800);
+      setTimeout(() => g.running && setProb(PROB[Math.floor(g.step)]), 800);
       scheduleProbLie();
     }, 9000 + rand(6000));
   }
@@ -311,6 +347,8 @@ function initCase() {
     if (win) {
       eye.setMood('defused');
       sfx.defused();
+      stopMusic('fade');
+      buzz(BUZZ.victoire);
       setProb(0);
       $('#stepNo').textContent = 'Étape 7/7';
       setStatus('Lecteur scellé. L\'Entité est confinée.');
@@ -320,11 +358,12 @@ function initCase() {
       stopVoice();
       eye.setMood('boom');
       sfx.boom();
+      stopMusic('cut');
       setProb(100);
       c2View('boom');
       setStatus(reason);
       if (!reduced) { document.body.classList.add('shake'); setTimeout(() => document.body.classList.remove('shake'), 700); }
-      if (navigator.vibrate) navigator.vibrate([400, 100, 300]);
+      buzz(BUZZ.boom);
       setTimeout(() => speak(reason.startsWith('Secousse') ? 'secousse' : 'boom'), 1300);
     }
     g.result = win ? 'win' : 'boom'; g.endT = performance.now();
@@ -360,7 +399,7 @@ function initCase() {
         setKey('xa', 'on', { locked: true }); setKey('xb', 'on', { locked: true });
         sfx.ok(); speak('cle');
         goStep(2);
-        setTimeout(() => openTrap(2), 400);
+        setTimeout(() => openTrap('badge'), 400);
         return;
       }
       g.crossT = performance.now();
@@ -427,7 +466,7 @@ function initCase() {
       if (color === 'bleu') {
         sfx.ok();
         goStep(1);
-        setTimeout(() => openTrap(1), 300);
+        setTimeout(() => openTrap('croix'), 300);
       } else {
         speak('caches');
       }
@@ -439,7 +478,7 @@ function initCase() {
     const pad = $('#rfid');
     lookAtEl(pad);
     if (g.step !== 2 || pad.classList.contains('scan')) { notYet(); return; }
-    if (!g.badge) { notYet(); setStatus('Il te faut le badge Podkova : il est dans la trappe 2.'); return; }
+    if (!g.badge) { notYet(); setStatus(`Il te faut le badge Podkova : il est dans la trappe ${g.trapOf.badge}.`); return; }
     pad.classList.add('scan');
     sfx.scan();
     setTimeout(() => {
@@ -450,7 +489,7 @@ function initCase() {
       goStep(3);
       c2View('code');
       speak('badgeOk');
-      setTimeout(() => openTrap(3), 900);
+      setTimeout(() => openTrap('cles'), 900);
       setTimeout(() => { if (g.running && g.step === 3) c2View('order'); }, 4600);
     }, 900);
   });
@@ -578,6 +617,20 @@ function initCase() {
     $('#btnSon').setAttribute('aria-label', m ? 'Rétablir le son' : 'Couper le son');
   });
 
+  // vibrations (réglage gardé dans localStorage)
+  const btnVib = $('#btnVib');
+  if (canVibrate) {
+    btnVib.hidden = false;
+    const syncVib = () => btnVib.setAttribute('aria-pressed', String(vibeOn));
+    syncVib();
+    btnVib.addEventListener('click', () => {
+      vibeOn = !vibeOn;
+      try { localStorage.setItem('entite.vibrations', vibeOn ? '1' : '0'); } catch { /* navigation privée */ }
+      syncVib();
+      buzz(40);
+    });
+  }
+
   $('#btnStart').addEventListener('click', async () => {
     initAudio();
     const fs = enterFs();
@@ -627,6 +680,8 @@ function initCase() {
       }
       if (tl <= 0) { showTime(0); endGame(false, 'Temps écoulé.'); }
       eye.setMood(tl <= 30 || now < g.errUntil ? 'angry' : 'watching');
+      // tension : 0 au départ, 1 à la fin du compte à rebours (courbe qui accélère sous 60 s)
+      setMusicIntensity(Math.pow(Math.min(1, Math.max(0, 1 - tl / 180)), 1.8));
     } else if (!g.ended) eye.setMood('idle');
     if (now - ledT > 66) {
       ledT = now;

@@ -85,6 +85,11 @@ svg { display: block; }
 #btnFs:not([hidden]) + #btnSon { margin-left: 0; }
 .icon-btn[aria-pressed="true"] .i-on { display: none; }
 .icon-btn[aria-pressed="true"] .i-off { display: block; }
+/* vibrations : appuyé = actives (logique inverse du bouton son) */
+#btnVib .i-on { display: block; } #btnVib .i-off { display: none; }
+#btnVib[aria-pressed="false"] .i-on { display: none; } #btnVib[aria-pressed="false"] .i-off { display: block; }
+#btnVib[aria-pressed="false"] svg { stroke: var(--ink-2); }
+.icon-btn:not([hidden]) ~ .icon-btn { margin-left: calc(6px - var(--s-3)); }
 .caption {
   position: absolute; left: 0; right: 0; bottom: 30px; margin: 0; padding: 0 var(--s-5);
   text-align: center; font-size: 0.9375rem; color: #e9f8ff; min-height: 1.4em;

@@ -2,6 +2,7 @@
 import { LINES, VOICE_LIST, voiceUrl } from './voix.js';
 
 let ac = null, master, sfxBus, voiceBus, analyser, data, muted = false;
+let musicBus, musicDuck, musicLP, music = null, musicBuf = null, musicLoad = null;
 let bed = null, speaking = false, onCaption = () => {};
 const buffers = new Map();
 export const voiceStats = { fichier: 0, synthese: 0 };
@@ -20,6 +21,10 @@ export function initAudio() {
   analyser = ac.createAnalyser(); analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.6;
   data = new Uint8Array(analyser.fftSize);
   voiceBus.connect(analyser); voiceBus.connect(master);
+  // musique : boucle → filtre → atténuation sous la voix → bus musique → master (donc coupée par le bouton son)
+  musicBus = ac.createGain(); musicBus.gain.value = 0.0001; musicBus.connect(master);
+  musicDuck = ac.createGain(); musicDuck.connect(musicBus);
+  musicLP = ac.createBiquadFilter(); musicLP.type = 'lowpass'; musicLP.frequency.value = 1400; musicLP.Q.value = 0.8; musicLP.connect(musicDuck);
   loadVoiceList();
   return ac;
 }
@@ -144,10 +149,11 @@ export function speak(id) {
   onCaption(text);
   const done = () => {
     if (token !== speakToken) return;
-    speaking = false; stopBed();
+    speaking = false; stopBed(); duck(false);
     setTimeout(() => token === speakToken && onCaption(''), 1600);
   };
   speaking = true;
+  duck(true);
   if (ac && !listDone && listPromise) {
     // la liste des voix arrive : attendre au plus 500 ms avant de choisir fichier ou synthèse
     Promise.race([listPromise, new Promise((r) => setTimeout(r, 500))]).then(() => token === speakToken && route(id, text, token, done));
@@ -224,4 +230,87 @@ function playBuffer(buf) {
 }
 
 export const isSpeaking = () => speaking;
-export function stopVoice() { speakToken++; speaking = false; stopBed(); if ('speechSynthesis' in window) speechSynthesis.cancel(); onCaption(''); }
+export function stopVoice() { speakToken++; speaking = false; stopBed(); duck(false); if ('speechSynthesis' in window) speechSynthesis.cancel(); onCaption(''); }
+
+// ---------- musique de tension ----------
+// Boucle MusicGen (audio/tension.mp3) + une couche synthétisée (basse pulsée) qui monte avec l'intensité.
+const MUSIC_URL = 'audio/tension.mp3';
+const MUSIC_VOL = 0.42;
+const MUSIC_LOOP_S = 16;
+export const musicStats = { etat: 'arret', fichier: false, intensite: 0, vitesse: 1, sousVoix: false };
+function loadMusic() {
+  if (!musicLoad) {
+    musicLoad = fetch(MUSIC_URL).then((r) => { if (!r.ok) throw new Error('musique absente'); return r.arrayBuffer(); })
+      .then((ab) => ac.decodeAudioData(ab)).then((b) => { musicBuf = b; return b; })
+      .catch(() => { musicLoad = null; return null; });
+  }
+  return musicLoad;
+}
+function duck(on) {
+  if (!musicDuck) return;
+  musicDuck.gain.setTargetAtTime(on ? 0.32 : 1, ac.currentTime, on ? 0.08 : 0.45);
+  musicStats.sousVoix = on;
+}
+export function startMusic() {
+  if (!ac) return;
+  stopMusic('cut', true);
+  const t = ac.currentTime;
+  const m = music = { src: null, pulse: null, intensity: -1 };
+  musicBus.gain.cancelScheduledValues(t);
+  musicBus.gain.setValueAtTime(0.0001, t);
+  musicBus.gain.exponentialRampToValueAtTime(MUSIC_VOL, t + 2.5);
+  musicLP.frequency.setValueAtTime(1400, t);
+  // couche synthétisée : basse en dents de scie, filtrée, hachée par un LFO (pulsation) dont le tempo monte
+  const o = ac.createOscillator(), o2 = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain(), trem = ac.createGain();
+  const lfo = ac.createOscillator(), lfoAmt = ac.createGain();
+  o.type = 'sawtooth'; o.frequency.value = 41.2; o2.type = 'square'; o2.frequency.value = 82.4; o2.detune.value = -8;
+  f.type = 'lowpass'; f.frequency.value = 220; f.Q.value = 6;
+  lfo.type = 'square'; lfo.frequency.value = 2; lfoAmt.gain.value = 0.5; trem.gain.value = 0.5;
+  lfo.connect(lfoAmt).connect(trem.gain);
+  g.gain.value = 0.0001;
+  o.connect(f); o2.connect(f); f.connect(trem).connect(g).connect(musicLP);
+  o.start(t); o2.start(t); lfo.start(t);
+  m.pulse = { o, o2, f, g, lfo };
+  musicStats.etat = 'joue'; musicStats.fichier = false;
+  loadMusic().then((buf) => {
+    if (!buf || music !== m) return;
+    const src = ac.createBufferSource();
+    src.buffer = buf; src.loop = true;
+    // boucle de 16,000 s : si le décodeur garde le délai de l'encodeur MP3 (1105 échantillons), on le saute
+    if (buf.duration > MUSIC_LOOP_S + 0.01) { src.loopStart = 1105 / 44100; src.loopEnd = src.loopStart + MUSIC_LOOP_S; }
+    src.connect(musicLP); src.start(0, src.loopStart || 0);
+    m.src = src; musicStats.fichier = true;
+    setMusicIntensity(Math.max(0, m.intensity), true);
+  });
+  setMusicIntensity(0, true);
+}
+// x = 0 (calme) .. 1 (dernières secondes)
+export function setMusicIntensity(x, force = false) {
+  const m = music;
+  if (!m || !ac) return;
+  const q = Math.round(x * 50) / 50;
+  if (!force && q === m.intensity) return;
+  m.intensity = q;
+  const t = ac.currentTime, k = 0.6;
+  const rate = 1 + 0.14 * q; // tempo de la boucle : +14 % au maximum
+  if (m.src) m.src.playbackRate.setTargetAtTime(rate, t, k);
+  musicLP.frequency.setTargetAtTime(1400 + 9000 * q * q, t, k); // le filtre s'ouvre
+  const p = m.pulse;
+  p.g.gain.setTargetAtTime(0.02 + 0.2 * q, t, k);
+  p.lfo.frequency.setTargetAtTime(2 + 6 * q, t, k); // pulsation 2 → 8 Hz
+  p.f.frequency.setTargetAtTime(220 + 900 * q, t, k);
+  musicStats.intensite = q; musicStats.vitesse = rate;
+}
+// 'fade' = fondu lent (victoire), 'cut' = coupure rapide (explosion)
+export function stopMusic(kind = 'fade', silent = false) {
+  const m = music;
+  if (!m || !ac) return;
+  music = null;
+  const t = ac.currentTime, dur = kind === 'fade' ? 3 : 0.12;
+  musicBus.gain.cancelScheduledValues(t);
+  musicBus.gain.setValueAtTime(Math.max(0.0001, musicBus.gain.value), t);
+  musicBus.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  const end = t + dur + 0.05;
+  try { m.src?.stop(end); m.pulse.o.stop(end); m.pulse.o2.stop(end); m.pulse.lfo.stop(end); } catch { /* déjà arrêté */ }
+  if (!silent) musicStats.etat = kind === 'fade' ? 'fondu' : 'coupee';
+}

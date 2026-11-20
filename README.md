@@ -6,7 +6,10 @@ Lien prévu : https://passcool17.github.io/entite-mallette/ (publié seulement a
 
 ## État
 
-Version 0.1.1 (locale, pas encore publiée ; la 0.1.0 est en ligne).
+Version 0.1.2 (locale, pas encore publiée ; la 0.1.1 est en ligne).
+
+- 0.1.2 : musique de tension qui accélère avec le compte à rebours, parties tirées au sort (code, ordre des clés,
+  bon fil, trappes) avec graine reproductible, vibrations (réglage à côté du son).
 
 - 0.1.1 : plein écran (bouton + automatique à « Ouvrir la mallette », verrouillage paysage si le navigateur le permet),
   voix enregistrées lues depuis `voix/` avec repli sur la synthèse vocale, zones tactiles agrandies (serrures, clavier).
@@ -26,6 +29,15 @@ Version 0.1.1 (locale, pas encore publiée ; la 0.1.0 est en ligne).
 - **Mensonges de l'Entité** : l'écran 2 montre d'abord un faux code, un faux ordre de clés ou un faux fil, puis la vérité
   revient ; le % ment parfois une fraction de seconde.
 - **Sons** synthétisés (WebAudio) : tic-tac, bips, clés, servos, cisaille, alarme, explosion, accord final.
+- **Musique de tension** (`audio/tension.mp3`, 16 s en boucle, MP3 96 kb/s, 193 Ko) : générée gratuitement sur la box
+  avec MusicGen (modèle small), prompt « suspense thriller underscore loop, relentless pulsing analog synth bass
+  sixteenth notes, metallic clock ticking, dark drone, cinematic tension, steady 120 bpm, no melody », puis bouclée
+  sans couture (fondu enchaîné de 1,5 s de la fin dans le début). Elle démarre au toucher « Ouvrir la mallette »,
+  passe par le bouton son, baisse sous chaque réplique, fond à la victoire et se coupe net à l'explosion.
+  Intensité de 0 à 1 selon le temps restant (courbe qui accélère sous 60 s) : boucle jusqu'à +14 % de vitesse,
+  filtre passe-bas qui s'ouvre de 1,4 à 10,4 kHz, et une basse synthétisée (WebAudio) hachée de 2 à 8 Hz qui monte.
+- **Vibrations** : courte sur une erreur, longue à l'explosion, double à la victoire. Bouton à côté du son,
+  réglage gardé dans le téléphone. Sans vibreur (iPhone) : bouton masqué, rien ne se passe.
 - **Voix** : répliques froides en français (synthèse vocale du navigateur en attendant le bot Voix, voir `VOIX.md`),
   sous-titrées sous l'œil, avec un grondement grave qui passe dans l'analyseur.
 - **Secousse = explosion** (DeviceMotion, permission demandée sur iPhone), bouton « Simuler une secousse » en secours.
@@ -44,13 +56,25 @@ Minuterie : 3:00. Erreurs : -10 s (ordre) ou -15 s (code).
 
 | # | Étape | Pièce | Ouvre | Échec |
 |---|---|---|---|---|
-| 1 | Lever le cache rouge, basculer ; puis le bleu | interrupteurs à cache | **Trappe 1** : les 2 moitiés de la clé en croix | 88,4 % |
-| 2 | Tourner Croix A et Croix B ensemble (moins de 1 s d'écart : deux doigts, ou l'une puis l'autre très vite) | 2 serrures | **Trappe 2** : badge Podkova (le code source) | 75,1 % |
-| 3 | Présenter le badge Podkova | lecteur RFID | code sur l'écran 2 (faux puis vrai) + **Trappe 3** : clés I, II, III | 61,8 % |
+| 1 | Lever le cache rouge, basculer ; puis le bleu | interrupteurs à cache | **Trappe A** : les 2 moitiés de la clé en croix | 88,4 % |
+| 2 | Tourner Croix A et Croix B ensemble (moins de 1 s d'écart : deux doigts, ou l'une puis l'autre très vite) | 2 serrures | **Trappe B** : badge Podkova (le code source) | 75,1 % |
+| 3 | Présenter le badge Podkova | lecteur RFID | code sur l'écran 2 (faux puis vrai) + **Trappe C** : clés I, II, III | 61,8 % |
 | 4 | Tourner I, II, III dans l'ordre de l'écran 2 (il ment d'abord) | 3 serrures | écran des fils | 44,6 % |
 | 5 | Couper le seul fil sans jumeau (mauvais fil = explosion) | CYD 2 | saisie du code | 29,3 % |
 | 6 | Taper le code Podkova : téléversement de la pilule empoisonnée | clavier 4x4 | arme le gros bouton | 11,2 % |
 | 7 | Maintenir le gros bouton rouge 1,5 s : sceller le lecteur 5D | gros bouton | victoire | 0,0 % |
+
+Trappes A, B et C : à chaque partie, elles tombent au hasard sur T1, T2 et T3 (le texte d'étape dit laquelle s'ouvre).
+
+### Parties tirées au sort
+
+Chaque partie tire d'une seule graine (générateur mulberry32) : le code de la pilule (4 chiffres), l'ordre des clés
+I, II, III, les couleurs des fils et le fil sans jumeau, et la trappe de chaque objet. Les écrans, les faux indices et
+les textes d'étape suivent ces valeurs.
+
+- `?seed=12345` : rejoue toujours la même partie (aussi après « Recommencer »).
+- `?debug=1` : affiche la graine à côté du numéro de version, et la journalise dans la console.
+- `?cyd=1` (aperçu CYD) n'est pas touché.
 
 Tant qu'une clé n'est pas ramassée dans sa trappe, sa serrure est vide et refuse le geste.
 Explosion : temps écoulé, mauvais fil ou secousse.
@@ -71,7 +95,7 @@ zone utile 273 x 169 mm, base 83 mm, couvercle 17 mm, encombrement de chaque pi�
 
 - `index.html`, `css/app.css`, `js/app.js` (logique et panneau), `js/eye.js` (rendu), `js/eye-config.js` (tous les
   paramètres de l'œil), `js/panel-config.js` (cotes réelles), `js/audio.js`, `js/voix.js`, `sw.js`, `manifest.webmanifest`.
-- `tests/v011.mjs` (test léger 0.1.1 : plein écran, voix fichier + repli, zones tactiles, paysage),
+- `tests/v012.mjs` (test léger 0.1.2 : graine, indices, musique, vibrations, `?cyd=1`), `tests/v011.mjs` (test léger 0.1.1 : plein écran, voix fichier + repli, zones tactiles, paysage),
   `tests/voix-liste.mjs` (liste des voix), `tests/run.mjs` (test léger : séquence complète jusqu'à la victoire, console, captures), `tests/fps.mjs` (une mesure d'fps),
   `tests/eye.html` (œil seul, `?ref=1` = cadrage de la référence).
 - Polices auto-hébergées : Chakra Petch et JetBrains Mono (licence OFL, `fonts/OFL.txt`).
