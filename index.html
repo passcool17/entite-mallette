@@ -12,8 +12,8 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="preload" href="fonts/chakra-petch-latin-500-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fonts/jetbrains-mono-latin-500-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/app.css?v=0.1.0">
-  <script type="module" src="js/app.js?v=0.1.0"></script>
+  <link rel="stylesheet" href="css/app.css?v=0.1.1">
+  <script type="module" src="js/app.js?v=0.1.1"></script>
 </head>
 <body>
   <a class="skip" href="#case">Aller au panneau</a>
@@ -29,6 +29,9 @@
           <span class="prob-label" id="probLabel">Probabilité d'échec</span>
           <output class="prob-value" id="prob" aria-labelledby="probLabel">99,7 %</output>
         </div>
+        <button class="icon-btn" id="btnFs" type="button" aria-pressed="false" aria-label="Plein écran" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-in" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/><path class="i-out" d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+        </button>
         <button class="icon-btn" id="btnSon" type="button" aria-pressed="false" aria-label="Couper le son">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-spk" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="i-on" d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11"/><path class="i-off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
         </button>
@@ -117,7 +120,8 @@
         <p class="intro-lead">Une intelligence sans corps. Elle falsifie les voix, réécrit les images et calcule tes choix avant toi.</p>
         <p class="intro-brief">Sept verrous, trois trappes, trois minutes. Elle mentira sur les écrans : attends que la vérité revienne.</p>
         <button class="primary-btn" id="btnStart" type="button">Ouvrir la mallette</button>
-        <p class="intro-note" id="introNote">Le son démarre au toucher. Secouer le téléphone fait exploser la mallette.</p>
+        <p class="intro-note" id="introNote">Le son et le plein écran démarrent au toucher. Secouer le téléphone fait exploser la mallette.</p>
+        <p class="intro-note" id="fsHint" hidden>Pour le plein écran sur iPhone : Partager, puis « Sur l'écran d'accueil ».</p>
       </div>
     </section>
 

@@ -6,7 +6,11 @@ Lien prévu : https://passcool17.github.io/entite-mallette/ (publié seulement a
 
 ## État
 
-Version 0.1.0 : une version complète, testée en local (Chromium sans écran, 412x915). Pas encore publiée.
+Version 0.1.1 (locale, pas encore publiée ; la 0.1.0 est en ligne).
+
+- 0.1.1 : plein écran (bouton + automatique à « Ouvrir la mallette », verrouillage paysage si le navigateur le permet),
+  voix enregistrées lues depuis `voix/` avec repli sur la synthèse vocale, zones tactiles agrandies (serrures, clavier).
+- 0.1.0 : première version (QA PASS).
 
 ## Fonctions
 
@@ -26,6 +30,11 @@ Version 0.1.0 : une version complète, testée en local (Chromium sans écran, 4
   sous-titrées sous l'œil, avec un grondement grave qui passe dans l'analyseur.
 - **Secousse = explosion** (DeviceMotion, permission demandée sur iPhone), bouton « Simuler une secousse » en secours.
 - **Aperçu CYD** `?cyd=1` : rendu natif 240x320, 20 i/s max, particules réduites, boutons d'humeur. Voir `PORTAGE-CYD.md`.
+- **Plein écran** : bouton en haut à droite, et automatique au toucher « Ouvrir la mallette ». Une fois en plein écran,
+  l'app demande `screen.orientation.lock('landscape')` ; si c'est refusé, elle garde l'orientation actuelle.
+  Sans API plein écran (Safari iPhone), le bouton est masqué et l'accueil propose d'installer l'app sur l'écran d'accueil.
+- **Zones tactiles** agrandies sans changer le dessin à l'échelle : serrures 48 px, touches du clavier jusqu'à l'espace
+  entre les touches (environ 40 px en portrait, limité par le pas réel de 17 mm du clavier membrane).
 - PWA installable, hors ligne (service worker versionné écrit à la main), `prefers-reduced-motion` respecté,
   zones sûres, libellés accessibles. Le son ne démarre qu'après un toucher.
 
@@ -62,7 +71,8 @@ zone utile 273 x 169 mm, base 83 mm, couvercle 17 mm, encombrement de chaque pi�
 
 - `index.html`, `css/app.css`, `js/app.js` (logique et panneau), `js/eye.js` (rendu), `js/eye-config.js` (tous les
   paramètres de l'œil), `js/panel-config.js` (cotes réelles), `js/audio.js`, `js/voix.js`, `sw.js`, `manifest.webmanifest`.
-- `tests/run.mjs` (test léger : séquence complète jusqu'à la victoire, console, captures), `tests/fps.mjs` (une mesure d'fps),
+- `tests/v011.mjs` (test léger 0.1.1 : plein écran, voix fichier + repli, zones tactiles, paysage),
+  `tests/voix-liste.mjs` (liste des voix), `tests/run.mjs` (test léger : séquence complète jusqu'à la victoire, console, captures), `tests/fps.mjs` (une mesure d'fps),
   `tests/eye.html` (œil seul, `?ref=1` = cadrage de la référence).
 - Polices auto-hébergées : Chakra Petch et JetBrains Mono (licence OFL, `fonts/OFL.txt`).
 
@@ -73,9 +83,16 @@ python3 -m http.server 8792   # depuis ce dossier
 node tests/run.mjs http://localhost:8792/
 ```
 
+## Voix enregistrées
+
+- Déposer les fichiers dans `voix/<id>.mp3` (ids de `VOIX.md`), puis lancer `node tests/voix-liste.mjs` : il écrit
+  `voix/voix.json` avec la liste des fichiers présents. L'app ne demande que les fichiers listés (pas d'erreur 404).
+- Chaque fichier passe dans l'`AnalyserNode` : l'œil pulse sur la vraie voix. Fichier absent, illisible ou trop lent
+  à arriver : synthèse vocale + grondement, comme avant. Le service worker garde les MP3 lus pour le hors ligne.
+
 ## Prochaines étapes
 
-- Enregistrer les voix (bot Voix, `VOIX.md`) et les déclarer dans `js/voix.js`.
+- Recevoir les voix du bot Voix, lancer `node tests/voix-liste.mjs`, publier.
 - Essai réel sur le Galaxy S20 FE (fps de l'œil, secousse, synthèse vocale française disponible).
 - Porter l'œil sur le CYD 1 (`PORTAGE-CYD.md`) et la logique sur l'ESP32.
 - Tirer le panneau 3D de `js/panel-config.js`.

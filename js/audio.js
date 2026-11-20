@@ -1,9 +1,10 @@
 // audio.js : sons synthétisés (WebAudio) + voix de l'Entité routée dans un AnalyserNode pour animer l'œil.
-import { LINES, VOICE_FILES } from './voix.js';
+import { LINES, VOICE_LIST, voiceUrl } from './voix.js';
 
 let ac = null, master, sfxBus, voiceBus, analyser, data, muted = false;
 let bed = null, speaking = false, onCaption = () => {};
 const buffers = new Map();
+export const voiceStats = { fichier: 0, synthese: 0 };
 
 export function initAudio() {
   if (ac) { if (ac.state === 'suspended') ac.resume(); return ac; }
@@ -19,6 +20,7 @@ export function initAudio() {
   analyser = ac.createAnalyser(); analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.6;
   data = new Uint8Array(analyser.fftSize);
   voiceBus.connect(analyser); voiceBus.connect(master);
+  loadVoiceList();
   return ac;
 }
 
@@ -146,7 +148,29 @@ export function speak(id) {
     setTimeout(() => token === speakToken && onCaption(''), 1600);
   };
   speaking = true;
-  if (VOICE_FILES[id] && ac) { playFile(VOICE_FILES[id]).then(done, done); return; }
+  if (ac && !listDone && listPromise) {
+    // la liste des voix arrive : attendre au plus 500 ms avant de choisir fichier ou synthèse
+    Promise.race([listPromise, new Promise((r) => setTimeout(r, 500))]).then(() => token === speakToken && route(id, text, token, done));
+    return;
+  }
+  route(id, text, token, done);
+}
+
+function route(id, text, token, done) {
+  if (ac && voiceAvail.has(id) && !voiceFailed.has(id)) {
+    loadVoice(id).then((buf) => {
+      if (token !== speakToken) return;
+      if ('speechSynthesis' in window) speechSynthesis.cancel();
+      voiceStats.fichier++;
+      playBuffer(buf).then(done, done);
+    }, () => { voiceFailed.add(id); if (token === speakToken) speakTTS(text, token, done); });
+    return;
+  }
+  speakTTS(text, token, done);
+}
+
+function speakTTS(text, token, done) {
+  voiceStats.synthese++;
   if (!muted) startBed();
   const est = 900 + text.length * 70;
   let fallback = setTimeout(done, est);
@@ -162,13 +186,38 @@ export function speak(id) {
   }
 }
 
-async function playFile(url) {
-  let buf = buffers.get(url);
-  if (!buf) {
-    const res = await fetch(url);
-    buf = await ac.decodeAudioData(await res.arrayBuffer());
-    buffers.set(url, buf);
+// ---------- voix enregistrées (bot Voix) ----------
+const voiceAvail = new Set(), voiceFailed = new Set(), loading = new Map();
+let listPromise = null, listDone = false;
+function loadVoiceList() {
+  if (!listPromise) listPromise = fetchVoiceList().finally(() => { listDone = true; });
+  return listPromise;
+}
+async function fetchVoiceList() {
+  try {
+    const res = await fetch(VOICE_LIST, { cache: 'no-cache' });
+    if (!res.ok) return;
+    const data = await res.json();
+    for (const id of data.files || []) if (LINES[id]) voiceAvail.add(id);
+    // préchargement doux des premières répliques
+    ['intro', 'depart'].forEach((id) => voiceAvail.has(id) && loadVoice(id).catch(() => voiceFailed.add(id)));
+  } catch { /* pas de liste : synthèse vocale */ }
+}
+function loadVoice(id) {
+  if (buffers.has(id)) return Promise.resolve(buffers.get(id));
+  if (!loading.has(id)) {
+    loading.set(id, (async () => {
+      const res = await fetch(voiceUrl(id));
+      if (!res.ok) throw new Error('voix absente');
+      const ab = await res.arrayBuffer();
+      const buf = await ac.decodeAudioData(ab);
+      buffers.set(id, buf);
+      return buf;
+    })().catch((e) => { loading.delete(id); throw e; }));
   }
+  return loading.get(id);
+}
+function playBuffer(buf) {
   return new Promise((resolve) => {
     const s = ac.createBufferSource(); s.buffer = buf; s.connect(voiceBus); s.onended = resolve; s.start();
   });

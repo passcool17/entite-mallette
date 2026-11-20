@@ -2,9 +2,10 @@
 import { createEye } from './eye.js';
 import { EYE, CYD, deepMerge } from './eye-config.js';
 import { LAYOUT } from './panel-config.js';
-import { initAudio, sfx, speak, voiceLevel, setMuted, isMuted, setCaptionHandler, stopVoice } from './audio.js';
+import { initAudio, sfx, speak, voiceLevel, setMuted, isMuted, setCaptionHandler, stopVoice, voiceStats } from './audio.js';
+window.__voix = voiceStats;
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.1';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -539,6 +540,36 @@ function initCase() {
     if (m > 24) endGame(false, 'Secousse détectée.');
   }
 
+  // plein écran (+ verrouillage paysage si permis)
+  const fsEl = document.documentElement;
+  const fsSupported = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  const fsActive = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  const standalone = matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || navigator.standalone;
+  const btnFs = $('#btnFs');
+  if (fsSupported) btnFs.hidden = false;
+  else if (!standalone) $('#fsHint').hidden = false;
+  async function enterFs() {
+    if (!fsSupported || fsActive()) return;
+    try {
+      if (fsEl.requestFullscreen) await fsEl.requestFullscreen({ navigationUI: 'hide' });
+      else if (fsEl.webkitRequestFullscreen) fsEl.webkitRequestFullscreen();
+    } catch { return; }
+    try { await screen.orientation?.lock?.('landscape'); } catch { /* orientation actuelle conservée */ }
+  }
+  async function exitFs() {
+    try { screen.orientation?.unlock?.(); } catch { /* rien */ }
+    try { if (document.exitFullscreen) await document.exitFullscreen(); else document.webkitExitFullscreen?.(); } catch { /* rien */ }
+  }
+  function syncFs() {
+    const on = fsActive();
+    btnFs.setAttribute('aria-pressed', String(on));
+    btnFs.setAttribute('aria-label', on ? 'Quitter le plein écran' : 'Plein écran');
+    if (!on) { try { screen.orientation?.unlock?.(); } catch { /* rien */ } }
+  }
+  document.addEventListener('fullscreenchange', syncFs);
+  document.addEventListener('webkitfullscreenchange', syncFs);
+  btnFs.addEventListener('click', () => (fsActive() ? exitFs() : enterFs()));
+
   // son
   $('#btnSon').addEventListener('click', () => {
     const m = !isMuted();
@@ -549,6 +580,7 @@ function initCase() {
 
   $('#btnStart').addEventListener('click', async () => {
     initAudio();
+    const fs = enterFs();
     if (typeof DeviceMotionEvent !== 'undefined') {
       try {
         if (typeof DeviceMotionEvent.requestPermission === 'function') {
@@ -557,6 +589,7 @@ function initCase() {
         } else addEventListener('devicemotion', onMotion);
       } catch { /* bouton de secours */ }
     }
+    await fs;
     startGame();
   });
   $('#btnAgain').addEventListener('click', startGame);

@@ -25,5 +25,8 @@ export const LINES = {
   tropLent:   "Trop lent. Les deux moitiés, ensemble.",
 };
 
-// id -> URL d'un fichier audio enregistré. Vide pour l'instant : aucune requête réseau inutile.
-export const VOICE_FILES = {};
+// Fichiers enregistrés : voix/<id>.mp3, listés dans voix/voix.json ({ "files": ["intro", "depart", ...] }).
+// La liste évite de demander des fichiers absents (pas d'erreur 404). Fichier absent ou illisible : synthèse vocale.
+export const VOICE_DIR = 'voix/';
+export const VOICE_LIST = VOICE_DIR + 'voix.json';
+export const voiceUrl = (id) => `${VOICE_DIR}${id}.mp3`;
