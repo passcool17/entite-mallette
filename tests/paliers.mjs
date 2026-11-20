@@ -1,4 +1,4 @@
-// 1000 graines : répartition des paliers, bandes de notes avant/après rejet, temps de génération (CPU ralenti x4 = téléphone)
+// 1000 graines : répartition des paliers, bandes de notes avant/après rejet, temps de génération (CPU ralenti x4 = téléphone). 0.1.6 : énigmes de js/puzzles.js
 import { chromium } from '/home/box/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/index.mjs';
 const BASE = process.argv[2] || 'http://127.0.0.1:8792/';
 const b = await chromium.launch({ executablePath: '/opt/google/chrome/chrome' });

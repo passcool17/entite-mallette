@@ -416,3 +416,32 @@ body.cyd .app, body.cyd .skip { display: none; }
 .stage.liar #eye, .liar #cyd1 { animation: liar 0.14s steps(2) infinite; filter: hue-rotate(165deg) saturate(1.8) contrast(1.15); }
 @keyframes liar { 0% { transform: translate(0, 0); } 50% { transform: translate(-2px, 1px) skewX(1.5deg); } 100% { transform: translate(1px, -1px); } }
 @media (prefers-reduced-motion: reduce) { .stage.liar #eye, .liar #cyd1 { animation: none; } }
+
+/* 0.1.6 : énigmes visuelles sur l'écran 2 (suite de couleurs, trappes qui mentent, symboles, grille du clavier) */
+.seq { display: flex; flex-wrap: nowrap; width: 100%; justify-content: center; gap: max(2px, calc(0.6 * var(--mm))); max-width: 100%; }
+.dot { --d: max(9px, calc(3.4 * var(--mm))); flex: 1 1 0; min-width: 0; max-width: var(--d); aspect-ratio: 1; border-radius: 50%; background: var(--dc); box-shadow: 0 0 6px var(--dc); display: grid; place-items: center; }
+.dot b { font: 700 calc(var(--d) * 0.5) / 1 var(--mono); color: #061018; }
+.dot.hole { background: none; box-shadow: inset 0 0 0 2px #fff; }
+.dot.hole b { color: #fff; }
+.tstmts { display: grid; gap: max(2px, calc(0.8 * var(--mm))); }
+.tstmts span { display: flex; gap: 8px; justify-content: space-between; font: 500 max(10px, calc(3.4 * var(--mm))) var(--mono); letter-spacing: 0.06em; }
+.tstmts b { color: var(--cyan); }
+.tstmts i { font-style: normal; color: #fff; }
+.c2-lines { white-space: pre-line; line-height: 1.25; }
+.badge { font-size: max(11px, calc(3.6 * var(--mm))); letter-spacing: 0.3em; }
+.kgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; width: min(100%, calc(30 * var(--mm))); }
+.kgrid span { aspect-ratio: 1; display: grid; place-items: center; border: 1px solid rgb(98 214 255 / 0.25); border-radius: 2px; font-size: max(9px, calc(3.4 * var(--mm))); color: #fff; }
+.kgrid span.on { border-color: var(--cyan); text-shadow: 0 0 6px var(--cyan); }
+.kgrid span.off { border-style: dashed; opacity: 0.5; }
+.loupe .dot { --d: 24px; }
+.loupe .dot b { font-size: 10px; }
+.loupe .seq { gap: 3px; }
+.loupe .tstmts span { font-size: 16px; min-height: 30px; align-items: center; }
+.loupe .badge { font-size: 20px; }
+.loupe .c2-lines { font-size: 18px; }
+.loupe .kgrid { width: 150px; gap: 3px; }
+.loupe .kgrid span { font-size: 22px; line-height: 1; }
+.c2-badge { font-size: max(10px, calc(3.6 * var(--mm))); letter-spacing: 0.04em; color: #fff; white-space: nowrap; }
+.loupe .c2-badge { font-size: 17px; }
+.loupe[data-view="pilule"] { flex-direction: row; }
+.loupe[data-view="pilule"] .cyd-screen { width: min(48%, 190px); }
