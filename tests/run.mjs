@@ -15,10 +15,8 @@ await p.waitForTimeout(5000);
 const idle = await p.evaluate(() => ({ ...window.__eye.stats }));
 // séquence
 await p.tap('#btnStart'); await p.waitForTimeout(600);
-await p.tap('.guard-red .cover'); await p.waitForTimeout(500);
-await p.tap('.guard-red .lever'); await p.waitForTimeout(300);
-await p.tap('.guard-blue .cover'); await p.waitForTimeout(500);
-await p.tap('.guard-blue .lever'); await p.waitForTimeout(1500);
+for (const c of (await p.evaluate(() => window.__game.first)) === 'rouge' ? ['red', 'blue'] : ['blue', 'red']) { await p.tap(`.guard-${c} .cover`); await p.waitForTimeout(400); await p.tap(`.guard-${c} .lever`); await p.waitForTimeout(400); }
+await p.waitForTimeout(1100);
 await p.tap(`.trap[data-trap="${await p.evaluate(() => window.__game.trapOf.croix)}"] .trap-key`); await p.waitForTimeout(400);
 await p.evaluate(() => { for (const id of ['xa', 'xb']) document.querySelector(`[data-key="${id}"] button`).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); });
 await p.waitForTimeout(1300);
@@ -33,7 +31,7 @@ const playing = await p.evaluate(() => ({ ...window.__eye.stats, mood: window.__
 await p.waitForTimeout(2200);
 for (const i of st1.order) await p.evaluate((k) => document.querySelector(`[data-key="${k}"] button`).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })), ['k1', 'k2', 'k3'][i]);
 await p.waitForTimeout(400);
-const uniq = await p.evaluate(() => window.__game.wires.indexOf(window.__game.unique));
+const uniq = await p.evaluate(() => window.__game.wireIdx);
 await p.click(`.wire[data-i="${uniq}"]`); await p.waitForTimeout(400);
 for (const c of st1.code) await p.click(`.kp:text-is("${c}")`);
 await p.waitForTimeout(3200);

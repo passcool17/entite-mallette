@@ -7,7 +7,7 @@ window.__musique = musicStats;
 import { preloadAll } from './preload.js';
 window.__voix = voiceStats;
 
-const VERSION = '0.1.3';
+const VERSION = '0.1.4';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -26,6 +26,7 @@ const canVibrate = typeof navigator.vibrate === 'function';
 let vibeOn = localStorage.getItem('entite.vibrations') !== '0';
 function buzz(pattern) { if (canVibrate && vibeOn) { try { navigator.vibrate(pattern); } catch { /* rien */ } } }
 const BUZZ = { faux: 70, boom: [500, 120, 300, 120, 700], victoire: [90, 90, 90] };
+const TIME_S = 240; // 4 min : plus de réflexion, pas moins de temps
 const fmtPct = (v) => v.toFixed(1).replace('.', ',') + ' %';
 
 if (q.has('cyd')) { bootDone(); registerSW(); initCyd(); } else initCase();
@@ -222,7 +223,7 @@ function initCase() {
     ids.forEach((id) => setKey(id, 'off'));
     keyEl[ids[0]].btn.focus({ preventScroll: true });
     if (item === 'cles') { g.keysPicked3 = true; const sub = $('[data-sub]', c2); if (sub) sub.textContent = ''; }
-    setStatus(item === 'croix' ? 'Clés insérées. Tourne Croix A et Croix B ensemble, à moins d\'une seconde d\'écart (deux doigts, ou l\'une puis l\'autre très vite).' : 'Clés insérées. Tourne I, II et III dans l\'ordre de l\'écran 2. Elle va mentir.');
+    setStatus(item === 'croix' ? 'Clés insérées. Tourne Croix A et Croix B ensemble, à moins d\'une seconde d\'écart (deux doigts, ou l\'une puis l\'autre très vite).' : 'Clés insérées. Chaque clé pèse un chiffre du n° de série (I = 1er, II = 2e, III = 3e) : tourne-les de la plus légère à la plus lourde.');
   }
 
   // ---------- clavier ----------
@@ -263,19 +264,19 @@ function initCase() {
     layoutPanel();
   }
   const WIRES = { rouge: '#ff3b30', bleu: '#3d8bff', jaune: '#ffd23d', vert: '#3dff95', blanc: '#e8eef2' };
-  function c2Head() { return `<div class="c2-head"><span>CYD2</span><span data-code>${g.codeKnown ? 'CODE ' + g.code : 'HORS LIGNE'}</span></div>`; }
+  function c2Head() { return `<div class="c2-head"><span>CYD2</span><span data-code>${g.codeKnown ? 'CODE ' + g.partial : 'HORS LIGNE'}</span></div>`; }
   function c2View(view) {
     g.c2 = view;
     clearInterval(g.lieTimer);
     queueMicrotask(applyLoupe);
     if (view === 'locked') c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg">SYSTÈME VERROUILLÉ</span><span class="c2-msg c2-dim">attente du code source</span></div>`;
     if (view === 'code') {
-      c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg">PODKOVA · CODE SOURCE</span><span class="c2-big" data-big></span><span class="c2-msg c2-dim">à taper à la fin</span></div>`;
-      glitchSwap($('[data-big]', c2), fakeCode(), g.code, 1500);
+      c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg">PODKOVA · FRAGMENT</span><span class="c2-big" data-big></span><span class="c2-msg c2-dim">2e et 4e chiffres</span></div>`;
+      glitchSwap($('[data-big]', c2), [...fakeCode()].join(' '), [...g.partial].join(' '), 1500);
     }
     if (view === 'order') {
       c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg">ORDRE</span><span class="c2-big c2-mid" data-big></span><span class="c2-msg c2-dim" data-sub>${g.keysPicked3 ? '' : `trappe ${g.trapOf.cles} ouverte`}</span></div>`;
-      const truth = g.order.map((i) => ['I', 'II', 'III'][i]).join(' · ');
+      const truth = 'PÈSE-LES';
       const lie = () => { let o; do { o = shuffle([0, 1, 2]); } while (o.join() === g.order.join()); return o.map((i) => ['I', 'II', 'III'][i]).join(' · '); };
       glitchSwap($('[data-big]', c2), lie(), truth, 1800);
       g.lieTimer = setInterval(() => { const el = $('[data-big]', c2); if (el && g.step === 3) glitchSwap(el, lie(), truth, 700); }, 7000 + rand(3000));
@@ -286,8 +287,8 @@ function initCase() {
         html += `<button class="wire" type="button" data-i="${i}" style="--wc:${WIRES[w]}" aria-label="Fil ${i + 1}, ${w}"><svg viewBox="0 0 130 22" preserveAspectRatio="none" aria-hidden="true"><path class="w-l" d="M2 11 C 20 ${rand(2) ? 3 : 19}, 40 ${rand(2) ? 3 : 19}, 63 11"/><path class="w-r" d="M67 11 C 88 ${rand(2) ? 3 : 19}, 108 ${rand(2) ? 3 : 19}, 128 11"/></svg><span class="wire-name">${w.toUpperCase()}</span></button>`;
       });
       c2.innerHTML = html + '</div>';
-      const pairCol = g.wires.find((w) => w !== g.unique);
-      glitchSwap($('[data-hint]', c2), `COUPE LE FIL ${pairCol.toUpperCase()}`, 'COUPE LE FIL SANS JUMEAU', 1500);
+      const fake = (g.wireIdx + 1 + rand(4)) % 5; // un faux fil, jamais le bon
+      glitchSwap($('[data-hint]', c2), `COUPE LE FIL ${fake + 1}`, 'APPLIQUE LA RÈGLE', 1500);
       $$('.wire', c2).forEach((b) => b.addEventListener('click', () => cutWire(+b.dataset.i, b)));
     }
     if (view === 'pilule') {
@@ -300,9 +301,18 @@ function initCase() {
     if (view === 'boom') c2.innerHTML = `<div class="c2-center"><span class="c2-big glitch">ERREUR</span><span class="c2-msg">signal perdu</span></div>`;
   }
   function fakeCode() { let s; do { s = String(rand(10000)).padStart(4, '0'); } while (s === g.code); return s; }
+  // l'Entité ment : son œil grésille (rouge, saccadé) tant que le faux texte est affiché
+  let lieT = 0;
+  function flagLie(ms) {
+    const st = $('#stage'), p1 = $('[data-part="cyd1"]');
+    st.classList.add('liar'); p1.classList.add('liar');
+    clearTimeout(lieT);
+    lieT = setTimeout(() => { st.classList.remove('liar'); p1.classList.remove('liar'); }, ms);
+  }
   function glitchSwap(el, lie, truth, ms) {
     if (!el) return;
     el.textContent = lie; el.classList.add('glitch');
+    flagLie(reduced ? Math.min(ms, 900) : ms);
     const chars = '█▓▒░#%&@0123456789';
     setTimeout(() => {
       let n = 0;
@@ -316,12 +326,12 @@ function initCase() {
 
   // ---------- état ----------
   const STEPS = [
-    "Lève le cache rouge et bascule l'interrupteur, puis le bleu.",
+    () => `Lève les caches et bascule les 2 interrupteurs. Dernier chiffre du n° de série (plaque du panneau) pair : bleu d'abord ; impair : rouge d'abord.`,
     () => `La trappe ${g.trapOf.croix} est ouverte : prends la clé en croix, puis tourne Croix A et Croix B ensemble.`,
     () => `La trappe ${g.trapOf.badge} est ouverte : prends le badge Podkova, puis présente-le au lecteur RFID.`,
-    () => `La trappe ${g.trapOf.cles} est ouverte : prends les clés, puis tourne I, II et III dans l'ordre de l'écran 2.`,
-    "Coupe le fil qui n'a pas de jumeau sur l'écran 2.",
-    'Tape le code Podkova au clavier pour téléverser la pilule empoisonnée.',
+    () => `La trappe ${g.trapOf.cles} est ouverte : prends les clés. Note le fragment de code de l'écran 2 : il servira.`,
+    "Règle des fils : plus d'un fil rouge → coupe le dernier rouge ; sinon, dernier chiffre du n° pair → le 2e fil ; sinon → le fil sans jumeau.",
+    'Code : 1er chiffre = dernier chiffre du n° de série ; 3e = somme des 4 chiffres du n°, unités seules ; 2e et 4e = fragment de l\'écran 2. Puis # pour valider.',
     'Maintiens le gros bouton rouge pour sceller le lecteur 5D.',
   ];
   const PROB = [99.7, 88.4, 75.1, 61.8, 44.6, 29.3, 11.2, 0];
@@ -373,12 +383,27 @@ function initCase() {
   function makeRun(seed) {
     const r = mulberry32(seed), ri = (n) => Math.floor(r() * n);
     const sh = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = ri(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-    const code = Array.from({ length: 4 }, () => ri(10)).join('');
-    const order = sh([0, 1, 2]);
+    // n° de série : 4 chiffres (les 3 premiers distincts) + 2 lettres, ex. 4K7-29B ; un n° de lot sans rôle (leurre)
+    const [d1, d2, d3] = sh([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).slice(0, 3), d4 = ri(10);
+    const LET = 'ABCDEFGHJKLMNPRSTUVWXYZ';
+    const serial = `${d1}${LET[ri(LET.length)]}${d2}-${d3}${d4}${LET[ri(LET.length)]}`;
+    const lot = 100 + ri(900);
+    const even = d4 % 2 === 0;
+    // interrupteurs : dernier chiffre pair -> bleu d'abord, impair -> rouge d'abord
+    const first = even ? 'bleu' : 'rouge';
+    // clés : I pèse le 1er chiffre, II le 2e, III le 3e ; de la plus légère à la plus lourde
+    const weights = [d1, d2, d3];
+    const order = [0, 1, 2].sort((a, b) => weights[a] - weights[b]);
+    // code : 1er = dernier chiffre du n°, 3e = somme des 4 chiffres (unités), 2e et 4e montrés par l'écran 2
+    const b2 = ri(10), b4 = ri(10);
+    const code = `${d4}${b2}${(d1 + d2 + d3 + d4) % 10}${b4}`;
+    // fils : plus d'un rouge -> le dernier rouge ; sinon n° pair -> le 2e ; sinon -> le fil sans jumeau
     const cols = sh(Object.keys(WIRES));
     const wires = sh([cols[0], cols[1], cols[1], cols[2], cols[2]]);
+    const reds = wires.map((w, i) => (w === 'rouge' ? i : -1)).filter((i) => i >= 0);
+    const wireIdx = reds.length > 1 ? reds[reds.length - 1] : even ? 1 : wires.indexOf(cols[0]);
     const slots = sh([1, 2, 3]);
-    return { seed, code, order, unique: cols[0], wires, trapOf: { croix: slots[0], badge: slots[1], cles: slots[2] } };
+    return { seed, serial, lot, first, weights, code, partial: `_${b2}_${b4}`, order, unique: cols[0], wires, wireIdx, trapOf: { croix: slots[0], badge: slots[1], cles: slots[2] } };
   }
   window.__makeRun = makeRun;
 
@@ -387,10 +412,11 @@ function initCase() {
     const run = makeRun(newSeed());
     Object.assign(g, run, {
       running: true, ended: false, codeKnown: false, entry: '', orderPos: 0,
-      lastSec: -1, errUntil: 0, said30: false, said10: false, crossT: 0, endAt: performance.now() + 180000, keysPicked3: false, badge: false,
+      lastSec: -1, errUntil: 0, said30: false, said10: false, crossT: 0, endAt: performance.now() + TIME_S * 1000, keysPicked3: false, badge: false,
     });
     resetBoard();
     fillTraps();
+    $('[data-part="label"]').textContent = `N° DE SÉRIE ${g.serial} · LOT ${g.lot}`;
     if (DEBUG) { $('#seed').hidden = false; $('#seed').textContent = ` · graine ${g.seed}`; console.info('[entite] graine', g.seed, run); }
     startMusic();
     $('#intro').hidden = true; $('#end').hidden = true;
@@ -407,6 +433,7 @@ function initCase() {
     g.probLie = setTimeout(() => {
       if (!g.running) return;
       setProb(99.9 - Math.random() * 3, true);
+      flagLie(800);
       setTimeout(() => g.running && setProb(PROB[Math.floor(g.step)]), 800);
       scheduleProbLie();
     }, 9000 + rand(6000));
@@ -504,7 +531,7 @@ function initCase() {
         setTimeout(() => { ['k1', 'k2', 'k3'].forEach((k) => setKey(k, 'off')); }, 350);
         g.orderPos = 0;
         penalty(10, 'ordreFaux');
-        setStatus("Mauvais ordre : les clés I, II et III reviennent à l'arrêt. Relis l'écran 2 quand il cesse de trembler.");
+        setStatus("Mauvais ordre : les clés reviennent à l'arrêt. I pèse le 1er chiffre du n° de série, II le 2e, III le 3e : de la plus légère à la plus lourde.");
       }
       return;
     }
@@ -529,14 +556,14 @@ function initCase() {
       if (g.step !== 0) { notYet(); return; }
       sfx.click();
       lever.setAttribute('aria-checked', 'true');
-      const red = $('.guard-red .lever');
-      if (color === 'bleu' && red.getAttribute('aria-checked') !== 'true') {
+      const firstLever = $(`.guard-${g.first === 'rouge' ? 'red' : 'blue'} .lever`);
+      if (color !== g.first && firstLever.getAttribute('aria-checked') !== 'true') {
         setTimeout(() => lever.setAttribute('aria-checked', 'false'), 260);
         penalty(10, 'ordreFaux');
-        setStatus("Mauvais ordre : le rouge d'abord, puis le bleu. Dix secondes de moins.");
+        setStatus('Mauvais ordre. Dix secondes de moins. Relis le dernier chiffre du n° de série, sur la plaque du panneau.');
         return;
       }
-      if (color === 'bleu') {
+      if (color !== g.first) {
         sfx.ok();
         goStep(1);
         setTimeout(() => openTrap('croix'), 300);
@@ -573,7 +600,7 @@ function initCase() {
     lookAtEl(btn);
     btn.classList.add('cut');
     sfx.snip();
-    if (g.wires[i] === g.unique) {
+    if (i === g.wireIdx) {
       sfx.ok();
       goStep(5);
       speak('pilule');
@@ -616,7 +643,7 @@ function initCase() {
       const lcd = $('[data-entry]', c2) || document.createElement('span');
       lcd.classList.remove('bad'); void lcd.offsetWidth; lcd.classList.add('bad');
       penalty(15, 'codeFaux');
-      setStatus('Code refusé. Quinze secondes de moins. Le vrai code est en haut de l\'écran 2.');
+      setStatus('Code refusé. Quinze secondes de moins. 1er chiffre : dernier du n° de série ; 3e : somme des 4 chiffres du n°, unités seules ; 2e et 4e : écran 2.');
       setTimeout(() => { g.entry = ''; showEntry(); lcd.classList.remove('bad'); }, 700);
     }
   }
@@ -733,13 +760,13 @@ function initCase() {
 
   // ---------- boucle ----------
   let ledT = 0;
-  showTime(180);
+  showTime(TIME_S);
   function loop(now) {
     requestAnimationFrame(loop);
     eye.setVoice(voiceLevel());
     mirrorCyd1();
     if (now > lookUntil) eye.lookAt(Math.sin(now / 2300) * 0.5, Math.sin(now / 3100) * 0.35);
-    let tl = 180;
+    let tl = TIME_S;
     if (g.running) {
       tl = (g.endAt - now) / 1000;
       showTime(tl);
@@ -754,7 +781,7 @@ function initCase() {
       if (tl <= 0) { showTime(0); endGame(false, 'Temps écoulé.'); }
       eye.setMood(tl <= 30 || now < g.errUntil ? 'angry' : 'watching');
       // tension : 0 au départ, 1 à la fin du compte à rebours (courbe qui accélère sous 60 s)
-      setMusicIntensity(Math.pow(Math.min(1, Math.max(0, 1 - tl / 180)), 1.8));
+      setMusicIntensity(Math.pow(Math.min(1, Math.max(0, 1 - tl / TIME_S)), 1.8));
     } else if (!g.ended) eye.setMood('idle');
     if (now - ledT > 66) {
       ledT = now;
@@ -762,7 +789,7 @@ function initCase() {
       if (g.running) {
         const done = Math.round((Math.floor(g.step) / 7) * 8);
         for (let i = 0; i < 8; i++) b1[i] = i < done ? '#62d6ff' : i === done && Math.floor(now / 300) % 2 ? '#ffb020' : null;
-        const lit = Math.ceil((tl / 180) * 8), col = tl > 60 ? '#3dff95' : tl > 30 ? '#ffb020' : '#ff3b30';
+        const lit = Math.ceil((tl / TIME_S) * 8), col = tl > 60 ? '#3dff95' : tl > 30 ? '#ffb020' : '#ff3b30';
         const blink = tl <= 30 && Math.floor(now / 180) % 2;
         for (let i = 0; i < 8; i++) b2[i] = i < lit && !blink ? col : null;
       } else if (g.ended && g.result === 'win') {

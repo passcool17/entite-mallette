@@ -401,3 +401,8 @@ body.cyd .app, body.cyd .skip { display: none; }
 }
 .wire-name { position: absolute; right: 0; top: 0; font-size: 9px; line-height: 1; color: var(--ink-2); letter-spacing: 0.04em; }
 .c2-mid { font-size: max(12px, calc(4.8 * var(--mm))); letter-spacing: 0.04em; }
+
+/* mensonge de l'Entité : l'œil (et son miroir sur le CYD 1) grésille en rouge */
+.stage.liar #eye, .liar #cyd1 { animation: liar 0.14s steps(2) infinite; filter: hue-rotate(165deg) saturate(1.8) contrast(1.15); }
+@keyframes liar { 0% { transform: translate(0, 0); } 50% { transform: translate(-2px, 1px) skewX(1.5deg); } 100% { transform: translate(1px, -1px); } }
+@media (prefers-reduced-motion: reduce) { .stage.liar #eye, .liar #cyd1 { animation: none; } }

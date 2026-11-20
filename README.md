@@ -6,7 +6,10 @@ Lien prévu : https://passcool17.github.io/entite-mallette/ (publié seulement a
 
 ## État
 
-Version 0.1.3 (locale, pas encore publiée ; la 0.1.2 est en ligne).
+Version 0.1.4 (locale, pas encore publiée ; la 0.1.3 est en ligne).
+
+- 0.1.4 : plus difficile, par la réflexion : tout se déduit du n° de série et des écrans, l'Entité ment (œil qui
+  grésille), 4 minutes. Un seul mode (pas de mode facile).
 
 - 0.1.3 : correctif paysage (téléphone couché, avec ou sans barres du navigateur) : panneau entier toujours visible,
   fils et code agrandis dans une loupe, bouton son qui n'est plus coupé. Écran de chargement avec vrai pourcentage,
@@ -56,7 +59,23 @@ Version 0.1.3 (locale, pas encore publiée ; la 0.1.2 est en ligne).
 
 ## Séquence de désamorçage (ordre final)
 
-Minuterie : 3:00. Erreurs : -10 s (ordre) ou -15 s (code).
+Minuterie : 4:00. Erreurs : -10 s (ordre) ou -15 s (code), et la probabilité d'échec remonte.
+
+### Règles à déduire (0.1.4, mode unique)
+
+Tout vient du panneau : la plaque affiche `N° DE SÉRIE 4K7-29B · LOT 316` (tiré de la graine ; le lot est un leurre).
+Les règles sont dans le texte d'étape ; aucune réponse n'est affichée telle quelle.
+
+- **Interrupteurs** : dernier chiffre du n° pair → bleu d'abord ; impair → rouge d'abord.
+- **Clés I, II, III** : chaque clé pèse un chiffre du n° (I = 1er, II = 2e, III = 3e, toujours différents) ;
+  tourner de la plus légère à la plus lourde.
+- **Fils** : plus d'un fil rouge → le dernier rouge ; sinon, dernier chiffre pair → le 2e fil ; sinon → le fil
+  sans jumeau. Mauvais fil = explosion.
+- **Code (pilule)** : 1er chiffre = dernier chiffre du n° ; 3e = somme des 4 chiffres du n°, unités seules ;
+  2e et 4e = fragment montré par l'écran 2 après le badge (`CODE _6_2` reste en haut de l'écran 2).
+- **Mensonges** : l'écran 2 affiche parfois un faux code, un faux ordre ou un faux fil ; à chaque mensonge
+  (et quand le % ment), l'œil et le CYD 1 grésillent en rouge. Ce qui s'affiche pendant le grésillement est faux.
+- Croix A et B : toujours à moins d'une seconde d'écart.
 
 | # | Étape | Pièce | Ouvre | Échec |
 |---|---|---|---|---|
@@ -133,7 +152,7 @@ zone utile 273 x 169 mm, base 83 mm, couvercle 17 mm, encombrement de chaque pi�
 
 - `index.html`, `css/app.css`, `js/app.js` (logique et panneau), `js/eye.js` (rendu), `js/eye-config.js` (tous les
   paramètres de l'œil), `js/panel-config.js` (cotes réelles), `js/audio.js`, `js/voix.js`, `sw.js`, `manifest.webmanifest`.
-- `tests/v013-chargement.mjs` (1re visite à froid en Fast 3G, revisite, échec + Réessayer), `tests/v013.mjs` (test léger 0.1.3 : paysage 915x412, 915x340, 800x360, toutes les étapes), `tests/v012.mjs` (test léger 0.1.2 : graine, indices, musique, vibrations, `?cyd=1`), `tests/v011.mjs` (test léger 0.1.1 : plein écran, voix fichier + repli, zones tactiles, paysage),
+- `tests/v014.mjs` (partie complète avec `?seed=N` en lisant seulement l'écran), `tests/v013-chargement.mjs` (1re visite à froid en Fast 3G, revisite, échec + Réessayer), `tests/v013.mjs` (test léger 0.1.3 : paysage 915x412, 915x340, 800x360, toutes les étapes), `tests/v012.mjs` (test léger 0.1.2 : graine, indices, musique, vibrations, `?cyd=1`), `tests/v011.mjs` (test léger 0.1.1 : plein écran, voix fichier + repli, zones tactiles, paysage),
   `tests/voix-liste.mjs` (liste des voix), `tests/run.mjs` (test léger : séquence complète jusqu'à la victoire, console, captures), `tests/fps.mjs` (une mesure d'fps),
   `tests/eye.html` (œil seul, `?ref=1` = cadrage de la référence).
 - Polices auto-hébergées : Chakra Petch et JetBrains Mono (licence OFL, `fonts/OFL.txt`).

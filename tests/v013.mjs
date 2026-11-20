@@ -25,11 +25,11 @@ const measure = (sels) => p.evaluate((sels) => {
 const M = {};
 await p.goto(base + '?seed=777'); await p.waitForTimeout(1000);
 await p.tap('#btnStart'); await p.waitForTimeout(800);
-const run = await p.evaluate(() => ({ code: window.__game.code, order: window.__game.order, wires: window.__game.wires, unique: window.__game.unique, trapOf: window.__game.trapOf }));
+const run = await p.evaluate(() => ({ code: window.__game.code, order: window.__game.order, wires: window.__game.wires, unique: window.__game.unique, wireIdx: window.__game.wireIdx, trapOf: window.__game.trapOf }));
 for (const [w, h] of [[915, 412], [915, 340], [800, 360]]) { await vp(w, h); M['step0_' + w + 'x' + h] = await measure(['.guard .cover', '#btnSon']); }
 await vp(915, 412);
-await p.tap('.guard-red .cover'); await p.waitForTimeout(300); await p.tap('.guard-red .lever'); await p.waitForTimeout(300);
-await p.tap('.guard-blue .cover'); await p.waitForTimeout(300); await p.tap('.guard-blue .lever'); await p.waitForTimeout(1400);
+for (const c of (await p.evaluate(() => window.__game.first)) === 'rouge' ? ['red', 'blue'] : ['blue', 'red']) { await p.tap(`.guard-${c} .cover`); await p.waitForTimeout(400); await p.tap(`.guard-${c} .lever`); await p.waitForTimeout(400); }
+await p.waitForTimeout(1100);
 M.step1 = await measure([`.trap[data-trap="${run.trapOf.croix}"] .trap-key`, '.keysw-btn']);
 await p.tap(`.trap[data-trap="${run.trapOf.croix}"] .trap-key`); await p.waitForTimeout(300);
 await press('xa'); await press('xb'); await p.waitForTimeout(1300);
@@ -45,7 +45,7 @@ await p.screenshot({ path: out + 'v013-01-fils-paysage-915x412.png' });
 await vp(915, 340); M.wires_915x340 = await measure(['.wire']);
 await vp(800, 360); M.wires_800x360 = await measure(['.wire']);
 await p.screenshot({ path: out + 'v013-02-fils-paysage-800x360.png' });
-await p.tap(`.wire[data-i="${run.wires.indexOf(run.unique)}"]`); await p.waitForTimeout(1000);
+await p.tap(`.wire[data-i="${run.wireIdx}"]`); await p.waitForTimeout(1000);
 M.code_800x360 = await measure(['.kp', '[data-entry]']);
 M.kpHit = await p.evaluate(() => { const k = document.querySelectorAll('#loupe .kp')[5]?.getBoundingClientRect(); if (!k) return null; const e = document.elementFromPoint(k.right + 2, k.top + k.height / 2); return { w: Math.round(k.width), gapHit: e?.className }; });
 await vp(915, 340); M.code_915x340 = await measure(['.kp']);

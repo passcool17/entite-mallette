@@ -16,7 +16,7 @@ Elle parle comme une machine qui a déjà calculé la suite. Pas de nom de film,
 |---|---|---|
 | `intro` | Ouverture de la mallette | Je suis l'Entité. J'ai déjà calculé tes choix. |
 | `depart` | 3,6 s après l'intro | Trois minutes. Quatre-vingt-dix-neuf virgule sept pour cent d'échec. Je ne me trompe jamais. |
-| `caches` | Interrupteur rouge basculé | Rouge d'abord. Puis bleu. Si tu me crois. |
+| `caches` | Premier interrupteur basculé | Un cache levé. As-tu lu mon numéro de série ? |
 | `trappe` | Une trappe (servo) s'ouvre | Une trappe s'ouvre. Je l'ai permis. |
 | `tropLent` | Clés en croix pas tournées ensemble | Trop lent. Les deux moitiés, ensemble. |
 | `cle` | Clés en croix réussies | Une clé en croix. Tu crois ouvrir quelque chose. |
@@ -24,7 +24,7 @@ Elle parle comme une machine qui a déjà calculé la suite. Pas de nom de film,
 | `badgeOk` | Badge Podkova lu | Podkova. Tu ne devrais pas avoir ça. Lis vite, la vérité change. |
 | `mensonge` | (réserve, moments de faux texte) | Ce que tu lis est faux. Ou vrai. Je décide. |
 | `ordreFaux` | Mauvais ordre (interrupteurs ou clés I-III) | Mauvais ordre. Je t'ai menti. Dix secondes de moins. |
-| `fils` | Écran des fils affiché | Un seul fil n'a pas de jumeau. Coupe-le. |
+| `fils` | Écran des fils affiché | Cinq fils. Une seule règle. Je la connais, toi non. |
 | `filOk` | (réserve) | Fil coupé. Tu crois avancer. |
 | `pilule` | Bon fil coupé | La pilule empoisonnée. Tape le code. Tu n'oseras pas. |
 | `codeFaux` | Code refusé | Code refusé. Chaque erreur me nourrit. |
