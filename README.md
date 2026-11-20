@@ -6,7 +6,10 @@ Lien prévu : https://passcool17.github.io/entite-mallette/ (publié seulement a
 
 ## État
 
-Version 0.1.2 (locale, pas encore publiée ; la 0.1.1 est en ligne).
+Version 0.1.3 (locale, pas encore publiée ; la 0.1.2 est en ligne).
+
+- 0.1.3 : correctif paysage (téléphone couché, avec ou sans barres du navigateur) : panneau entier toujours visible,
+  fils et code agrandis dans une loupe, bouton son qui n'est plus coupé.
 
 - 0.1.2 : musique de tension qui accélère avec le compte à rebours, parties tirées au sort (code, ordre des clés,
   bon fil, trappes) avec graine reproductible, vibrations (réglage à côté du son).
@@ -79,6 +82,19 @@ les textes d'étape suivent ces valeurs.
 Tant qu'une clé n'est pas ramassée dans sa trappe, sa serrure est vide et refuse le geste.
 Explosion : temps écoulé, mauvais fil ou secousse.
 
+## Paysage sur téléphone (0.1.3)
+
+Testé à 915x412, 915x340 (barres du navigateur visibles) et 800x360.
+
+- Le panneau garde son rapport 273:169 et sa largeur suit la hauteur réellement visible (`innerHeight`, recalculée au
+  redimensionnement et quand le texte d'étape change de hauteur) : il tient entier, sans défiler.
+- **Loupe** : à l'étape des fils, l'écran 2 passe agrandi dans la colonne de l'œil (5 fils de 44 px de haut, toujours
+  visibles). À l'étape du code, l'écran 2 et le clavier y passent ensemble (touches de 38 px, zone tactile de 44 px
+  avec l'espace entre les touches). Un repère « agrandi ◀ » reste à leur place sur le panneau ; tout revient ensuite.
+  En portrait, rien ne change.
+- La colonne de l'œil (300 px au minimum) garde la minuterie et les 3 boutons ; la probabilité d'échec passe dans
+  la barre d'étape. Avant, le bouton son débordait et était à moitié coupé.
+
 ## Panneau : dimensions et choix d'orientation
 
 Les cotes réelles sont dans `js/panel-config.js` (pour le futur panneau imprimé en 3D) :
@@ -95,7 +111,7 @@ zone utile 273 x 169 mm, base 83 mm, couvercle 17 mm, encombrement de chaque pi�
 
 - `index.html`, `css/app.css`, `js/app.js` (logique et panneau), `js/eye.js` (rendu), `js/eye-config.js` (tous les
   paramètres de l'œil), `js/panel-config.js` (cotes réelles), `js/audio.js`, `js/voix.js`, `sw.js`, `manifest.webmanifest`.
-- `tests/v012.mjs` (test léger 0.1.2 : graine, indices, musique, vibrations, `?cyd=1`), `tests/v011.mjs` (test léger 0.1.1 : plein écran, voix fichier + repli, zones tactiles, paysage),
+- `tests/v013.mjs` (test léger 0.1.3 : paysage 915x412, 915x340, 800x360, toutes les étapes), `tests/v012.mjs` (test léger 0.1.2 : graine, indices, musique, vibrations, `?cyd=1`), `tests/v011.mjs` (test léger 0.1.1 : plein écran, voix fichier + repli, zones tactiles, paysage),
   `tests/voix-liste.mjs` (liste des voix), `tests/run.mjs` (test léger : séquence complète jusqu'à la victoire, console, captures), `tests/fps.mjs` (une mesure d'fps),
   `tests/eye.html` (œil seul, `?ref=1` = cadrage de la référence).
 - Polices auto-hébergées : Chakra Petch et JetBrains Mono (licence OFL, `fonts/OFL.txt`).

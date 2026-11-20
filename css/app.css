@@ -119,6 +119,7 @@ svg { display: block; }
 .status { display: flex; align-items: baseline; gap: var(--s-3); padding: var(--s-1) var(--s-1) 0; min-height: 48px; }
 .status-step { flex: none; font: 500 0.8125rem/1 var(--mono); color: var(--cyan); padding: 5px 7px; border: 1px solid rgb(98 214 255 / 0.35); border-radius: var(--r-s); }
 .status-text { margin: 0; font-size: 1rem; line-height: 1.35; color: var(--ink); text-wrap: pretty; }
+.status-prob { display: none; }
 .status-text.flash { animation: flash 0.6s var(--ease-out); }
 @keyframes flash { 0% { color: #fff; text-shadow: 0 0 14px var(--cyan); } 100% { color: var(--ink); text-shadow: none; } }
 
@@ -355,7 +356,43 @@ body.cyd .app, body.cyd .skip { display: none; }
   .intro, .end { left: max(300px, 40%); top: 0; }
   .intro-inner, .end-inner { top: var(--s-5); }
   .ledbars { display: none; }
+  .status-text { font-size: 0.9375rem; line-height: 1.3; }
+  /* le HUD de la colonne de l'œil (300 px min) garde minuterie + 3 boutons ; le % passe dans la barre d'état */
+  .hud .prob { display: none; }
+  .hud .seg-wrap { margin-right: auto; }
+  .stage .seg svg { width: 100px; }
+  .status-prob { display: block; flex: none; margin-left: auto; font: 500 0.8125rem/1 var(--mono); color: var(--ink-2); padding: 5px 7px; border: 1px solid var(--line-2); border-radius: var(--r-s); }
+  .status-prob output { color: var(--cyan); font-variant-numeric: tabular-nums; }
 }
+
+/* loupe paysage : écran 2 (+ clavier) agrandis dans la colonne de l'œil, sous le HUD */
+.loupe {
+  position: absolute; left: var(--s-2); right: var(--s-2); top: 60px; bottom: 6px; z-index: 3;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; pointer-events: none;
+}
+.loupe > * { pointer-events: auto; }
+.loupe .cyd-screen {
+  width: min(100%, 300px); height: auto; margin: 0; padding: 6px 10px; gap: 4px; font-size: 14px;
+  box-shadow: 0 0 0 4px #111, 0 0 0 7px #c9a92a, 0 12px 30px -6px #000;
+}
+.loupe .c2-head { font-size: 11px; }
+.loupe .c2-msg { font-size: 13px; }
+.loupe .c2-big { font-size: 24px; }
+.loupe .c2-center { margin: 0; gap: 2px; }
+.loupe .c2-center .c2-dim { display: none; }
+.loupe .wires { flex: none; }
+.loupe .wire { min-height: 44px; }
+.loupe .wire svg { height: 26px; max-height: 26px; }
+.loupe .wire-name { font-size: 11px; top: 2px; }
+.loupe #keypad {
+  position: relative; left: auto !important; top: auto !important; width: 182px !important; height: 182px !important;
+  --mm: 3px; gap: 6px; padding: 6px; box-shadow: 0 0 0 1px rgb(255 255 255 / 0.1), 0 12px 30px -6px #000;
+}
+.loupe .kp { font-size: 17px; }
+.loupe .kp::before { inset: -3px; }
+.ghost { display: grid; place-items: center; font: 500 max(9px, calc(3 * var(--mm))) var(--mono); color: var(--ink-3); letter-spacing: 0.08em; }
+.cyd-screen.ghost { opacity: 0.8; }
+.keypad.ghost { border: 1px dashed var(--line-2); background: none; box-shadow: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }

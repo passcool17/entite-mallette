@@ -6,7 +6,7 @@ import { initAudio, sfx, speak, voiceLevel, setMuted, isMuted, setCaptionHandler
 window.__musique = musicStats;
 window.__voix = voiceStats;
 
-const VERSION = '0.1.2';
+const VERSION = '0.1.3';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -44,6 +44,12 @@ function initCase() {
   function layoutPanel() {
     const L = landMQ.matches ? LAYOUT.landscape : LAYOUT.portrait;
     panel.classList.toggle('land', L === LAYOUT.landscape);
+    if (L === LAYOUT.landscape) {
+      // paysage : le panneau entier tient dans la hauteur visible (barres du navigateur comprises), rapport 273:169 gardé
+      const top = panel.getBoundingClientRect().top + scrollY;
+      const avail = Math.max(160, innerHeight - top - 8);
+      panel.style.width = `min(100%, ${Math.floor(avail * L.width / L.height)}px)`;
+    } else panel.style.width = '';
     const mm = panel.clientWidth / L.width;
     panel.style.setProperty('--mm', mm + 'px');
     for (const el of $$('[data-part]', panel)) {
@@ -55,7 +61,9 @@ function initCase() {
   }
   layoutPanel();
   new ResizeObserver(layoutPanel).observe(panel);
-  landMQ.addEventListener('change', layoutPanel);
+  new ResizeObserver(layoutPanel).observe($('.status'));
+  addEventListener('resize', layoutPanel);
+  landMQ.addEventListener('change', () => { layoutPanel(); applyLoupe(); });
 
   // CYD 1 : miroir de l'œil, cadré comme l'écran réel (240x320)
   const c1 = $('#cyd1'), c1x = c1.getContext('2d', { alpha: false }), eyeCanvas = $('#eye');
@@ -191,11 +199,36 @@ function initCase() {
 
   // ---------- écran 2 (CYD) ----------
   const c2 = $('#cyd2');
+
+  // ---------- loupe (paysage) ----------
+  // En paysage, l'écran 2 à l'échelle est trop petit pour les fils et le code : à ces étapes, l'écran 2 (et le clavier
+  // pour le code) passent agrandis dans la colonne de l'œil, avec des zones de 44 px. Un fantôme reste à leur place.
+  const LOUPE = { wires: ['#cyd2'], pilule: ['#cyd2', '#keypad'] };
+  const loupe = $('#loupe'), home = new Map();
+  function applyLoupe() {
+    const want = landMQ.matches && g.running ? (LOUPE[g.c2] || []).map((sel) => $(sel)) : [];
+    for (const [el, h] of home) {
+      if (want.includes(el)) continue;
+      h.ghost.replaceWith(el); home.delete(el);
+    }
+    for (const el of want) {
+      if (home.has(el)) continue;
+      const ghost = el.cloneNode(false);
+      ghost.removeAttribute('id'); ghost.removeAttribute('role'); ghost.removeAttribute('aria-live'); ghost.removeAttribute('aria-label');
+      ghost.classList.add('ghost'); ghost.setAttribute('aria-hidden', 'true'); ghost.textContent = 'agrandi ◀';
+      el.replaceWith(ghost); home.set(el, { ghost });
+      loupe.append(el);
+    }
+    loupe.dataset.view = want.length ? g.c2 : '';
+    loupe.hidden = !want.length;
+    layoutPanel();
+  }
   const WIRES = { rouge: '#ff3b30', bleu: '#3d8bff', jaune: '#ffd23d', vert: '#3dff95', blanc: '#e8eef2' };
   function c2Head() { return `<div class="c2-head"><span>CYD2</span><span data-code>${g.codeKnown ? 'CODE ' + g.code : 'HORS LIGNE'}</span></div>`; }
   function c2View(view) {
     g.c2 = view;
     clearInterval(g.lieTimer);
+    queueMicrotask(applyLoupe);
     if (view === 'locked') c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg">SYSTÈME VERROUILLÉ</span><span class="c2-msg c2-dim">attente du code source</span></div>`;
     if (view === 'code') {
       c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg">PODKOVA · CODE SOURCE</span><span class="c2-big" data-big></span><span class="c2-msg c2-dim">à taper à la fin</span></div>`;
@@ -264,6 +297,7 @@ function initCase() {
     const box = $('#probBox'), out = $('#prob');
     out.textContent = fmtPct(val);
     out.classList.toggle('glitch', lie);
+    const o2 = $('#prob2'); o2.textContent = fmtPct(val); o2.classList.toggle('glitch', lie);
   }
   function goStep(n) {
     g.step = n;
