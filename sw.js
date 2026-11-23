@@ -1,11 +1,12 @@
 // sw.js : service worker versionné, écrit à la main. Changer VERSION à chaque publication.
-const VERSION = '0.1.6';
-const CACHE = `entite-mallette-${VERSION}`;
+const VERSION = '0.1.5';
+// Nom distinct pour écarter le cache v0.1.6 sur les téléphones ; ne pas reprendre entite-mallette-0.1.5.
+const CACHE = 'entite-mallette-v0.1.5-base';
 const MEDIA = ['./audio/tension.mp3', './fonts/chakra-petch-latin-500-normal.woff2', './fonts/chakra-petch-latin-700-normal.woff2', './fonts/jetbrains-mono-latin-500-normal.woff2'];
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
-  './css/app.css?v=0.1.6', './js/app.js?v=0.1.6', './voix/voix.json',
-  './js/eye.js', './js/eye-config.js', './js/panel-config.js', './js/audio.js', './js/voix.js', './js/preload.js', './js/puzzles.js',
+  './css/app.css?v=0.1.5', './js/app.js?v=0.1.5', './voix/voix.json',
+  './js/eye.js', './js/eye-config.js', './js/panel-config.js', './js/audio.js', './js/voix.js', './js/preload.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
 ];
 
@@ -20,7 +21,8 @@ self.addEventListener('message', (e) => { if (e.data === 'SKIP_WAITING') self.sk
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter((k) => k.startsWith('entite-mallette-') && k !== CACHE).map((k) => caches.delete(k)));
+    // Supprimer les anciens caches de cette app, mais jamais ceux de l'archive v0.1.6 (entite-mallette-v016-*) sur le même origine.
+    await Promise.all(keys.filter((k) => k.startsWith('entite-mallette-') && !k.startsWith('entite-mallette-v016-') && k !== CACHE).map((k) => caches.delete(k)));
     await self.clients.claim();
   })());
 });

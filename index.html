@@ -41,16 +41,15 @@
     @media (prefers-reduced-motion: reduce) { .b-eye i { animation-duration: 30s; } .b-scan { animation-duration: 3s; } .b-eye b { animation: none; } }
   </style>
   <!-- feuille de style non bloquante (l'écran de chargement la recouvre) ; modules en parallèle au lieu d'une cascade -->
-  <link rel="stylesheet" href="css/app.css?v=0.1.6" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="css/app.css?v=0.1.6"></noscript>
+  <link rel="stylesheet" href="css/app.css?v=0.1.5" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="css/app.css?v=0.1.5"></noscript>
   <link rel="modulepreload" href="js/eye.js">
   <link rel="modulepreload" href="js/eye-config.js">
   <link rel="modulepreload" href="js/panel-config.js">
   <link rel="modulepreload" href="js/audio.js">
   <link rel="modulepreload" href="js/voix.js">
   <link rel="modulepreload" href="js/preload.js">
-  <link rel="modulepreload" href="js/puzzles.js">
-  <script type="module" src="js/app.js?v=0.1.6"></script>
+  <script type="module" src="js/app.js?v=0.1.5"></script>
 </head>
 <body>
   <div id="boot" aria-live="polite">
@@ -68,7 +67,7 @@
   <script>
     // % réel en deux phases : code (CSS + modules, 15 %) mesuré par PerformanceObserver, puis médias (85 %) par preload.js
     (function () {
-      var CODE_BYTES = 153962, $ = function (id) { return document.getElementById(id); };
+      var CODE_BYTES = 124711, $ = function (id) { return document.getElementById(id); };
       var B = window.__boot = { code: 0, asset: 0, shown: 0, ready: false };
       B.paint = function () {
         var f = Math.min(1, B.code * 0.15 + B.asset * 0.85);
@@ -201,7 +200,7 @@
       <div class="intro-inner">
         <h2 class="intro-title" id="introTitle">L'Entité</h2>
         <p class="intro-lead">Une intelligence sans corps. Elle falsifie les voix, réécrit les images et calcule tes choix avant toi.</p>
-        <p class="intro-brief">Deux couches de verrous, trois trappes, huit minutes. Tout se déduit du panneau et de l'écran 2, par logique, sans calcul. Quand son œil grésille, l'Entité ment.</p>
+        <p class="intro-brief">Deux couches de verrous, trois trappes, huit minutes. Tout se déduit du panneau et de son n° de série. Quand son œil grésille, l'Entité ment.</p>
         <button class="primary-btn" id="btnStart" type="button">Ouvrir la mallette</button>
         <p class="intro-note" id="introNote">Le son et le plein écran démarrent au toucher. Secouer le téléphone fait exploser la mallette.</p>
         <p class="intro-note" id="fsHint" hidden>Pour le plein écran sur iPhone : Partager, puis « Sur l'écran d'accueil ».</p>

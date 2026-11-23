@@ -2,18 +2,15 @@
 
 Simulateur web (PWA, téléphone d'abord) de la mallette de désamorçage ESP32 de Pascal, sous l'œil de l'Entité.
 
-Lien prévu : https://passcool17.github.io/entite-mallette/ (publié seulement après le PASS du QA).
+Lien : https://passcool17.github.io/entite-mallette/
 
 ## État
 
-Version 0.1.6 (locale, pas encore publiée ; la 0.1.5 est en ligne avec les voix v2).
+Version 0.1.5 (base en ligne, rétablie le 23 nov. 2026 par un commit en avant depuis la v0.1.6). Voix ElevenLabs : `voix/intro.mp3` (41318 octets) et `voix/depart.mp3` (63783 octets). Musique `audio/tension.mp3`. 12 étapes, 8 minutes.
 
-- 0.1.6 : plus aucun calcul. Les énigmes du n° de série (reste, parité, poids des chiffres, fragments de code) sont
-  remplacées par des énigmes de logique visuelle sur l'écran 2 : suites de couleurs, trappes qui mentent, symboles des
-  badges, indices d'ordre des clés, règles de fils « ni … ni … », grille du clavier pour les codes. Textes d'une ou deux
-  lignes, sans formule. Pas plus facile : chaque énigme demande au moins deux déductions enchaînées, leurres gardés
-  (clones, plaque, symboles en trop, fils qui ratent d'une seule condition), mensonges au même rythme (8 / 12).
-  Voir « Règles 0.1.6 » plus bas. Le cache du service worker change de nom, ce qui recharge aussi les voix v2.
+L'archive figée de la v0.1.6 (énigmes de logique visuelle, 33 voix Piper v2) est publiée à part : https://passcool17.github.io/entite-mallette-v016/
+
+Le cache du service worker s'appelle `entite-mallette-v0.1.5-base`, pour écarter l'ancien cache `entite-mallette-0.1.6`. À l'activation, les caches `entite-mallette-…` sont supprimés, sauf ceux qui commencent par `entite-mallette-v016-` (l'archive, même origine).
 
 - 0.1.5 : partie ~2x plus longue mais pas plus difficile : 12 étapes en deux couches de verrous, 8 minutes.
   Le début demande maintenant de vraies déductions (interrupteurs à deux indices, trappe à trouver, vrai badge Podkova
@@ -73,30 +70,7 @@ Version 0.1.6 (locale, pas encore publiée ; la 0.1.5 est en ligne avec les voix
 
 Minuterie : 4:00. Erreurs : -10 s (ordre) ou -15 s (code), et la probabilité d'échec remonte.
 
-### Règles 0.1.6 : logique visuelle, 12 étapes (énigmes dans `js/puzzles.js`)
-
-Couche 1
-1. Interrupteurs : compléter la suite de couleurs de l'écran 2 ; sa couleur se lève d'abord. Moyen : motif de 4
-   (case vide à la fin ou au milieu) ; difficile : motif de 5 ou suite croissante (a b c, a b b c…), case au milieu.
-2. Clé en croix : 3 phrases sur l'écran 2 (« T1 PAS ICI », « T3 EN T2 »…). Moyen : une seule ment ; difficile : une
-   seule dit vrai. Mauvaise trappe : vide, −5 s. Puis Croix A + B ensemble.
-3. Badges : 3 clones de 4 symboles. Moyen : « deux ▲, pas côte à côte » ; difficile : « …, et aucun ● ».
-4. Clés I-III : 2 indices (moyen) ou 3 indices tous utiles (difficile) : « II avant I », « III pas en premier »…
-5. Fils : « celui qui n'est ni rouge, ni à côté d'un bleu » (2 conditions ; difficile : 3, avec « ni au bout »).
-6. Code 1 : la grille de l'écran 2 a la forme du clavier ; chaque symbole du vrai badge donne une touche. Moyen : dans
-   l'ordre ; difficile : de droite à gauche. Puis le faux « C'est fini. Tu as gagné. » (mensonge signalé).
-
-Couche 2 : 7. nouvelle suite (autre type). 8. Croix A + B à l'arrêt ensemble. 9. Clés : nouveaux indices, autre ordre.
-10. Fils 2 : « celui à côté d'un jaune, mais pas vert » (difficile : « mais ni vert ni au bout » ; ou « entre deux
-fils pareils »). 11. Code 2 : nouvelle grille, badge lu dans l'autre sens. 12. Gros bouton.
-
-Chaque énigme a une seule réponse et chaque condition sert (vérifié par `node tests/v016.mjs`, 3000 graines, par
-des solveurs qui ne lisent que l'écran). Le n° de série et le lot restent sur la plaque comme leurres.
-Note de difficulté 0.1.6 = déductions + leurres + mensonges + pièges variables (fils qui ratent d'une seule condition,
-chiffre en double dans le code, phrases « EN T2 » à croiser…), recalée sur les bandes 0.1.5 : moyen 30–32,
-difficile 37–39 (`node tests/paliers.mjs`).
-
-### Règles 0.1.5 : deux couches, 12 étapes (remplacées en 0.1.6)
+### Règles 0.1.5 : deux couches, 12 étapes
 
 Couche 1
 1. Interrupteurs : n° avec une voyelle (A, E, U, Y) → bleu d'abord ; sinon dernier chiffre pair → bleu, impair → rouge.
@@ -222,8 +196,7 @@ zone utile 273 x 169 mm, base 83 mm, couvercle 17 mm, encombrement de chaque pi�
 
 - `index.html`, `css/app.css`, `js/app.js` (logique et panneau), `js/eye.js` (rendu), `js/eye-config.js` (tous les
   paramètres de l'œil), `js/panel-config.js` (cotes réelles), `js/audio.js`, `js/voix.js`, `sw.js`, `manifest.webmanifest`.
-- `tests/v016.mjs` (0.1.6 : solveurs logiques sur 3000 graines + partie complète par palier en 412x915, `VP=915x412` pour le paysage ; captures dans `/workspace/qa/entite-mallette/v0.1.6/`), `js/puzzles.js` (énigmes sans DOM),
-  `tests/v014.mjs` (partie complète avec `?seed=N` en lisant seulement l'écran), `tests/v013-chargement.mjs` (1re visite à froid en Fast 3G, revisite, échec + Réessayer), `tests/v013.mjs` (test léger 0.1.3 : paysage 915x412, 915x340, 800x360, toutes les étapes), `tests/v012.mjs` (test léger 0.1.2 : graine, indices, musique, vibrations, `?cyd=1`), `tests/v011.mjs` (test léger 0.1.1 : plein écran, voix fichier + repli, zones tactiles, paysage),
+- `tests/v014.mjs` (partie complète avec `?seed=N` en lisant seulement l'écran), `tests/v013-chargement.mjs` (1re visite à froid en Fast 3G, revisite, échec + Réessayer), `tests/v013.mjs` (test léger 0.1.3 : paysage 915x412, 915x340, 800x360, toutes les étapes), `tests/v012.mjs` (test léger 0.1.2 : graine, indices, musique, vibrations, `?cyd=1`), `tests/v011.mjs` (test léger 0.1.1 : plein écran, voix fichier + repli, zones tactiles, paysage),
   `tests/voix-liste.mjs` (liste des voix), `tests/run.mjs` (test léger : séquence complète jusqu'à la victoire, console, captures), `tests/fps.mjs` (une mesure d'fps),
   `tests/eye.html` (œil seul, `?ref=1` = cadrage de la référence).
 - Polices auto-hébergées : Chakra Petch et JetBrains Mono (licence OFL, `fonts/OFL.txt`).
@@ -244,7 +217,6 @@ node tests/run.mjs http://localhost:8792/
 
 ## Prochaines étapes
 
-- Réenregistrer `caches` et `code2` (textes 0.1.6 dans `VOIX.md`) ; QA puis publication de la 0.1.6.
 - Essai réel sur le Galaxy S20 FE (fps de l'œil, secousse, synthèse vocale française disponible).
 - Porter l'œil sur le CYD 1 (`PORTAGE-CYD.md`) et la logique sur l'ESP32.
 - Tirer le panneau 3D de `js/panel-config.js`.

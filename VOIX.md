@@ -16,7 +16,7 @@ Elle parle comme une machine qui a déjà calculé la suite. Pas de nom de film,
 |---|---|---|
 | `intro` | Ouverture de la mallette | Je suis l'Entité. J'ai déjà calculé tes choix. |
 | `depart` | 3,6 s après l'intro | Trois minutes. Quatre-vingt-dix-neuf virgule sept pour cent d'échec. Je ne me trompe jamais. |
-| `caches` | (0.1.6 : en attente du nouveau texte, voir plus bas) | Un cache levé. As-tu compris ma suite ? |
+| `caches` | Premier interrupteur basculé | Un cache levé. As-tu lu mon numéro de série ? |
 | `trappe` | Une trappe (servo) s'ouvre | Une trappe s'ouvre. Je l'ai permis. |
 | `tropLent` | Clés en croix pas tournées ensemble | Trop lent. Les deux moitiés, ensemble. |
 | `cle` | Clés en croix réussies | Une clé en croix. Tu crois ouvrir quelque chose. |
@@ -35,7 +35,7 @@ Elle parle comme une machine qui a déjà calculé la suite. Pas de nom de film,
 | `desamorce` | Victoire : piégée dans le lecteur 5D | Le lecteur se referme. Je reviendrai. |
 | `boom` | Explosion (temps, mauvais fil) | Prévisible. |
 | `secousse` | Explosion par secousse | Tu m'as secouée. Erreur fatale. |
-| `pasEncore` | 0.1.6 : premier interrupteur basculé | Pas encore. |
+| `pasEncore` | (réserve) | Pas encore. |
 
 ### Nouvelles répliques 0.1.5 (seconde couche)
 
@@ -54,17 +54,7 @@ dites. Les répliques marquées *mensonge* s'affichent avec l'œil rouge et le s
 | `menteBleu` | Palier difficile, interrupteurs (*mensonge*, quand c'est le rouge d'abord) | Le bleu d'abord. Crois-moi. |
 | `menteRouge` | Palier difficile, interrupteurs (*mensonge*, quand c'est le bleu d'abord) | Le rouge d'abord. Crois-moi. |
 | `fils2` | Second panneau de fils | Un second panneau. Une autre règle. |
-| `code2` | Code 2 à taper | Un second code. Une nouvelle grille. |
-
-### À réenregistrer pour la 0.1.6 (mêmes ids, nouveau texte)
-
-Les énigmes ne passent plus par le n° de série ni par « le code 1 à l'envers ». Le fichier actuel reste lu tant que
-le nouveau n'est pas livré.
-
-| id | Quand | Ancien texte | Nouveau texte |
-|---|---|---|---|
-| `caches` | (plus dite en 0.1.6 : remplacée par `pasEncore` au 1er interrupteur) | Un cache levé. As-tu lu mon numéro de série ? | Un cache levé. As-tu compris ma suite ? |
-| `code2` | Code 2 à taper | Le code, encore. Tu t'en souviens ? | Un second code. Une nouvelle grille. |
+| `code2` | Code 2 à taper | Le code, encore. Tu t'en souviens ? |
 
 ## Signature sonore
 
