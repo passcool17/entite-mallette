@@ -7,17 +7,17 @@
 // Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 // v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 1, variantes d'énigmes
 // tirées par étape (deux parties de suite ne se ressemblent pas : signature de la partie précédente dans localStorage).
-import { createEye } from './eye.js?v=0.2.5c';
-import { EYE, deepMerge } from './eye-config.js?v=0.2.5c';
-import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.5c';
-import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.2.5c';
-import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.5c';
-import { sfx } from './sfx.js?v=0.2.5c';
-import { preloadAll } from './preload.js?v=0.2.5c';
-import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.2.5c';
-import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.2.5c';
+import { createEye } from './eye.js?v=0.2.5d';
+import { EYE, deepMerge } from './eye-config.js?v=0.2.5d';
+import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.5d';
+import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.2.5d';
+import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.5d';
+import { sfx } from './sfx.js?v=0.2.5d';
+import { preloadAll } from './preload.js?v=0.2.5d';
+import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.2.5d';
+import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.2.5d';
 
-const VERSION = '0.2.5c';
+const VERSION = '0.2.5d';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -644,6 +644,30 @@ function objectiveText() {
   const step = g.phase === 'play' ? g.step : 0;
   return sentence(objectiveIds(run, step)) || cueText(OBJECTIVE[step]);
 }
+// Portrait : si le bandeau long (étape 10) ferait défiler, la mallette est légèrement zoomée
+// pour tenir sous le HUD. La consigne reste entière ; le zoom est remis à 1 dès que ça tient.
+let fitLock = false;
+function fitPlayfield() {
+  const fm = $('#face-mallette'), hud = $('.hud'), app = $('#app');
+  if (!fm || !hud || fitLock) return;
+  fitLock = true;
+  const prev = fm.style.zoom;
+  fm.style.zoom = '';
+  let next = '';
+  // toute orientation : si le document déborde, on réduit un peu la mallette (sans tronquer le bandeau)
+  if (!app?.hidden) {
+    const se = document.scrollingElement || document.documentElement;
+    const over = se.scrollHeight - se.clientHeight;
+    if (over > 0) {
+      const nat = fm.getBoundingClientRect().height;
+      const avail = nat - over - 2;
+      if (nat > 0 && avail > 200) next = Math.min(1, Math.max(0.82, avail / nat)).toFixed(3);
+      if (next === '1.000') next = '';
+    }
+  }
+  fm.style.zoom = next;
+  requestAnimationFrame(() => { fitLock = false; if (next !== prev) drawCables(true); });
+}
 function showObjective() {
   clearTimeout(stripTimer);
   const o = $('#objective'); o.classList.remove('ok', 'ko', 'hint');
@@ -653,6 +677,7 @@ function showObjective() {
   document.body.classList.toggle('obj-long', long);
   $('#objLabel').textContent = g.phase === 'play' ? `Étape ${g.step}/${NSTEPS}` : 'Objectif';
   $('#objText').textContent = text;
+  fitPlayfield();
 }
 // message temporaire dans le bandeau (retour Bien / Faux, indice), puis retour à l'objectif
 function setStrip(label, text, kind, ms = 2200) {
@@ -661,6 +686,7 @@ function setStrip(label, text, kind, ms = 2200) {
   document.body.classList.remove('obj-long');
   if (kind) o.classList.add(kind);
   $('#objLabel').textContent = g.phase === 'play' && !/^Étape/.test(label) ? `Étape ${g.step}/${NSTEPS} · ${label}` : label; $('#objText').textContent = text;
+  fitPlayfield();
   stripTimer = setTimeout(showObjective, ms);
 }
 // module(s) de l'étape : contour qui pulse (statique si mouvement réduit) ; un leurre ne brille jamais
@@ -1146,8 +1172,9 @@ function init() {
   eye = createEye($('#eye'), { config: deepMerge(EYE, { radiusOfMin: 0.3, center: { x: 0.5, y: 0.5 } }), reducedMotion: reduced });
   eye.start();
   wire(); initFullscreen(); initScrollPill();
-  new ResizeObserver(() => drawCables(true)).observe($('#face-mallette'));
-  addEventListener('resize', () => drawCables(true));
+  new ResizeObserver(() => { fitPlayfield(); drawCables(true); }).observe($('#face-mallette'));
+  new ResizeObserver(fitPlayfield).observe($('.hud'));
+  addEventListener('resize', () => { fitPlayfield(); drawCables(true); });
   showTime(TIME_S); showProb();
   requestAnimationFrame(loop);
   runBoot(() => { $('#btnStart').disabled = false; $('#btnStart').focus({ preventScroll: true }); registerSW(); });

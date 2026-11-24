@@ -538,9 +538,15 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
   .obj { order: 10; flex: 1 1 100%; display: flex; align-items: baseline; gap: 8px; padding: 4px 8px; }
   .obj-label { flex: none; }
   .obj-text { -webkit-line-clamp: 2; font-size: 12px; }
-  .obj.long { flex-wrap: wrap; align-items: flex-start; }
-  .obj.long .obj-label { flex: 1 1 100%; }
-  .obj.long .obj-text { flex: 1 1 100%; -webkit-line-clamp: 5; font-size: 12px; }
+  /* étape 10 : consigne entière à côté du libellé (pas une ligne de plus pour le libellé) */
+  .obj.long { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 2px 8px; padding: 3px 7px; }
+  .obj.long .obj-label { flex: none; padding-top: 2px; }
+  .obj.long .obj-text { -webkit-line-clamp: 5; font-size: 11px; line-height: 1.2; text-wrap: pretty; }
+  /* un peu moins de hauteur de modules : le bandeau long ne doit pas pousser le clavier hors écran */
+  body.obj-long { --cyd1-h: 84px; --cyd2-h: 90px; }
+  body.obj-long #face-mallette { gap: 4px; }
+  body.obj-long .lid-panel { gap: 4px; }
+  body.obj-long .base-panel { gap: 6px 8px; }
 }
 @media (orientation: portrait) and (min-width: 360px) and (max-width: 999px) { :root { --cyd1-h: 96px; --kp: 40px; } }
 @media (orientation: portrait) and (max-width: 599px) { .batt .batt-txt small { display: none; } .batt { gap: 2px; padding: 1px 2px; } .batt-ico { width: 13px; } }

@@ -2,8 +2,8 @@
 // repli mp3 / synthèse par id. Usage : node tests/v025.mjs [base]
 import { chromium } from '/home/box/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/index.mjs';
 import { mkdirSync, readFileSync } from 'node:fs';
-import { makeRun } from '../js/game.js?v=0.2.5';
-import { OBJECTIVE, objectiveIds, hintCues, HINT_COST, AUTO_HINT_MS } from '../js/guide.js?v=0.2.5';
+import { makeRun } from '../js/game.js?v=0.2.5d';
+import { OBJECTIVE, objectiveIds, hintCues, HINT_COST, AUTO_HINT_MS } from '../js/guide.js?v=0.2.5d';
 
 const base = process.argv[2] || 'http://127.0.0.1:8794/';
 const shots = process.env.SHOTS || '/workspace/qa/entite-mallette/v0.2.5-dev/';
@@ -97,7 +97,7 @@ async function openTo(p, step) {
   await p.tap('#btnHint'); await W(p, 250);
   const h3 = await D(p, () => ({ hint: __entiteDebug.state.hint, rem: __entiteDebug.state.remaining, dis: document.querySelector('#btnHint').disabled, heard: __entiteDebug.voiceLog.map((v) => v.ids[0]), text: document.querySelector('#objText').textContent }));
   ok('étape 10 : Indice 3 coûte −30 s, dit le premier geste (voix seulement), bouton épuisé', h3.hint === 3 && rem2 - h3.rem > 29.5 && rem2 - h3.rem < 31.5 && (h3.heard.includes('hint3_geste') || h3.heard.includes('hint3_debranche')) && h3.dis, { ...h3, rem2 });
-  ok('démarrage sans erreur, 0 404, imports ?v=0.2.5, mp3 Piper demandés', errs.length === 0 && !errs.some((e) => /404/.test(e)) && reqs.filter((u) => /\/js\/\w[\w-]*\.js/.test(u)).every((u) => /\?v=0\.2\.5$/.test(u)) && reqs.some((u) => /guide\.js\?v=0\.2\.5/.test(u)) && reqs.some((u) => /voix\/clue_patch_double\.mp3/.test(u)), { errs: errs.slice(0, 6), js: reqs.filter((u) => /\.js/.test(u)).map((u) => u.split('/').pop()) });
+  ok('démarrage sans erreur, 0 404, imports ?v=0.2.5d, mp3 Piper demandés', errs.length === 0 && !errs.some((e) => /404/.test(e)) && reqs.filter((u) => /\/js\/\w[\w-]*\.js/.test(u)).every((u) => /\?v=0\.2\.5d$/.test(u)) && reqs.some((u) => /guide\.js\?v=0\.2\.5d/.test(u)) && reqs.some((u) => /voix\/clue_patch_double\.mp3/.test(u)), { errs: errs.slice(0, 6), js: reqs.filter((u) => /\.js/.test(u)).map((u) => u.split('/').pop()) });
   await done();
 }
 
@@ -122,6 +122,72 @@ async function openTo(p, step) {
   const a = await D(p, () => ({ ...__entiteDebug.objective(), fits: (() => { const t = document.querySelector('#objText'); return t.scrollHeight <= t.clientHeight + 2; })() }));
   ok('étape 10 (série) : consigne avec rang de lettre, lisible, pas de numéro de prise calculé', a.text === want && /câble noir/.test(a.text) && /lettre F/.test(a.text) && /porte le rang/.test(a.text) && a.fits, a);
   await p.screenshot({ path: shots + 'etape10-serie-412.png' });
+  await done();
+}
+
+// ---------- overflow 412×915 (bandeau étape 10) + non-régression ----------
+const measureOverflow = () => {
+  const se = document.scrollingElement || document.documentElement;
+  const t = document.querySelector('#objText');
+  const pill = document.querySelector('#scrollPill');
+  const bottoms = ['#gtArm', '#gtTx', '.mod-keypad', '.mod-toggles'].map((sel) => {
+    const e = document.querySelector(sel);
+    return e ? e.getBoundingClientRect().bottom : 0;
+  });
+  return {
+    dx: se.scrollWidth - se.clientWidth,
+    dy: se.scrollHeight - se.clientHeight,
+    pill: pill ? !pill.hidden : null,
+    fits: t ? t.scrollHeight <= t.clientHeight + 2 : false,
+    text: t?.textContent || '',
+    long: document.querySelector('#objective')?.classList.contains('long') || false,
+    zoom: document.querySelector('#face-mallette')?.style.zoom || '1',
+    hud: Math.round(document.querySelector('.hud')?.getBoundingClientRect().height || 0),
+    bottom: Math.max(0, ...bottoms),
+    vh: window.innerHeight,
+  };
+};
+
+{
+  const cases = [
+    { seed: 0, kind: 'double', w: sentence(makeRun(0).cues[10]) },
+    { seed: 7, kind: 'échange', w: sentence(makeRun(7).cues[10]) },
+    { seed: 2, kind: 'série', w: sentence(makeRun(2).cues[10]) },
+    { seed: 33, kind: 'série-longue', w: sentence(makeRun(33).cues[10]) },
+  ];
+  for (const c of cases) {
+    const { p, errs, done } = await page({ width: 412, height: 915 }, { query: `&seed=${c.seed}&voix=rapide&notuto=1` });
+    await openTo(p, 10);
+    const m = await D(p, measureOverflow);
+    ok(`étape 10 (412×915, graine ${c.seed}, ${c.kind}) : overflow 0×0, consigne entière, pastille masquée, bas de mallette visible`, m.dx <= 0 && m.dy <= 0 && m.fits && m.pill === false && m.bottom <= m.vh + 1 && m.text === c.w && m.long, m);
+    ok(`étape 10 (412×915, graine ${c.seed}) : 0 erreur console`, errs.length === 0, errs);
+    if (c.seed === 2) await p.screenshot({ path: shots + 'etape10-serie-overflow-412.png' });
+    if (c.seed === 0) await p.screenshot({ path: shots + 'etape10-double-overflow-412.png' });
+    await done();
+  }
+}
+{
+  const { p, errs, done } = await page({ width: 412, height: 915 }, { query: '&seed=0&voix=rapide&notuto=1' });
+  await openTo(p, 1);
+  const m = await D(p, measureOverflow);
+  ok('étape 1 (412×915) : pas de régression overflow (0×0)', m.dx <= 0 && m.dy <= 0 && m.pill === false, m);
+  ok('étape 1 (412×915) : 0 erreur console', errs.length === 0, errs);
+  await done();
+}
+{
+  const { p, errs, done } = await page({ width: 915, height: 412 }, { query: '&seed=2&voix=rapide&notuto=1' });
+  await openTo(p, 10);
+  const m = await D(p, measureOverflow);
+  ok('étape 10 (915×412, série) : overflow 0×0, consigne entière, pastille masquée', m.dx <= 0 && m.dy <= 0 && m.fits && m.pill === false && m.bottom <= m.vh + 1, m);
+  ok('étape 10 (915×412) : 0 erreur console', errs.length === 0, errs);
+  await done();
+}
+{
+  const { p, errs, done } = await page({ width: 1280, height: 800 }, { query: '&seed=2&voix=rapide&notuto=1' });
+  await openTo(p, 10);
+  const m = await D(p, measureOverflow);
+  ok('étape 10 (1280×800, série) : overflow 0×0, consigne entière', m.dx <= 0 && m.dy <= 0 && m.fits && m.bottom <= m.vh + 1, m);
+  ok('étape 10 (1280×800) : 0 erreur console', errs.length === 0, errs);
   await done();
 }
 
