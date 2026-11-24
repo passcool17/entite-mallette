@@ -1,7 +1,7 @@
 // audio.js (v0.2.5) : graphe WebAudio unique (voix / musique / effets, limiteur, L/R), musique de tension, voix de l'Entité (manifeste voix/manifest.json : mp3 si prêt, sinon synthèse française),
 // routée dans un AnalyserNode pour animer l'œil.
-import { loadManifest, sentence, fileOf, cue } from './voice-manifest.js?v=0.2.5h';
-import { takePreloaded, MUSIC_URL } from './preload.js?v=0.2.5h';
+import { loadManifest, sentence, fileOf, cue } from './voice-manifest.js?v=0.2.5i';
+import { takePreloaded, MUSIC_URL } from './preload.js?v=0.2.5i';
 
 let ac = null, master, limiter, sfxBus, voiceBus, analyser, data, muted = false, volume = 0.9;
 let musicBus, musicDuck, musicLP, music = null, musicBuf = null, musicLoad = null;

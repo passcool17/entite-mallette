@@ -1,9 +1,9 @@
-// Test léger v0.2.5h : voix ElevenLabs, jauge CYD 2 (y compris 915×412), overflow 0.
+// Test léger v0.2.5i : voix ElevenLabs, jauge CYD 2 (y compris 915×412), overflow 0.
 // Usage : node tests/v025.mjs [base]
 import { chromium } from '/home/box/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/index.mjs';
 import { mkdirSync, readFileSync } from 'node:fs';
-import { makeRun } from '../js/game.js?v=0.2.5h';
-import { OBJECTIVE, objectiveIds, hintCues, HINT_COST, AUTO_HINT_MS } from '../js/guide.js?v=0.2.5h';
+import { makeRun } from '../js/game.js?v=0.2.5i';
+import { OBJECTIVE, objectiveIds, hintCues, HINT_COST, AUTO_HINT_MS } from '../js/guide.js?v=0.2.5i';
 
 const base = process.argv[2] || 'http://127.0.0.1:8794/';
 const shots = process.env.SHOTS || '/workspace/qa/entite-mallette/v0.2.5-dev/';
@@ -18,7 +18,7 @@ const VAGUE = 'Rebranche les câbles : nouvelle consigne.';
 // ================= 1. logique pure =================
 {
   const ready = man.cues.filter((c) => c.mp3Ready); const el = ready.filter((c) => c.source === 'elevenlabs');
-  ok('manifeste v0.2.5h : 172 répliques toutes prêtes, toutes ElevenLabs (intro/depart inclus)', man.version === '0.2.5h' && man.cues.length === 172 && ready.length === 172 && el.length === 172 && el.every((c) => c.mp3Ready && c.file === `voix/${c.id}.mp3`) && el.filter((c) => c.id === 'intro' || c.id === 'depart').length === 2);
+  ok('manifeste v0.2.5i : 172 répliques toutes prêtes, toutes ElevenLabs (intro/depart inclus)', man.version === '0.2.5i' && man.cues.length === 172 && ready.length === 172 && el.length === 172 && el.every((c) => c.mp3Ready && c.file === `voix/${c.id}.mp3`) && el.filter((c) => c.id === 'intro' || c.id === 'depart').length === 2);
   ok('coûts d’indice inchangés (0 / 15 / 30) et auto 45 s', HINT_COST[1] === 0 && HINT_COST[2] === 15 && HINT_COST[3] === 30 && AUTO_HINT_MS === 45000);
   const kinds = { double: 0, echange: 7, serie: 2 };
   const samples = {};
@@ -97,7 +97,7 @@ async function openTo(p, step) {
   await p.tap('#btnHint'); await W(p, 250);
   const h3 = await D(p, () => ({ hint: __entiteDebug.state.hint, rem: __entiteDebug.state.remaining, dis: document.querySelector('#btnHint').disabled, heard: __entiteDebug.voiceLog.map((v) => v.ids[0]), text: document.querySelector('#objText').textContent }));
   ok('étape 10 : Indice 3 coûte −30 s, dit le premier geste (voix seulement), bouton épuisé', h3.hint === 3 && rem2 - h3.rem > 29.5 && rem2 - h3.rem < 31.5 && (h3.heard.includes('hint3_geste') || h3.heard.includes('hint3_debranche')) && h3.dis, { ...h3, rem2 });
-  ok('démarrage sans erreur, 0 404, imports ?v=0.2.5h, mp3 ElevenLabs demandés', errs.length === 0 && !errs.some((e) => /404/.test(e)) && reqs.filter((u) => /\/js\/\w[\w-]*\.js/.test(u)).every((u) => /\?v=0\.2\.5h$/.test(u)) && reqs.some((u) => /guide\.js\?v=0\.2\.5h/.test(u)) && reqs.some((u) => /voix\/clue_patch_double\.mp3/.test(u)), { errs: errs.slice(0, 6), js: reqs.filter((u) => /\.js/.test(u)).map((u) => u.split('/').pop()) });
+  ok('démarrage sans erreur, 0 404, imports ?v=0.2.5i, mp3 ElevenLabs demandés', errs.length === 0 && !errs.some((e) => /404/.test(e)) && reqs.filter((u) => /\/js\/\w[\w-]*\.js/.test(u)).every((u) => /\?v=0\.2\.5i$/.test(u)) && reqs.some((u) => /guide\.js\?v=0\.2\.5i/.test(u)) && reqs.some((u) => /voix\/clue_patch_double\.mp3/.test(u)), { errs: errs.slice(0, 6), js: reqs.filter((u) => /\.js/.test(u)).map((u) => u.split('/').pop()) });
   await done();
 }
 
@@ -298,6 +298,89 @@ const measureBatt = () => {
   const mix = await D(p, () => __entiteDebug.voiceLog.findLast((v) => v.ids.join() === 'intro,ligne_absente_xyz'));
   ok('suite mixte intro + id inconnu : mode mix (mp3 puis synthèse)', !!mix && mix.mode === 'mix', mix);
   ok('repli voix : 0 erreur 404', errs.filter((e) => /404/.test(e)).length === 0, errs);
+  await done();
+}
+
+
+// ---------- étape 3 : Réécouter rejoue la séquence lumineuse (même ordre, pas de double anim) ----------
+{
+  const { p, errs, done } = await page({ width: 412, height: 915 }, { query: '&seed=0&voix=rapide&notuto=1' });
+  await p.tap('#btnStart'); await W(p, 300);
+  await p.tap('#coverArm'); await W(p, 120);
+  await p.tap('#leverArm'); await W(p, 300);
+  // coupe intro / consigne d'étape 1 encore en file, sinon la première séquence part trop tard
+  await D(p, () => __entiteDebug.clearVoice());
+  await D(p, () => __entiteDebug.goto(3));
+  await W(p, 120);
+  const want = await D(p, () => __entiteDebug.run.seq.slice());
+  const readLit = () => D(p, () => [...document.querySelectorAll('#bar i')].map((e, i) => (e.classList.contains('on') && e.style.getPropertyValue('--c').trim() === '#62d6ff' ? i + 1 : 0)).filter(Boolean));
+  const overflow = () => D(p, () => { const se = document.scrollingElement || document.documentElement; return { dx: se.scrollWidth - se.clientWidth, dy: se.scrollHeight - se.clientHeight }; });
+  async function recordSeq(ms = 18000) {
+    const ev = [];
+    let last = 0;
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      const on = await readLit();
+      const cur = on[0] || 0;
+      if (cur && cur !== last) ev.push({ led: cur, t: Date.now() - t0, css: 'on #62d6ff' });
+      last = cur;
+      if (ev.length >= want.length) {
+        // attendre l'extinction de la dernière pour figer le motif
+        const end = Date.now();
+        while (Date.now() - end < 900) {
+          const still = await readLit();
+          if (!still.length) break;
+          await W(p, 40);
+        }
+        break;
+      }
+      await W(p, 40);
+    }
+    return ev;
+  }
+  const first = await recordSeq();
+  const dt = first.length > 1 ? first.slice(1).map((e, i) => e.t - first[i].t) : [];
+  ok('étape 3 : première lecture, 4 DEL cyan dans l’ordre de run.seq', first.length === 4 && first.map((e) => e.led).join() === want.join(), { want, first });
+  const ov1 = await overflow();
+  ok('étape 3 après 1re séquence : overflow 0×0', ov1.dx <= 0 && ov1.dy <= 0, ov1);
+
+  await p.tap('#btnReplay');
+  const replay = await recordSeq();
+  const dtR = replay.length > 1 ? replay.slice(1).map((e, i) => e.t - replay[i].t) : [];
+  const sameOrder = replay.map((e) => e.led).join() === first.map((e) => e.led).join();
+  const samePace = dt.length === dtR.length && dt.every((d, i) => Math.abs(d - dtR[i]) < 200);
+  ok('Réécouter : même ordre de DEL que la première fois', sameOrder && replay.length === 4, { want, first: first.map((e) => e.led), replay: replay.map((e) => e.led) });
+  ok('Réécouter : même cadence (520 ms allumées + 260 ms d’écart, ±200 ms)', samePace, { dt, dtR });
+  const after = await readLit();
+  ok('après la réécoute, la barre revient à l’état d’attente (aucune DEL allumée)', after.length === 0, after);
+
+  // double appui : annule la 1re réécoute et n’en joue qu’une
+  await p.tap('#btnReplay');
+  await W(p, 400);
+  await p.tap('#btnReplay');
+  const twice = await recordSeq();
+  ok('double Réécouter : une seule séquence, même ordre, pas de DEL coincée', twice.length === 4 && twice.map((e) => e.led).join() === want.join() && (await readLit()).length === 0, { want, twice: twice.map((e) => e.led) });
+
+  // saisie clavier pendant une réécoute : le code est pris, la séquence finit, pas d’erreur
+  await p.tap('#btnReplay');
+  const tWait = Date.now();
+  let saw = false;
+  while (Date.now() - tWait < 18000 && !saw) { saw = (await readLit()).length > 0; if (!saw) await W(p, 80); }
+  await D(p, () => __entiteDebug.press('1'));
+  const mid = await D(p, () => ({ code: __entiteDebug.state.code, step: __entiteDebug.state.step }));
+  const rest = [];
+  let last = 0, t2 = Date.now();
+  while (Date.now() - t2 < 5000 && rest.length < 4) {
+    const on = await readLit();
+    const cur = on[0] || 0;
+    if (cur && cur !== last) rest.push(cur);
+    last = cur;
+    await W(p, 40);
+  }
+  ok('clavier pendant la réécoute : le chiffre est retenu, l’étape 3 continue, pas d’erreur', mid.code === '1' && mid.step === 3 && rest.length >= 1, { mid, rest });
+  ok('étape 3 Réécouter : 0 erreur console', errs.length === 0, errs);
+  R.seqLog = { want, first, replay, twice, dt, dtR };
+  await p.screenshot({ path: shots + 'replay-seq-412.png' });
   await done();
 }
 

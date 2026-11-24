@@ -7,17 +7,17 @@
 // Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 // v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 2, variantes d'énigmes
 // tirées par étape (deux parties de suite ne se ressemblent pas : signature de la partie précédente dans localStorage).
-import { createEye } from './eye.js?v=0.2.5h';
-import { EYE, deepMerge } from './eye-config.js?v=0.2.5h';
-import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.5h';
-import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.2.5h';
-import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.5h';
-import { sfx } from './sfx.js?v=0.2.5h';
-import { preloadAll } from './preload.js?v=0.2.5h';
-import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.2.5h';
-import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.2.5h';
+import { createEye } from './eye.js?v=0.2.5i';
+import { EYE, deepMerge } from './eye-config.js?v=0.2.5i';
+import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.5i';
+import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.2.5i';
+import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.5i';
+import { sfx } from './sfx.js?v=0.2.5i';
+import { preloadAll } from './preload.js?v=0.2.5i';
+import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.2.5i';
+import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.2.5i';
 
-const VERSION = '0.2.5h';
+const VERSION = '0.2.5i';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -57,7 +57,7 @@ function resetState(remember = false) {
     cables: run.wires.map((color, i) => ({ color, socket: i })), sel: null, patchTok: 0, // câble c (port c de la base) → prise 0..4 ou null
     pos: null, code: '', keysTurned: [], hesitating: false, lastInput: 0,
     sabotage: false, sabT: 0, said30: false, said10: false,
-    lastClue: null, pressure: [], decoy: null, startT: 0,
+    lastClue: null, lastGoodAt: 0, pressure: [], decoy: null, startT: 0,
     hint: 0, progressT: 0, hintsUsed: 0,
   });
 }
@@ -66,7 +66,7 @@ function resetState(remember = false) {
 // v0.2.4 : vraie file d'attente. Une réplique « now » (mensonge, erreur, indice) coupe la voix en cours, mais une
 // CONSIGNE (clue) n'est jamais perdue : coupée ou en attente, elle est redite juste après. (Avant, un mensonge arrivé
 // pendant depart.mp3 pouvait effacer la consigne de l'étape 1 : on restait bloqué sans savoir quoi faire.)
-const vqItems = []; let vqBusy = false, vqCur = null;
+const vqItems = []; let vqBusy = false, vqCur = null, voiceGen = 0;
 // ids : un id ou une suite d'ids du manifeste. lie : œil rouge pendant la réplique.
 function voice(ids, { lie = false, now = false, clue = false } = {}) {
   ids = Array.isArray(ids) ? ids : [ids];
@@ -84,17 +84,31 @@ function voice(ids, { lie = false, now = false, clue = false } = {}) {
 }
 async function pumpVoice() {
   if (vqBusy) return; vqBusy = true;
-  while (vqItems.length) {
-    const it = vqItems.shift(); vqCur = it; it.requeued = false;
-    if (it.lie) flagLie(true);
-    await speak(it.ids, { lie: it.lie });
-    if (it.lie) flagLie(false);
-    vqCur = null;
-    if (!it.requeued) it.resolve(true);
+  try {
+    while (vqItems.length) {
+      const gen = voiceGen;
+      const it = vqItems.shift(); vqCur = it; it.requeued = false;
+      if (it.lie) flagLie(true);
+      await speak(it.ids, { lie: it.lie });
+      if (it.lie) flagLie(false);
+      const done = vqCur === it && !it.requeued && voiceGen === gen;
+      if (vqCur === it) vqCur = null;
+      if (done) it.resolve(true);
+    }
+  } finally {
+    vqBusy = false;
+    if (vqItems.length) pumpVoice();
   }
-  vqBusy = false;
 }
-function clearVoice() { while (vqItems.length) vqItems.shift().resolve(false); if (vqCur) vqCur.requeued = false; stopVoice(); }
+// Coupe la voix en cours ET vide la file, y compris les consignes : à la réussite d'une étape,
+// l'ancienne réplique (et ses fragments / indices encore en attente) ne doit plus jouer.
+// Les promesses en cours se résolvent à false, pour qu'un .then tardif (flashSeq, etc.) n'enchaîne pas.
+function clearVoice() {
+  voiceGen++;
+  while (vqItems.length) vqItems.shift().resolve(false);
+  if (vqCur) { vqCur.requeued = true; vqCur.resolve(false); vqCur = null; }
+  stopVoice();
+}
 function flagLie(on) {
   if (on) { g.lies++; g.lieUntil = performance.now() + 2600; }
   const apply = () => {
@@ -553,17 +567,20 @@ function drawCyd2() {
 }
 
 // ================= déroulé =================
-function nextStep(n) {
+function nextStep(n, { holdStrip = 0 } = {}) {
   g.step = n; g.pressure.forEach(clearTimeout); g.pressure = []; g.decoy = null; clearDecoys();
-  g.hint = 0; progress(); showStep(); showObjective(); highlight(); hintUi();
+  cancelSeq();
+  g.hint = 0; progress(); showStep();
+  if (!holdStrip) showObjective();
+  highlight(); hintUi();
   const O = OBJECTIVE[n], C = Object.fromEntries(Object.entries(run.cues).map(([k, v]) => [k, [O, ...v]]));
   switch (n) {
     case 1: setEncMode('alpha');
       voice(C[1], { clue: true }); pressureEnc(); break;
     case 2: voice(C[2], { clue: true });
       pressure(5500, () => { const w = (run.trap + 1) % 3; decoy('trap', w); voice(['taunt_trappe', color(run.trapColors[w])], { lie: true, now: true }); }); break;
-    case 3: g.code = ''; voice(C[3], { clue: true }).then(() => g.step === 3 && flashSeq(run.seq));
-      pressure(9000, () => { voice('taunt_regarde', { lie: true, now: true }); flashSeq(run.seq.map((d) => (d % 8) + 1), true); }); break;
+    case 3: g.code = ''; g._seqPressureArmed = false;
+      showSeqAfterVoice(voice(C[3], { clue: true })); break;
     case 4: voice(C[4], { clue: true });
       pressure(6000, () => { const w = run.decoys.wire1; decoy('wire', w); voice(['taunt_branche', cableCue(w.cable), prise(w.socket)], { lie: true, now: true }); }); break;
     case 5: g.pos = run.maze1.start.slice(); voice([O, 'clue_verrou'], { clue: true });
@@ -611,14 +628,18 @@ function decoy(kind, i) {
 function clearDecoys() { $$('.decoy').forEach((e) => e.classList.remove('decoy')); }
 
 function good(nextN, fragIdx) {
+  // réussite : l'étape avance tout de suite, et la voix aussi — plus de consigne / indice / fragment de l'étape d'avant
+  cancelSeq();
+  clearVoice();
+  g.lastGoodAt = performance.now();
   sfx.confirm(); buzz(30); progress();
-  flashModules('ok'); setStrip(`Étape ${g.step}/${NSTEPS} franchie`, 'Bien.', 'ok', 1800);
+  flashModules('ok'); setStrip(`Étape ${g.step}/${NSTEPS} franchie`, 'Bien.', 'ok', 900);
   g.prob = Math.max(0.3, g.prob - 7.9); showProb();
   if (fragIdx != null) {
     if (run.lies.fragLies.includes(fragIdx)) voice(['clue_fragment', digit(run.decoys.frags[fragIdx])], { lie: true, now: true });
     voice(['clue_fragment', digit(run.frags[fragIdx])], { clue: true, now: !run.lies.fragLies.includes(fragIdx) });
   } else voice('outcome_ok', { now: true });
-  if (nextN) setTimeout(() => g.running && nextStep(nextN), 350);
+  if (nextN) nextStep(nextN, { holdStrip: 900 });
 }
 function bad(sec = 5, line = 'outcome_faux') {
   sfx.strike(); buzz(70);
@@ -720,7 +741,9 @@ function giveHint(level, auto = false) {
   if (cost) { g.remaining -= cost; showTime(g.remaining); }
   const ids = hintCues(run, k, level, { pos: g.pos, sabotage: g.sabotage });
   sfx.push();
-  voice(ids, { now: true });
+  const spoken = voice(ids, { now: true });
+  // indices 1 et 2 de l'étape 3 parlent de la barre : rejouer la séquence, comme Réécouter
+  if (k === 3 && level <= 2) showSeqAfterVoice(spoken);
   setStrip(cost ? `Indice ${level} · −${cost} s` : `Indice ${level}${auto ? ' · automatique' : ''}`, hintStrip(k, level).replace(/^Indice : /, ''), 'hint', 7000);
   hintUi();
 }
@@ -787,6 +810,8 @@ function armToggle() {
   sfx.toggleSnap(); sfx.arm(); buzz([40, 60, 40]);
   flashModules('ok');
   g.phase = 'play'; g.running = true; g.startT = performance.now(); g.lastTick = performance.now(); g.lastInput = performance.now();
+  clearVoice();
+  g.lastGoodAt = performance.now();
   voice('depart', { now: true });
   startMusic();
   nextStep(1);
@@ -799,6 +824,7 @@ function txFlip() {
   if (g.phase !== 'play') { t.classList.add('snap'); setTimeout(() => t.classList.remove('snap'), 420); return; }
   if (g.step !== 12) { t.classList.add('snap'); setTimeout(() => t.classList.remove('snap'), 420); bad(8); return; }
   g.txOn = true; lv.setAttribute('aria-checked', 'true'); t.classList.remove('armed'); t.classList.add('on'); sfx.hold();
+  g.lastGoodAt = performance.now();
   setTimeout(() => g.running && endGame(true), 450);
 }
 
@@ -825,7 +851,11 @@ function endGame(win) {
 function wire() {
   $('#btnStart').addEventListener('click', startGame);
   $('#btnAgain').addEventListener('click', () => { document.body.classList.remove('boom'); stopVoice(); startGame(); });
-  $('#btnReplay').addEventListener('click', () => { if (!g.lastClue) return; voice(g.lastClue, { now: true }).then(() => { if (g.running && g.step === 3 && g.code === '') flashSeq(run.seq); }); });
+  $('#btnReplay').addEventListener('click', () => {
+    if (!g.lastClue) return;
+    const p = voice(g.lastClue, { now: true });
+    if (g.step === 3) showSeqAfterVoice(p);
+  });
   $('#btnHint').addEventListener('click', () => { input(); giveHint(g.hint + 1); });
   $('#btnHelp').addEventListener('click', () => showTuto(null));
   $('#tutoSkip').addEventListener('click', closeTuto);
@@ -952,8 +982,8 @@ function turn(i, s) {
   // pression : quand un encodeur tombe juste, l'Entité affirme le contraire (une fois par étape)
   if ((g.step === 1 || g.step === 8) && !g._encTaunted && g.enc[i] === curEncTarget()[i] && g.enc.filter((v, k) => v === curEncTarget()[k]).length >= 2) {
     g._encTaunted = true;
-    const right = curEncTarget()[i], wrong = (right + 3 + Math.floor(Math.random() * 5)) % n;
-    setTimeout(() => g.running && voice(['taunt_cetait', letter(RING[wrong]), 'taunt_depeche'], { lie: true, now: true }), 300);
+    const right = curEncTarget()[i], wrong = (right + 3 + Math.floor(Math.random() * 5)) % n, stepAt = g.step;
+    setTimeout(() => g.running && g.step === stepAt && voice(['taunt_cetait', letter(RING[wrong]), 'taunt_depeche'], { lie: true, now: true }), 300);
   }
 }
 function pushEnc(i) {
@@ -971,12 +1001,39 @@ function openTrap(i, what) {
   const well = $('.trap-well', t);
   well.innerHTML = what === 'keys' ? '<span class="keyset" role="img" aria-label="Clés I, II, III"><i></i><i></i><i></i></span>' : '<span class="trap-led" role="img" aria-label="Trappe ouverte"></span>';
 }
-// séquence lumineuse sur la barre WS2812B (étape 3) ; fake = fausse séquence de l'Entité (œil rouge)
+// séquence lumineuse sur la barre WS2812B (étape 3) ; fake = fausse séquence de l'Entité (œil rouge).
+// Un nouveau flashSeq / showSeqAfterVoice / cancelSeq invalide les timeouts encore en attente (pas de double anim, pas de DEL coincée).
+let seqGen = 0;
+function cancelSeq() { seqGen++; g.seqShow = null; }
 function flashSeq(seq, fake = false) {
-  const t0 = performance.now(), on = 520, gap = 260;
+  const gen = ++seqGen, t0 = performance.now(), on = 520, gap = 260;
   g.seqShow = { seq, t0, on, gap, fake };
-  seq.forEach((d, k) => setTimeout(() => g.seqShow?.t0 === t0 && sfx.simon(fake ? 'rouge' : ['bleu', 'vert', 'ambre', 'rouge'][k % 4]), k * (on + gap)));
-  setTimeout(() => { if (g.seqShow?.t0 === t0) g.seqShow = null; }, seq.length * (on + gap) + 50);
+  seq.forEach((d, k) => setTimeout(() => { if (seqGen !== gen) return; sfx.simon(fake ? 'rouge' : ['bleu', 'vert', 'ambre', 'rouge'][k % 4]); }, k * (on + gap)));
+  setTimeout(() => {
+    if (seqGen !== gen) return;
+    g.seqShow = null;
+    // le leurre « 9 s après la consigne » part après la *première* vraie séquence : les mp3 ElevenLabs durent ~10 s, plus longs que l'ancien délai depuis le début d'étape
+    if (!fake && g.running && g.step === 3 && !g._seqPressureArmed) {
+      g._seqPressureArmed = true;
+      pressure(9000, () => {
+        if (!g.running || g.step !== 3) return;
+        voice('taunt_regarde', { lie: true, now: true });
+        flashSeq(run.seq.map((d) => (d % 8) + 1), true);
+      });
+    }
+  }, seq.length * (on + gap) + 50);
+}
+// Après une voix (première consigne, Réécouter, indice 1 ou 2) : même flashSeq. Une nouvelle passe annule la précédente.
+function showSeqAfterVoice(p) {
+  const gen = ++seqGen;
+  g.seqShow = null;
+  // Réécouter / indice : annuler le leurre « 9 s » pour qu'il ne coupe pas la vraie séquence
+  g.pressure.forEach(clearTimeout); g.pressure = [];
+  return Promise.resolve(p).then(() => {
+    if (seqGen !== gen || !g.running || g.phase !== 'play' || g.step !== 3) return false;
+    flashSeq(run.seq);
+    return true;
+  });
 }
 function press(k) {
   sfx.keypad();
@@ -990,10 +1047,13 @@ function press(k) {
     g.code = ''; drawOled();
     if (step === 3) good(4, 1);
     else if (step === 6) {
-      sfx.confirm(); g.prob = Math.max(0.3, g.prob - 7.9); showProb(); flashModules('ok'); setStrip(`Étape 6/${NSTEPS} franchie`, 'Bien.', 'ok', 1800);
+      cancelSeq();
+      clearVoice();
+      g.lastGoodAt = performance.now();
+      sfx.confirm(); g.prob = Math.max(0.3, g.prob - 7.9); showProb(); flashModules('ok'); setStrip(`Étape 6/${NSTEPS} franchie`, 'Bien.', 'ok', 900);
       voice('taunt_fini', { lie: true, now: true }); voice('taunt_couche2');
       openTrap((run.trap + 1) % 3, 'keys');
-      setTimeout(() => g.running && nextStep(7), 400);
+      nextStep(7, { holdStrip: 900 });
     } else good(12);
   } else { g.code = ''; setTimeout(drawOled, 250); bad(8); }
 }
@@ -1191,7 +1251,9 @@ function init() {
       battery: () => ({ warnings: battTick.warnings || 0, pct: +batt.pct.toFixed(2), volts: +batt.volts.toFixed(2), level: batt.level, low: batt.low, why: batt.why, pack: PACK.name }), setBattery(p) { batt.set(p); battShow(true); }, battDip(k) { batt.dip(k); battShow(true); },
       sigDiff, lastSig, hint(l) { giveHint(l ?? g.hint + 1); }, ageStep(ms) { g.progressT -= ms; }, objective: () => ({ label: $('#objLabel').textContent, text: $('#objText').textContent, kind: $('#objective').className }),
       active: () => { const k = hintStep(); return k == null ? [] : MODULES[k].filter((sel) => $(sel)?.classList.contains('active-mod')); }, showTuto() { showTuto(null); },
-      goto(n) { if (g.phase === 'play') nextStep(n); }, cables: () => cableGeom.map((c) => ({ ...c })), ecg: () => ({ bpm: Math.round(ecg.bpm), target: Math.round(ecg.target), label: ecg.label, adren: +ecg.adren.toFixed(1) }), ecgSpike, oled: () => drawOled(), get drag() { return drag; }, RING, DETENTS,
+      goto(n) { if (g.phase === 'play') nextStep(n); },
+      get seqShow() { return g.seqShow; }, cancelSeq, clearVoice,
+      cables: () => cableGeom.map((c) => ({ ...c })), ecg: () => ({ bpm: Math.round(ecg.bpm), target: Math.round(ecg.target), label: ecg.label, adren: +ecg.adren.toFixed(1) }), ecgSpike, oled: () => drawOled(), get drag() { return drag; }, RING, DETENTS,
     };
   }
 }
