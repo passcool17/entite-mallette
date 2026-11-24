@@ -24,6 +24,17 @@ Refonte « Cool Escape Props » de la v0.1.5 : la mallette est dessinée comme l
     clavier membrane 4×4 (clavier seul, sans lecteur), TM1637 + OLED, 3 trappes SG90,
     grille du haut-parleur 3 W 8 Ω, gros bouton rouge TRANSMIT.
 
+### Mise en page (r2)
+
+La face Mallette tient entière dans l’écran, sans défiler :
+
+- Portrait 412×915 : bandeau + onglets, couvercle (CYD 1 à gauche ; barre WS2812B 8 LED, Réécouter et Pochette à droite),
+  puis la base : TM1637 + OLED et 4 encodeurs, CYD 2 + joystick, clavier 4×4 à gauche | trappes, haut-parleur et TRANSMIT à droite.
+- Paysage 915×412 et bureau 1280×800 : couvercle à gauche, base à droite en trois colonnes
+  (encodeurs + TRANSMIT | clavier + trappes | CYD 2 + joystick).
+- Écrans plus courts : la page défile et une pastille « ↓ COMMANDES » s’affiche tant que le bas n’est pas visible.
+- Bandeau : « PROB. ÉCHEC » (probabilité d’échec). Réécouter fait toujours au moins 44 px de haut.
+
 Il n’y a pas de lecteur RFID, pas de badge, pas de manuel, pas de mode à deux joueurs et pas de mode facile.
 
 ### Règle de base : rien d’écrit
@@ -93,8 +104,8 @@ jamais publiés.
   panneau 273×169 en deux moitiés 136,5×169) et implantation des pièces.
 - `js/audio.js`, `js/voice-manifest.js`, `js/sfx.js`, `js/eye.js`, `js/preload.js` : voix, sons, œil, préchargement.
 - `audio/tension.mp3` (192827 octets) : musique de tension.
-- `sw.js` : service worker, cache `entite-mallette-v0.2.0` (manifeste des voix inclus). À l’activation, les anciens
-  caches `entite-mallette-*` sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`).
+- `sw.js` : service worker, cache `entite-mallette-v0.2.0-r2` (manifeste des voix inclus). À l’activation, les anciens
+  caches `entite-mallette-*` (dont `entite-mallette-v0.2.0` et `entite-mallette-v0.1.5-base`) sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`).
 
 ## Tests
 
@@ -106,7 +117,9 @@ node tests/v020.mjs            # ou : node tests/v020.mjs <base> <graine>
 `tests/v020.mjs` (Playwright) joue une partie complète (graine 42) en portrait puis vérifie le paysage :
 aucune trace de RFID/badge ni de manuel, aucun code écrit, mensonges (œil rouge), TRANSMIT trop tôt = erreur,
 hésitation ×1,6, sabotage du joystick, victoire, tailles des mp3, schéma du manifeste, cache du service worker,
-0 erreur console/réseau. Captures dans `/workspace/qa/entite-mallette/v0.2.0-dev/`.
+0 erreur console/réseau. Elle vérifie aussi, en 412×915, 915×412 et 1280×800, que toutes les commandes de la face Mallette sont dans le premier écran,
+sans chevauchement ni défilement, puis la pastille de défilement sur un écran 360×600.
+Captures dans `/workspace/qa/entite-mallette/v0.2.0-fix/` (`01-mallette-412.png`, `02-mallette-915x412.png`, `03-mallette-1280x800.png`).
 Les anciens tests (`tests/v011*.mjs` … `v015`, `paliers.mjs`, `run.mjs`) concernent la v0.1.x.
 
 ## Historique

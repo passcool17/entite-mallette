@@ -20,7 +20,7 @@ const canVibrate = typeof navigator.vibrate === 'function';
 const buzz = (p) => { if (canVibrate) { try { navigator.vibrate(p); } catch { /* rien */ } } };
 const fmtPct = (v) => v.toFixed(1).replace('.', ',') + ' %';
 const LED = { rouge: '#ff3b30', vert: '#36f08a', bleu: '#3d8bff', ambre: '#ffb020', cyan: '#62d6ff', off: null };
-const WIRE = { rouge: '#d8262b', noir: '#17181b', bleu: '#1f5fd6', jaune: '#f2c230', vert: '#1f9d4f' };
+const WIRE = { rouge: '#d8262b', noir: '#17181b', bleu: '#2b7cff', jaune: '#f2c230', vert: '#1f9d4f' };
 const ORD = ['1er', '2e', '3e', '4e', '5e'];
 
 // ================= état =================
@@ -126,7 +126,7 @@ function buildParts() {
 function buildJacks() {
   const j = $('#jacks'); j.textContent = '';
   g.wires.forEach((c, i) => {
-    const el = document.createElement('div'); el.className = 'jack'; el.dataset.i = i; el.style.setProperty('--w', WIRE[c]);
+    const el = document.createElement('div'); el.className = 'jack'; el.dataset.i = i; el.dataset.c = c; el.style.setProperty('--w', WIRE[c]);
     el.innerHTML = `<span class="jack-socket"></span><button class="plug" type="button" aria-label="Fiche ${ORD[i]}, fil ${c} : débrancher"><span class="plug-body"></span><span class="plug-wire"></span></button><span class="silk">${i + 1}</span>`;
     j.append(el);
   });
@@ -614,6 +614,21 @@ function runBoot(onReady) {
   const slow = setTimeout(() => { if (!finished && $id('bootActions').hidden) { $id('bootSkip').textContent = 'Ouvrir sans attendre'; b.problem('Réseau lent : le chargement continue.', true); $id('bootRetry').hidden = true; } }, 8000);
   start();
 }
+// indicateur « ↓ COMMANDES » : seulement si la page déborde (écrans très courts) et tant qu'on n'est pas en bas
+function initScrollPill() {
+  const pill = $('#scrollPill'), se = document.scrollingElement || document.documentElement;
+  const check = () => {
+    const over = se.scrollHeight > se.clientHeight + 8;
+    const atEnd = se.scrollTop + se.clientHeight >= se.scrollHeight - 24;
+    const hide = $('#app').hidden || !over || atEnd;
+    if (pill.hidden !== hide) pill.hidden = hide; // n'écrire que si ça change (sinon boucle avec le MutationObserver)
+  };
+  pill.addEventListener('click', () => scrollBy({ top: se.clientHeight * 0.7, behavior: 'smooth' }));
+  addEventListener('scroll', check, { passive: true }); addEventListener('resize', check);
+  new ResizeObserver(check).observe(document.body);
+  new MutationObserver(check).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
+  check();
+}
 function initFullscreen() {
   const ok = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled), btn = $('#btnFs');
   if (!ok) return;
@@ -646,7 +661,7 @@ function init() {
   setCaptionHandler((text, lie) => { const c = $('#caption'); c.textContent = text; c.classList.toggle('show', !!text); c.classList.toggle('lie', !!lie); });
   eye = createEye($('#eye'), { config: deepMerge(EYE, { radiusOfMin: 0.3, center: { x: 0.5, y: 0.5 } }), reducedMotion: reduced });
   eye.start();
-  wire(); initFullscreen();
+  wire(); initFullscreen(); initScrollPill();
   showTime(TIME_S); showProb();
   requestAnimationFrame(loop);
   runBoot(() => { $('#btnStart').disabled = false; $('#btnStart').focus({ preventScroll: true }); registerSW(); });

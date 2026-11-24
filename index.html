@@ -111,7 +111,7 @@
       <div class="hud-row">
         <div class="tm" role="timer" aria-label="Temps restant"><span class="tm-digits" id="timer">8:00</span></div>
         <div class="hud-meta">
-          <span class="hud-label">échec</span><output class="hud-val" id="prob">99,7 %</output>
+          <span class="hud-label">prob. échec</span><output class="hud-val" id="prob">99,7 %</output>
         </div>
         <div class="hud-meta">
           <span class="hud-label">étape</span><output class="hud-val" id="stepNo">—</output>
@@ -162,13 +162,15 @@
             <div class="cyd cyd1" id="cyd1">
               <span class="pcb-tag" aria-hidden="true">CYD 1</span>
               <div class="screen"><canvas id="eye" aria-hidden="true"></canvas><p class="caption" id="caption" aria-live="polite"></p></div>
-              <button class="replay" id="btnReplay" type="button" aria-label="Réécouter la dernière consigne" disabled>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/></svg><span>Réécouter</span>
-              </button>
             </div>
             <div class="lid-side">
-              <div class="ws" aria-label="Barre lumineuse WS2812B"><div class="ws-leds" id="bar" role="img" aria-label="Barre lumineuse éteinte"></div><span class="silk">WS2812B</span></div>
-              <button class="pocket" id="btnPocket" type="button" aria-haspopup="dialog"><span class="pocket-card" aria-hidden="true"></span><span class="silk">POCHETTE</span></button>
+              <div class="ws" aria-label="Barre lumineuse WS2812B"><div class="ws-leds ws-bar" id="bar" role="img" aria-label="Barre lumineuse éteinte"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="silk">WS2812B · 8 LED</span></div>
+              <div class="lid-ctrls">
+                <button class="replay" id="btnReplay" type="button" aria-label="Réécouter la dernière consigne" disabled>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/></svg><span>Réécouter</span>
+                </button>
+                <button class="pocket" id="btnPocket" type="button" aria-haspopup="dialog"><span class="pocket-card" aria-hidden="true"></span><span class="silk">POCHETTE</span></button>
+              </div>
             </div>
           </div>
         </div>
@@ -228,6 +230,7 @@
         </div>
       </section>
     </main>
+    <button class="scroll-pill" id="scrollPill" type="button" aria-label="Défiler vers les commandes du bas" hidden>↓ COMMANDES</button>
   </div>
 
   <dialog class="pocket-dlg" id="pocketDlg" aria-labelledby="pocketTitle">

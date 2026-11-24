@@ -7,7 +7,7 @@ import { chromium } from '/home/box/.npm/_npx/9833c18b2d85bc59/node_modules/play
 import { mkdirSync } from 'node:fs';
 const base = process.argv[2] || 'http://127.0.0.1:8794/';
 const SEED = +(process.argv[3] || 42);
-const shots = '/workspace/qa/entite-mallette/v0.2.0-dev/';
+const shots = process.env.SHOTS || '/workspace/qa/entite-mallette/v0.2.0-fix/';
 mkdirSync(shots, { recursive: true });
 const b = await chromium.launch({ executablePath: '/opt/google/chrome/chrome', args: ['--autoplay-policy=no-user-gesture-required'] });
 const R = { checks: {}, errors: [] };
@@ -30,12 +30,50 @@ const W = (p, ms) => p.waitForTimeout(ms);
 const D = (p, f, a) => p.evaluate(f, a);
 const overflow = (p) => D(p, () => document.documentElement.scrollWidth - innerWidth);
 
+// Face Mallette : toutes les commandes essentielles dans le premier écran, sans défiler ni se chevaucher.
+R.layout = {};
+async function fold(p, tag) {
+  await W(p, 250);
+  const m = await D(p, () => {
+    const se = document.scrollingElement, vh = innerHeight, vw = innerWidth;
+    const sel = { cyd1: '#cyd1', ws: '#bar', replay: '#btnReplay', pocket: '#btnPocket', enc: '.enc', cyd2: '.cyd2', joy: '#joy', keys: '.kp-key', traps: '.trap', transmit: '#transmit' };
+    const out = { scrollH: se.scrollHeight, clientH: se.clientHeight, scrollX: se.scrollWidth - vw, scrollY: se.scrollTop, bad: [], rects: {} };
+    const all = [];
+    for (const [k, q] of Object.entries(sel)) {
+      const els = [...document.querySelectorAll(q)];
+      out.rects[k] = els.map((e) => { const r = e.getBoundingClientRect(); all.push([k, e, r]);
+        if (!(r.width > 0 && r.top >= 0 && r.left >= 0 && r.bottom <= vh + 2 && r.right <= vw + 2)) out.bad.push(k);
+        return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; });
+      out[k + 'N'] = els.length;
+    }
+    out.overlap = [];
+    for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
+      const [ka, ea, a] = all[i], [kb, eb, b] = all[j];
+      if (ea.contains(eb) || eb.contains(ea)) continue;
+      if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) out.overlap.push(ka + '/' + kb);
+    }
+    out.wsW = out.rects.ws[0][2]; out.wsLeds = document.querySelectorAll('#bar i').length;
+    out.ledW = Math.round(document.querySelector('#bar i').getBoundingClientRect().width);
+    out.replayH = out.rects.replay[0][3];
+    out.pill = !document.querySelector('#scrollPill').hidden;
+    return out;
+  });
+  R.layout[tag] = { scrollH: m.scrollH, clientH: m.clientH, cyd1: m.rects.cyd1[0], ws: m.rects.ws[0], replay: m.rects.replay[0], keypadFirst: m.rects.keys[0], keypadLast: m.rects.keys[15], traps: m.rects.traps, transmit: m.rects.transmit[0], joy: m.rects.joy[0], cyd2: m.rects.cyd2[0] };
+  ok(`${tag} : Mallette sans défilement vertical`, m.scrollH <= m.clientH + 4 && m.scrollY === 0, { scrollH: m.scrollH, clientH: m.clientH });
+  ok(`${tag} : pas de débordement horizontal`, m.scrollX <= 0, m.scrollX);
+  ok(`${tag} : toutes les commandes dans le premier écran`, m.bad.length === 0 && m.encN === 4 && m.keysN === 16 && m.trapsN === 3, [...new Set(m.bad)]);
+  ok(`${tag} : aucune commande ne se chevauche`, m.overlap.length === 0, m.overlap.slice(0, 6));
+  ok(`${tag} : WS2812B 8 LED, largeur >= 120 px`, m.wsLeds === 8 && m.wsW >= 120 && m.ledW >= 10, { w: m.wsW, led: m.ledW });
+  ok(`${tag} : Réécouter >= 44 px de haut`, m.replayH >= 44, m.replayH);
+  ok(`${tag} : pas d'indicateur de défilement quand tout tient`, !m.pill);
+}
+
 // ================= portrait : partie complète =================
 try {
   const { ctx, p, errs, reqs } = await page({ width: 412, height: 915 });
   ok('aucun RFID ni badge (DOM)', await D(p, () => !document.querySelector('.badge, .rf-ring, [class*="rfid" i], [id*="rfid" i]') && !/RFID|badge|RC522/i.test(document.body.innerText + document.body.innerHTML.replace(/<script[\s\S]*?<\/script>/g, ''))));
   ok('pas de manuel.html', await D(p, () => !document.querySelector('a[href*="manuel"]')));
-  await p.screenshot({ path: shots + '01-accueil-412.png' });
+  await p.screenshot({ path: shots + '00-accueil-412.png' });
   await p.tap('#btnStart'); await W(p, 400);
   ok('armement : face Dessus', (await D(p, () => __entiteDebug.face)) === 'dessus');
   ok('dessus sans débordement', (await overflow(p)) <= 0);
@@ -47,6 +85,8 @@ try {
   const run = await D(p, () => JSON.parse(JSON.stringify(__entiteDebug.run)));
   R.seed = run.seed; R.tier = run.tier; R.serial = run.serial;
   ok('partie lancée, étape 1, face Mallette', await D(p, () => __entiteDebug.state.phase === 'play' && __entiteDebug.state.step === 1 && __entiteDebug.face === 'mallette'));
+  await fold(p, '412x915'); await p.screenshot({ path: shots + '01-mallette-412.png' });
+  ok('HUD : libellé « prob. échec »', await D(p, () => /prob\. échec/i.test(document.querySelector('#hud').innerText)));
   const step = () => D(p, () => __entiteDebug.state.step);
   const st = () => D(p, () => ({ step: __entiteDebug.state.step, errors: __entiteDebug.state.errors, rem: __entiteDebug.state.remaining }));
   const setEnc = async (target) => {
@@ -112,7 +152,7 @@ try {
   const dv = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[d0];
   ok('sabotage : axes inversés', p1[0] === p0[0] + dv[0] && p1[1] === p0[1] + dv[1], { p0, p1, d0 });
   ok('sabotage : œil rouge + CYD 2 rouge', await D(p, () => document.querySelector('.cyd2').classList.contains('sab')));
-  await p.screenshot({ path: shots + '02-mallette-412-sabotage.png' });
+  await p.screenshot({ path: shots + '04-mallette-412-sabotage.png' });
   await D(p, () => __entiteDebug.forceSabotage(false));
   await walk(run.maze2.path.slice(1)); await W(p, 500);
   ok('9 verrou saboté → 10', (await step()) === 10);
@@ -146,12 +186,46 @@ try {
   ok('paysage flanc sans débordement', (await overflow(p)) <= 0);
   await p.tap('#cover'); await W(p, 300); await p.tap('#lever'); await W(p, 1300);
   ok('paysage mallette sans débordement', (await overflow(p)) <= 0);
+  await fold(p, '915x412');
   const vis = await D(p, () => ['#eye', '#btnReplay', '.knob', '#cyd2', '#joy', '#keypad', '#transmit', '.face-tab'].map((s) => { const r = document.querySelector(s).getBoundingClientRect(); return [s, r.width > 0 && r.left >= 0 && r.right <= innerWidth + 0.5]; }));
   ok('paysage : commandes clés visibles en largeur', vis.every((v) => v[1]), vis);
   const small = await D(p, () => [...document.querySelectorAll('#face-mallette button, .face-tab, .icon-btn')].filter((e) => e.offsetParent && !e.hidden).map((e) => { const r = e.getBoundingClientRect(); return [e.className, Math.round(r.width), Math.round(r.height)]; }).filter(([, w, h]) => w < 32 || h < 32));
   ok('cibles tactiles ≥ 32 px (44 px visé)', small.length === 0, small);
-  await p.screenshot({ path: shots + '03-mallette-915x412.png' });
+  await p.screenshot({ path: shots + '02-mallette-915x412.png' });
   R.errors.push(...errs.map((e) => 'paysage ' + e));
+  await ctx.close();
+}
+
+// ================= bureau 1280x800 =================
+{
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: 'block' });
+  const p = await ctx.newPage(); const errs = [];
+  p.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
+  p.on('pageerror', (e) => errs.push('page: ' + e.message));
+  p.on('response', (r) => { if (r.status() >= 400) errs.push(`${r.status()} ${r.url()}`); });
+  await p.goto(`${base}?seed=${SEED}&debug=1`);
+  await p.waitForSelector('#btnStart:not([disabled])', { timeout: 20000 }); await p.waitForSelector('#boot', { state: 'hidden' });
+  await p.click('#btnStart'); await W(p, 300);
+  await p.click('.latch[data-latch="0"] .lock-btn'); await p.click('.latch[data-latch="1"] .lock-btn'); await W(p, 800);
+  await p.click('#cover'); await W(p, 300); await p.click('#lever'); await W(p, 1300);
+  await fold(p, '1280x800');
+  await p.screenshot({ path: shots + '03-mallette-1280x800.png' });
+  R.errors.push(...errs.map((e) => 'bureau ' + e));
+  await ctx.close();
+}
+// ================= écran très court : l'indicateur de défilement apparaît, puis disparaît en bas =================
+{
+  const ctx = await b.newContext({ viewport: { width: 360, height: 600 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
+  const p = await ctx.newPage();
+  await p.goto(`${base}?seed=${SEED}&debug=1`);
+  await p.waitForSelector('#btnStart:not([disabled])', { timeout: 20000 }); await p.waitForSelector('#boot', { state: 'hidden' });
+  await p.tap('#btnStart'); await W(p, 300);
+  await p.tap('.latch[data-latch="0"] .lock-btn'); await p.tap('.latch[data-latch="1"] .lock-btn'); await W(p, 800);
+  await p.tap('#cover'); await W(p, 300); await p.tap('#lever'); await W(p, 1300);
+  const shown = await D(p, () => !document.querySelector('#scrollPill').hidden);
+  await D(p, () => scrollTo(0, document.scrollingElement.scrollHeight)); await W(p, 300);
+  const gone = await D(p, () => document.querySelector('#scrollPill').hidden);
+  ok('360x600 : « ↓ COMMANDES » visible si ça déborde, caché une fois en bas', shown && gone, { shown, gone });
   await ctx.close();
 }
 
@@ -171,7 +245,7 @@ try {
   ok('manifeste : schéma complet', man.cues.every((c) => c.id && c.file === `voix/${c.id}.mp3` && /^\d{4}$/.test(c.dfplayerTrack) && ['intro', 'clue', 'digit', 'color', 'taunt', 'sabotage', 'outcome'].includes(c.category) && c.text));
   R.manifeste = { repliques: man.cues.length };
   const sw = await (await ctx.request.get(base + 'sw.js')).text();
-  ok('sw : cache entite-mallette-v0.2.0 (manifeste, sans manuel)', sw.includes("`entite-mallette-v${VERSION}`") && sw.includes("const VERSION = '0.2.0'") && sw.includes('voix/manifest.json') && !sw.includes('manuel'));
+  ok('sw : cache entite-mallette-v0.2.0-r2 (manifeste, sans manuel, archives gardées)', sw.includes("`entite-mallette-v${VERSION}-${REV}`") && sw.includes("const VERSION = '0.2.0'") && sw.includes("const REV = 'r2'") && sw.includes("'entite-mallette-v015-'") && sw.includes("'entite-mallette-v016-'") && sw.includes('voix/manifest.json') && !sw.includes('manuel'));
   await ctx.close();
 }
 ok('0 erreur console / page / réseau', R.errors.length === 0, R.errors);
