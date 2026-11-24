@@ -473,17 +473,17 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
   .mod-keys .lock-btn { width: 36px; height: 36px; }
 }
 
-/* ---------- v0.2.4 : jauge batterie 3S (CYD 1, coin haut droit, ne cache pas l'œil) ---------- */
-.batt { position: absolute; top: 3px; right: 4px; z-index: 2; display: flex; align-items: center; gap: 3px; padding: 1px 3px; border-radius: 3px; background: rgb(0 0 0 / .55); color: #36f08a; font: 700 8px/1 var(--f-mono); pointer-events: none; --fill: 80%; }
+/* ---------- v0.2.5e : jauge batterie 3S sur le CYD 2 (coin haut droit), pas sur le CYD 1 ---------- */
+.batt { position: absolute; top: 2px; right: 2px; z-index: 3; display: flex; align-items: center; gap: 3px; padding: 1px 3px; border-radius: 3px; background: rgb(0 0 0 / .72); color: #36f08a; font: 700 8px/1 var(--f-mono); pointer-events: none; --fill: 80%; max-width: 58%; }
 .batt[data-level="mid"] { color: #ffb020; } .batt[data-level="low"] { color: #ff3b30; }
-.batt-ico { position: relative; width: 15px; height: 8px; border: 1px solid currentColor; border-radius: 2px; }
+.batt-ico { position: relative; flex: none; width: 15px; height: 8px; border: 1px solid currentColor; border-radius: 2px; }
 .batt-ico::after { content: ""; position: absolute; right: -3px; top: 2px; width: 2px; height: 3px; border-radius: 0 1px 1px 0; background: currentColor; }
 .batt-ico i { position: absolute; left: 1px; top: 1px; bottom: 1px; width: calc((100% - 2px) * var(--fill) / 100%); max-width: calc(100% - 2px); background: currentColor; border-radius: 1px; }
-.batt-txt { display: flex; gap: 3px; align-items: baseline; white-space: nowrap; }
-.batt-txt small { font-size: 7px; opacity: .8; }
+.batt-txt { display: flex; gap: 3px; align-items: baseline; white-space: nowrap; min-width: 0; }
+.batt-txt small { font-size: 7px; opacity: .85; }
 .batt.low .batt-ico { animation: batt-blink 1s steps(2, jump-none) infinite; }
 @keyframes batt-blink { 50% { opacity: .15; } }
-@media (min-width: 1000px) and (min-height: 600px) { .batt { font-size: 11px; top: 5px; right: 6px; } .batt-ico { width: 20px; height: 10px; } .batt-ico::after { top: 3px; } .batt-txt small { font-size: 9px; } }
+@media (min-width: 1000px) and (min-height: 600px) { .batt { font-size: 10px; top: 3px; right: 3px; } .batt-ico { width: 16px; height: 9px; } .batt-ico::after { top: 2px; } .batt-txt small { font-size: 8px; } }
 @media (prefers-reduced-motion: reduce) { .batt.low .batt-ico { animation: none; outline: 1px solid #ff3b30; outline-offset: 1px; } }
 
 /* ---------- v0.2.4 / v0.2.5 : clarté — bandeau objectif, bouton Indice, module actif, retours, tutoriel ---------- */
@@ -549,4 +549,4 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
   body.obj-long .base-panel { gap: 6px 8px; }
 }
 @media (orientation: portrait) and (min-width: 360px) and (max-width: 999px) { :root { --cyd1-h: 96px; --kp: 40px; } }
-@media (orientation: portrait) and (max-width: 599px) { .batt .batt-txt small { display: none; } .batt { gap: 2px; padding: 1px 2px; } .batt-ico { width: 13px; } }
+@media (orientation: portrait) and (max-width: 599px) { .batt { gap: 2px; padding: 1px 2px; } .batt-ico { width: 13px; } .batt-txt small { display: inline; font-size: 7px; } }

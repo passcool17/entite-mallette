@@ -40,19 +40,19 @@
     @keyframes b-scan { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
     @media (prefers-reduced-motion: reduce) { .b-eye i { animation-duration: 30s; } .b-scan { animation-duration: 3s; } .b-eye b { animation: none; } }
   </style>
-  <link rel="stylesheet" href="css/app.css?v=0.2.5d" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="css/app.css?v=0.2.5d"></noscript>
-  <link rel="modulepreload" href="js/eye.js?v=0.2.5d">
-  <link rel="modulepreload" href="js/eye-config.js?v=0.2.5d">
-  <link rel="modulepreload" href="js/game.js?v=0.2.5d">
-  <link rel="modulepreload" href="js/audio.js?v=0.2.5d">
-  <link rel="modulepreload" href="js/sfx.js?v=0.2.5d">
-  <link rel="modulepreload" href="js/voice-manifest.js?v=0.2.5d">
-  <link rel="modulepreload" href="js/preload.js?v=0.2.5d">
-  <link rel="modulepreload" href="js/panel-config.js?v=0.2.5d">
-  <link rel="modulepreload" href="js/battery.js?v=0.2.5d">
-  <link rel="modulepreload" href="js/guide.js?v=0.2.5d">
-  <script type="module" src="js/app.js?v=0.2.5d"></script>
+  <link rel="stylesheet" href="css/app.css?v=0.2.5e" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="css/app.css?v=0.2.5e"></noscript>
+  <link rel="modulepreload" href="js/eye.js?v=0.2.5e">
+  <link rel="modulepreload" href="js/eye-config.js?v=0.2.5e">
+  <link rel="modulepreload" href="js/game.js?v=0.2.5e">
+  <link rel="modulepreload" href="js/audio.js?v=0.2.5e">
+  <link rel="modulepreload" href="js/sfx.js?v=0.2.5e">
+  <link rel="modulepreload" href="js/voice-manifest.js?v=0.2.5e">
+  <link rel="modulepreload" href="js/preload.js?v=0.2.5e">
+  <link rel="modulepreload" href="js/panel-config.js?v=0.2.5e">
+  <link rel="modulepreload" href="js/battery.js?v=0.2.5e">
+  <link rel="modulepreload" href="js/guide.js?v=0.2.5e">
+  <script type="module" src="js/app.js?v=0.2.5e"></script>
 </head>
 <body>
   <div id="boot" aria-live="polite">
@@ -160,7 +160,7 @@
               <div class="spk spk-l" aria-hidden="true"><span class="spk-cone"></span><span class="silk">SPK-L · 3 W</span></div>
               <div class="cyd cyd1" id="cyd1">
                 <span class="pcb-tag" aria-hidden="true">CYD 1</span>
-                <div class="screen"><canvas id="eye" aria-hidden="true"></canvas><div class="batt" id="batt" role="img" aria-label="Batterie"><span class="batt-ico" aria-hidden="true"><i></i></span><span class="batt-txt" aria-hidden="true"><b id="battPct">— %</b><small id="battV">— V</small></span></div><p class="caption" id="caption" aria-live="polite"></p></div>
+                <div class="screen"><canvas id="eye" aria-hidden="true"></canvas><p class="caption" id="caption" aria-live="polite"></p></div>
               </div>
               <div class="spk spk-r" aria-hidden="true"><span class="spk-cone"></span><span class="silk">SPK-R · 3 W</span></div>
             </div>
@@ -219,7 +219,7 @@
             </div>
             <div class="col col-c">
             <div class="mod mod-signal">
-              <div class="cyd cyd2"><span class="pcb-tag" aria-hidden="true">CYD 2</span><div class="screen"><canvas id="cyd2" width="240" height="180" role="img" aria-label="Écran 2"></canvas></div></div>
+              <div class="cyd cyd2"><span class="pcb-tag" aria-hidden="true">CYD 2</span><div class="screen"><canvas id="cyd2" width="240" height="180" role="img" aria-label="Écran 2"></canvas><div class="batt" id="batt" role="img" aria-label="Batterie"><span class="batt-ico" aria-hidden="true"><i></i></span><span class="batt-txt" aria-hidden="true"><b id="battPct">— %</b><small id="battV">— V</small></span></div></div></div>
               <div class="joy" id="joy" role="group" aria-label="Joystick">
                 <div class="joy-well"><span class="joy-cap" id="joyCap"></span></div>
                 <button class="joy-dir up" type="button" data-dir="up" aria-label="Haut"></button>

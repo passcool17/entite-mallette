@@ -1,9 +1,9 @@
-// Test léger v0.2.5 : bandeau étape 10 = consigne dictée (persistante), Indice à l'étape 10,
-// repli mp3 / synthèse par id. Usage : node tests/v025.mjs [base]
+// Test léger v0.2.5e : bandeau étape 10, overflow 0, jauge batterie sur le CYD 2.
+// Usage : node tests/v025.mjs [base]
 import { chromium } from '/home/box/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/index.mjs';
 import { mkdirSync, readFileSync } from 'node:fs';
-import { makeRun } from '../js/game.js?v=0.2.5d';
-import { OBJECTIVE, objectiveIds, hintCues, HINT_COST, AUTO_HINT_MS } from '../js/guide.js?v=0.2.5d';
+import { makeRun } from '../js/game.js?v=0.2.5e';
+import { OBJECTIVE, objectiveIds, hintCues, HINT_COST, AUTO_HINT_MS } from '../js/guide.js?v=0.2.5e';
 
 const base = process.argv[2] || 'http://127.0.0.1:8794/';
 const shots = process.env.SHOTS || '/workspace/qa/entite-mallette/v0.2.5-dev/';
@@ -97,7 +97,7 @@ async function openTo(p, step) {
   await p.tap('#btnHint'); await W(p, 250);
   const h3 = await D(p, () => ({ hint: __entiteDebug.state.hint, rem: __entiteDebug.state.remaining, dis: document.querySelector('#btnHint').disabled, heard: __entiteDebug.voiceLog.map((v) => v.ids[0]), text: document.querySelector('#objText').textContent }));
   ok('étape 10 : Indice 3 coûte −30 s, dit le premier geste (voix seulement), bouton épuisé', h3.hint === 3 && rem2 - h3.rem > 29.5 && rem2 - h3.rem < 31.5 && (h3.heard.includes('hint3_geste') || h3.heard.includes('hint3_debranche')) && h3.dis, { ...h3, rem2 });
-  ok('démarrage sans erreur, 0 404, imports ?v=0.2.5d, mp3 Piper demandés', errs.length === 0 && !errs.some((e) => /404/.test(e)) && reqs.filter((u) => /\/js\/\w[\w-]*\.js/.test(u)).every((u) => /\?v=0\.2\.5d$/.test(u)) && reqs.some((u) => /guide\.js\?v=0\.2\.5d/.test(u)) && reqs.some((u) => /voix\/clue_patch_double\.mp3/.test(u)), { errs: errs.slice(0, 6), js: reqs.filter((u) => /\.js/.test(u)).map((u) => u.split('/').pop()) });
+  ok('démarrage sans erreur, 0 404, imports ?v=0.2.5e, mp3 Piper demandés', errs.length === 0 && !errs.some((e) => /404/.test(e)) && reqs.filter((u) => /\/js\/\w[\w-]*\.js/.test(u)).every((u) => /\?v=0\.2\.5e$/.test(u)) && reqs.some((u) => /guide\.js\?v=0\.2\.5e/.test(u)) && reqs.some((u) => /voix\/clue_patch_double\.mp3/.test(u)), { errs: errs.slice(0, 6), js: reqs.filter((u) => /\.js/.test(u)).map((u) => u.split('/').pop()) });
   await done();
 }
 
@@ -188,6 +188,62 @@ const measureOverflow = () => {
   const m = await D(p, measureOverflow);
   ok('étape 10 (1280×800, série) : overflow 0×0, consigne entière', m.dx <= 0 && m.dy <= 0 && m.fits && m.bottom <= m.vh + 1, m);
   ok('étape 10 (1280×800) : 0 erreur console', errs.length === 0, errs);
+  await done();
+}
+
+// ---------- jauge batterie sur le CYD 2 (pas le CYD 1), sans chevauchement, overflow 0 ----------
+const measureBatt = () => {
+  const e = document.querySelector('#batt');
+  const s = document.querySelector('.cyd2 .screen');
+  if (!e || !s) return { missing: true };
+  const er = e.getBoundingClientRect(), sr = s.getBoundingClientRect();
+  const mid = { left: sr.left + sr.width * 0.12, right: sr.right - sr.width * 0.12, top: sr.top + sr.height * 0.4, bottom: sr.bottom - 6 };
+  const overlapMid = !(er.right <= mid.left || er.left >= mid.right || er.bottom <= mid.top || er.top >= mid.bottom);
+  const fs = parseFloat(getComputedStyle(e).fontSize) || 0;
+  const txt = (e.innerText || '').replace(/\s+/g, ' ').trim();
+  return {
+    onCyd2: !!e.closest('.cyd2 .screen'),
+    onCyd1: !!e.closest('#cyd1'),
+    inside: er.left >= sr.left - 1 && er.right <= sr.right + 1 && er.top >= sr.top - 1 && er.bottom <= sr.bottom + 1,
+    corner: er.left > sr.left + sr.width * 0.42 && er.bottom <= sr.top + sr.height * 0.4,
+    overlapMid,
+    txt,
+    aria: e.getAttribute('aria-label') || '',
+    hasPct: /\d+\s*%/.test(txt),
+    hasV: /\d+,\d/.test(txt),
+    readable: er.width >= 36 && er.height >= 8 && fs >= 7,
+    w: +er.width.toFixed(1), h: +er.height.toFixed(1), fs,
+    cls: e.className, lvl: e.dataset.level,
+  };
+};
+
+{
+  const { p, errs, done } = await page({ width: 412, height: 915 }, { query: '&seed=0&voix=rapide&notuto=1' });
+  await openTo(p, 1);
+  const b = await D(p, measureBatt);
+  const ov = await D(p, measureOverflow);
+  ok('batterie (412×915, ECG) : sur le CYD 2, coin haut droit, plus sur le CYD 1', b.onCyd2 && !b.onCyd1 && b.inside && b.corner, b);
+  ok('batterie (ECG) : icône + % + tension lisibles, pas de chevauchement avec le tracé', b.hasPct && b.hasV && b.readable && !b.overlapMid && /Batterie \d+ %, \d+,\d volts/.test(b.aria), b);
+  ok('batterie (ECG) : overflow 0×0', ov.dx <= 0 && ov.dy <= 0 && ov.pill === false, ov);
+  await p.screenshot({ path: shots + 'cyd2-batterie-ecg-412.png' });
+  await D(p, () => __entiteDebug.setBattery(12));
+  await W(p, 700);
+  const lowB = await D(p, measureBatt);
+  const lowS = await D(p, () => ({ ...__entiteDebug.battery(), anim: getComputedStyle(document.querySelector('#batt .batt-ico')).animationName, aria: document.querySelector('#batt').getAttribute('aria-label') }));
+  ok('batterie < 15 % : jauge toujours sur le CYD 2, icône rouge qui clignote + 1 seul bip, aucune pénalité', lowB.onCyd2 && lowS.low && /low/.test(lowB.cls) && lowB.lvl === 'low' && lowS.anim === 'batt-blink' && lowS.warnings === 1 && /faible/.test(lowS.aria), { ...lowB, ...lowS });
+  ok('batterie (ECG) : 0 erreur console', errs.length === 0, errs);
+  await done();
+}
+{
+  const { p, errs, done } = await page({ width: 412, height: 915 }, { query: '&seed=0&voix=rapide&notuto=1' });
+  await openTo(p, 5);
+  const b = await D(p, measureBatt);
+  const ov = await D(p, measureOverflow);
+  const maze = await D(p, () => /verrou de signal/.test(document.querySelector('#cyd2')?.getAttribute('aria-label') || ''));
+  ok('batterie (412×915, labyrinthe étape 5) : sur le CYD 2, coin haut droit, pas de chevauchement avec le labyrinthe', maze && b.onCyd2 && !b.onCyd1 && b.inside && b.corner && !b.overlapMid && b.hasPct && b.hasV, { ...b, maze });
+  ok('batterie (labyrinthe étape 5) : overflow 0×0', ov.dx <= 0 && ov.dy <= 0 && ov.pill === false, ov);
+  await p.screenshot({ path: shots + 'cyd2-batterie-labyrinthe-412.png' });
+  ok('batterie (labyrinthe) : 0 erreur console', errs.length === 0, errs);
   await done();
 }
 

@@ -11,7 +11,7 @@ Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/ent
 
 ## Version 0.2.5 (24 nov. 2026)
 
-État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.2.5d`, imports `?v=0.2.5d`).
+État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.2.5e`, imports `?v=0.2.5e`).
 
 - **Étape 10, bandeau clair** : plus de « Rebranche les câbles : nouvelle consigne. ». Le bandeau affiche la consigne
   exacte dictée par l’Entité (couleur du câble et prise, ou rang d’une lettre sur la plaque), et reste visible jusqu’à
@@ -28,6 +28,9 @@ Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/ent
   (consigne entière lisible, clavier et leviers ARM / TRANSMIT dans le premier écran, pastille « ↓ COMMANDES »
   masquée). Typographie un peu plus serrée en portrait, modules légèrement compactés, et si besoin la mallette
   est un peu réduite pour tenir sous le bandeau.
+- **v0.2.5e, jauge batterie sur le CYD 2** : le niveau de pile (icône + % + tension) est dans le coin haut droit
+  du 2e écran (ECG, ou labyrinthe aux étapes 5 et 9), plus sur le CYD 1. L’alerte < 15 % (clignotement + un bip)
+  est inchangée. Le tracé ECG et le labyrinthe restent dégagés.
 
 ### Toujours vrai
 Rotatifs E1–E4 = lettres seulement, chiffres au clavier 4×4, baie banane 5×5 (5 couleurs, glisser + toucher), ECG sur le
@@ -66,9 +69,9 @@ CYD 2 (labyrinthe aux étapes 5 et 9), tout dans la valise ouverte. Les archives
   passent au-dessus. Contexte audio relancé au premier geste (mobile).
 - Bouton son conservé ; muet + volume gardés dans `localStorage` (`entite-son`).
 
-### Jauge batterie (CYD 1, coin haut droit)
-- Batterie réelle : Mspalocell 12 V 5600 mAh Li-ion 3S (12,6 V pleine, ~9,0 V vide, 67,2 Wh). Icône + % (+ tension en
-  paysage / bureau), tension tirée d’une courbe OCV Li-ion réaliste ×3 (100 % 12,6 V · 50 % 11,4 V · 15 % 10,7 V · 0 % 9,0 V).
+### Jauge batterie (CYD 2, coin haut droit)
+- Batterie réelle : Mspalocell 12 V 5600 mAh Li-ion 3S (12,6 V pleine, ~9,0 V vide, 67,2 Wh). Icône + % + tension dans
+  le coin haut droit du CYD 2 (à partir de la v0.2.5e ; plus sur le CYD 1). Tension tirée d’une courbe OCV Li-ion réaliste ×3 (100 % 12,6 V · 50 % 11,4 V · 15 % 10,7 V · 0 % 9,0 V).
 - Simulation accélérée : −0,5 %/min en partie (≈ −4 % sur 8 min), −0,1 %/min hors partie ; −0,3 % par servo / trappe,
   −0,5 % par sabotage, −1 % à l’explosion. Vert ≥ 40 %, ambre, rouge < 15 % : icône qui clignote + un bip discret, une fois,
   aucune pénalité.
@@ -243,7 +246,7 @@ jamais publiés.
 - `js/audio.js`, `js/voice-manifest.js`, `js/sfx.js`, `js/eye.js`, `js/preload.js` : voix, sons, œil, préchargement.
 - `audio/tension.mp3` (192827 octets) : musique de tension.
 - `js/guide.js` : objectifs, modules actifs, indices (v0.2.5 : bandeau étape 10 = consigne dictée). `js/battery.js` : modèle de batterie 3S (v0.2.4).
-- `sw.js` : service worker, cache `entite-mallette-v0.2.5d` (manifeste des voix inclus). À l’activation, les anciens
+- `sw.js` : service worker, cache `entite-mallette-v0.2.5e` (manifeste des voix inclus). À l’activation, les anciens
   caches `entite-mallette-*` (dont `entite-mallette-v0.2.2`, `entite-mallette-v0.2.1`, `entite-mallette-v0.2.0-r2`, `entite-mallette-v0.2.0` et `entite-mallette-v0.1.5-base`) sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`).
 
 ## Tests
@@ -255,7 +258,7 @@ node tests/v025.mjs            # ou : node tests/v025.mjs <base>
 
 `tests/v025.mjs` (test léger v0.2.5) : bandeau de l’étape 10 = consigne dictée (les 3 variantes), persistant jusqu’à
 la réussite ; bouton Indice à l’étape 10 (gratuit, −15 s, −30 s) ; 172 mp3 prêts, fragments de l’étape 10 enchaînés,
-repli synthèse si un id est absent ; imports `?v=0.2.5d` ; overflow 0 en 412×915 à l’étape 10 (graines 0, 2, 7 et variante la plus longue) ; 0 erreur 404. Captures dans `/workspace/qa/entite-mallette/v0.2.5-live/`.
+repli synthèse si un id est absent ; imports `?v=0.2.5e` ; overflow 0 en 412×915 à l’étape 10 (graines 0, 2, 7 et variante la plus longue) ; jauge batterie sur le CYD 2 ; 0 erreur 404. Captures dans `/workspace/qa/entite-mallette/v0.2.5-live/`.
 
 `tests/v024.mjs` concerne la v0.2.4 (clarté, son mixé, batterie, paliers).
 

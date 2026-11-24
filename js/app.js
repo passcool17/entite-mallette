@@ -5,19 +5,19 @@
 // Règle de Pascal : aucun code ni réponse calculée écrit à l'écran (sauf ?debug=1). L'Entité dicte (voix), puis presse et ment (œil rouge)
 // pendant que tu choisis. À l'étape 10 le bandeau reprend la consigne de câblage dictée, visible jusqu'à la réussite.
 // Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
-// v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 1, variantes d'énigmes
+// v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 2, variantes d'énigmes
 // tirées par étape (deux parties de suite ne se ressemblent pas : signature de la partie précédente dans localStorage).
-import { createEye } from './eye.js?v=0.2.5d';
-import { EYE, deepMerge } from './eye-config.js?v=0.2.5d';
-import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.5d';
-import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.2.5d';
-import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.5d';
-import { sfx } from './sfx.js?v=0.2.5d';
-import { preloadAll } from './preload.js?v=0.2.5d';
-import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.2.5d';
-import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.2.5d';
+import { createEye } from './eye.js?v=0.2.5e';
+import { EYE, deepMerge } from './eye-config.js?v=0.2.5e';
+import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.5e';
+import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.2.5e';
+import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.5e';
+import { sfx } from './sfx.js?v=0.2.5e';
+import { preloadAll } from './preload.js?v=0.2.5e';
+import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.2.5e';
+import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.2.5e';
 
-const VERSION = '0.2.5d';
+const VERSION = '0.2.5e';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -466,7 +466,7 @@ function drawEcg(c, W, H, now) {
   ecg.target = ecgTarget(now);
   ecg.adren *= Math.exp(-dt / 9); ecg.jit *= Math.exp(-dt / 0.8);
   ecg.bpm += (ecg.target - ecg.bpm) * (1 - Math.exp(-dt / (g.phase === 'boom' ? 0.5 : 1.6)));
-  const st = ecgStyle(ecg.bpm), top = 26, bot = H - 14, mid = top + (bot - top) * 0.62, amp = (bot - top) * 0.55;
+  const st = ecgStyle(ecg.bpm), top = 32, bot = H - 14, mid = top + (bot - top) * 0.62, amp = (bot - top) * 0.55;
   if (!ecg.buf || ecg.buf.length !== W) { ecg.buf = new Float32Array(W).fill(NaN); ecg.head = 0; }
   // balayage gauche → droite (≈ 2,6 s par écran) ; la phase cardiaque avance au rythme du pouls
   const flat = g.phase === 'boom' && ecg.bpm < 8;
@@ -507,7 +507,8 @@ function drawEcg(c, W, H, now) {
   c.textBaseline = 'middle'; c.fillStyle = st.hud; c.font = 'bold 16px ui-monospace, Menlo, Consolas, monospace'; c.textAlign = 'left';
   c.fillText(String(shown), 26, 13); const tw = c.measureText(String(shown)).width;
   c.font = 'bold 9px ui-monospace, Menlo, Consolas, monospace'; c.fillText('BPM', 30 + tw, 14);
-  c.textAlign = 'right'; c.font = 'bold 10px ui-monospace, Menlo, Consolas, monospace'; c.fillText(st.label, W - 8, 13);
+  // état à gauche, sous le BPM : le coin droit est réservé à la jauge batterie (HTML)
+  c.font = 'bold 8px ui-monospace, Menlo, Consolas, monospace'; c.fillText(st.label, 26, 25);
   const f = Math.max(0, Math.min(1, (ecg.bpm - 60) / 116));
   c.fillStyle = 'rgba(255,255,255,.08)'; c.fillRect(8, H - 8, W - 16, 4);
   c.fillStyle = st.ink; c.fillRect(8, H - 8, (W - 16) * f, 4);
@@ -527,7 +528,7 @@ function drawCyd2() {
   }
   if (ecg.aria) { ecg.aria = ''; ecg.ariaL = ''; }
   { const [ax, ay] = g.pos || maze.start, al = `Écran 2 : verrou de signal, point en colonne ${ax + 1}, ligne ${ay + 1}${sab ? ', commandes inversées' : ''}`; if (cv.getAttribute('aria-label') !== al) cv.setAttribute('aria-label', al); }
-  const n = maze.n, cs = Math.floor(Math.min((W - 20) / n, (H - 20) / n)), ox = Math.floor((W - cs * n) / 2), oy = Math.floor((H - cs * n) / 2);
+  const n = maze.n, hud = 32, cs = Math.floor(Math.min((W - 16) / n, (H - 16 - hud) / n)), ox = Math.floor((W - cs * n) / 2), oy = hud + Math.floor((H - hud - cs * n) / 2);
   const ink = sab ? '#ff4b3e' : '#62d6ff';
   c.strokeStyle = sab ? 'rgba(255,75,62,.16)' : 'rgba(98,214,255,.14)'; c.lineWidth = 1;
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) c.strokeRect(ox + x * cs + 0.5, oy + y * cs + 0.5, cs, cs);
@@ -1013,7 +1014,7 @@ function stick(dir) {
 }
 function startSabotage() { g.sabotage = true; g.sabEnd = performance.now() + 5500; $('.cyd2').classList.add('sab'); voice('sabotage_joystick', { lie: true, now: true }); sfx.glitch(); batt?.dip('sabotage'); }
 function endSabotage() { g.sabotage = false; $('.cyd2').classList.remove('sab'); g.sabT = performance.now() + 7000; if (g.running && g.step === 9) voice('sabotage_fin', { now: true }); }
-// ================= batterie 3S (CYD 1, coin haut droit) =================
+// ================= batterie 3S (CYD 2, coin haut droit) =================
 // Mspalocell 12 V 5600 mAh Li-ion 3S : % + tension (courbe de décharge réelle), vidange lente, alerte < 15 %.
 let batt = null;
 function battInit() {

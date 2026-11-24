@@ -3,7 +3,7 @@
 // (contour qui pulse), et 3 niveaux d'INDICES. Règle de Pascal : le bandeau dit QUOI faire et OÙ, jamais une réponse
 // calculée (aucun code, sauf ?debug=1). À l'étape 10 le bandeau reprend la consigne dictée (couleur / prise). Seul l'indice 3 DIT (à voix haute) un morceau de la réponse.
 // Logique pure (sans DOM) : testable avec node.
-import { RING, DIRS, canMove } from './game.js?v=0.2.5d';
+import { RING, DIRS, canMove } from './game.js?v=0.2.5e';
 
 // objectif : id de réplique (voix/manifest.json) ; le texte du bandeau = le texte de la réplique (même phrase)
 export const OBJECTIVE = {
