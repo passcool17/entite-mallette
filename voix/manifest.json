@@ -1,5 +1,5 @@
 {
- "version": "0.2.2",
+ "version": "0.2.3",
  "note": "Voix de l'Entité. Chaque réplique = un id ou une suite d'ids. mp3Ready true : voix/<id>.mp3 est joué (repli synthèse française si échec). mp3Ready false : synthèse française directe, aucun fichier demandé. Pour remplacer une voix : déposer voix/<id>.mp3 puis mettre mp3Ready à true, sans toucher au code. dfplayerTrack = nom du fichier sur la microSD du DFPlayer Mini (dossier mp3/0001.mp3…).",
  "cues": [
   {
@@ -171,7 +171,7 @@
    "category": "clue",
    "source": "tts",
    "mp3Ready": false,
-   "text": "Signal un. Règle les quatre encodeurs sur les chiffres du numéro de série, dans l'ordre. Puis clique."
+   "text": "Signal un. Tourne les quatre encodeurs rotatifs sur les quatre lettres du numéro de série, dans l'ordre. Puis clique."
   },
   {
    "id": "clue_enc1_envers",
@@ -180,7 +180,7 @@
    "category": "clue",
    "source": "tts",
    "mp3Ready": false,
-   "text": "Signal un. Règle les quatre encodeurs sur les chiffres du numéro de série, en partant de la fin. Puis clique."
+   "text": "Signal un. Tourne les quatre encodeurs rotatifs sur les quatre lettres du numéro de série, en partant de la fin. Puis clique."
   },
   {
    "id": "clue_trappe_frequente",
@@ -219,22 +219,22 @@
    "text": "Regarde la barre lumineuse. Retiens les lumières qui s'allument. Tape leurs positions au clavier, à l'envers."
   },
   {
-   "id": "clue_fils1_moyen",
-   "file": "voix/clue_fils1_moyen.mp3",
+   "id": "clue_patch_route",
+   "file": "voix/clue_patch_route.mp3",
    "dfplayerTrack": "0026",
    "category": "clue",
    "source": "tts",
    "mp3Ready": false,
-   "text": "Les fiches. Cinq fils. Plus d'un rouge : débranche le dernier rouge. Sinon, le fil sans jumeau."
+   "text": "La baie banane. Branche"
   },
   {
-   "id": "clue_fils1_dur",
-   "file": "voix/clue_fils1_dur.mp3",
+   "id": "clue_patch_double",
+   "file": "voix/clue_patch_double.mp3",
    "dfplayerTrack": "0027",
    "category": "clue",
    "source": "tts",
    "mp3Ready": false,
-   "text": "Les fiches. Cinq fils. Plus d'un rouge : le dernier rouge. Sinon, si le numéro finit par un chiffre pair : le deuxième fil. Sinon, le fil sans jumeau."
+   "text": "Deuxième couche. J'ai remis les câbles droits. Débranche"
   },
   {
    "id": "clue_verrou",
@@ -300,22 +300,22 @@
    "text": "Signal deux. Les quatre encodeurs tournent sur vingt lettres. J'épelle le mot à l'envers : compose-le à l'endroit, puis clique un encodeur."
   },
   {
-   "id": "clue_fils2_moyen",
-   "file": "voix/clue_fils2_moyen.mp3",
+   "id": "patch_laisse",
+   "file": "voix/patch_laisse.mp3",
    "dfplayerTrack": "0035",
    "category": "clue",
    "source": "tts",
    "mp3Ready": false,
-   "text": "Deuxième couche de fils. Débranche le fil sans jumeau."
+   "text": "et laisse-le débranché. Puis branche"
   },
   {
-   "id": "clue_fils2_dur",
-   "file": "voix/clue_fils2_dur.mp3",
+   "id": "taunt_branche",
+   "file": "voix/taunt_branche.mp3",
    "dfplayerTrack": "0036",
-   "category": "clue",
+   "category": "taunt",
    "source": "tts",
    "mp3Ready": false,
-   "text": "Deuxième couche de fils. Plus d'un bleu : le premier bleu. Sinon, le fil sans jumeau."
+   "text": "Non ! Branche plutôt"
   },
   {
    "id": "clue_code2",
@@ -378,7 +378,7 @@
    "category": "taunt",
    "source": "tts",
    "mp3Ready": false,
-   "text": "Débranche le fil"
+   "text": "Débranche"
   },
   {
    "id": "taunt_saute",
@@ -712,6 +712,96 @@
    "source": "tts",
    "mp3Ready": false,
    "text": "V."
+  },
+  {
+   "id": "cable_rouge",
+   "file": "voix/cable_rouge.mp3",
+   "dfplayerTrack": "0081",
+   "category": "color",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "le câble rouge"
+  },
+  {
+   "id": "cable_noir",
+   "file": "voix/cable_noir.mp3",
+   "dfplayerTrack": "0082",
+   "category": "color",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "le câble noir"
+  },
+  {
+   "id": "cable_jaune",
+   "file": "voix/cable_jaune.mp3",
+   "dfplayerTrack": "0083",
+   "category": "color",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "le câble jaune"
+  },
+  {
+   "id": "cable_vert",
+   "file": "voix/cable_vert.mp3",
+   "dfplayerTrack": "0084",
+   "category": "color",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "le câble vert"
+  },
+  {
+   "id": "cable_bleu",
+   "file": "voix/cable_bleu.mp3",
+   "dfplayerTrack": "0085",
+   "category": "color",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "le câble bleu"
+  },
+  {
+   "id": "prise_1",
+   "file": "voix/prise_1.mp3",
+   "dfplayerTrack": "0086",
+   "category": "socket",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "dans la prise un."
+  },
+  {
+   "id": "prise_2",
+   "file": "voix/prise_2.mp3",
+   "dfplayerTrack": "0087",
+   "category": "socket",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "dans la prise deux."
+  },
+  {
+   "id": "prise_3",
+   "file": "voix/prise_3.mp3",
+   "dfplayerTrack": "0088",
+   "category": "socket",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "dans la prise trois."
+  },
+  {
+   "id": "prise_4",
+   "file": "voix/prise_4.mp3",
+   "dfplayerTrack": "0089",
+   "category": "socket",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "dans la prise quatre."
+  },
+  {
+   "id": "prise_5",
+   "file": "voix/prise_5.mp3",
+   "dfplayerTrack": "0090",
+   "category": "socket",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "dans la prise cinq."
   }
  ]
 }

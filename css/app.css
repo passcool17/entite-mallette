@@ -257,7 +257,7 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
 .rivet { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #7b8288 60%, #3e4348); }
 .rivet:nth-child(1) { left: 3px; top: 3px; } .rivet:nth-child(2) { right: 3px; top: 3px; } .rivet:nth-child(3) { left: 3px; bottom: 3px; } .rivet:nth-child(4) { right: 3px; bottom: 3px; }
 .sp-label { font: 700 6px/1 var(--f-tech); letter-spacing: .2em; }
-.sp-num { font: 500 16px/1 var(--f-mono); letter-spacing: .04em; text-shadow: 0 1px 0 rgb(255 255 255 / .5); white-space: nowrap; }
+.sp-num { font: 500 16px/1 var(--f-mono); letter-spacing: .01em; text-shadow: 0 1px 0 rgb(255 255 255 / .5); white-space: nowrap; }
 .sp-lot { font: 500 7px/1 var(--f-mono); color: #3b4045; }
 /* baie de fiches banane Keadic */
 .patchbay { display: grid; gap: 3px; justify-items: center; }
@@ -410,46 +410,61 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
 .enc-row { gap: 6px; justify-items: center; }
 .enc .silk { display: block; font-size: 7px; }
 
-/* douilles femelles du couvercle : numéro au-dessus, la fiche entre par-dessous */
+/* ================= v0.2.3 : baie banane 5x5 (couvercle) ↔ 5 câbles ancrés sur la base ================= */
+/* prises femelles du couvercle : numéro au-dessus ; vide = alésage laiton ouvert */
 .patchbay { position: relative; }
 .jacks { padding: 2px 6px 0; }
 .jack .silk { order: -1; line-height: 1; }
-.plug { height: 44px; -webkit-tap-highlight-color: transparent; }
-.jack-socket { top: 3px; bottom: auto; }
-.jack.pulled .jack-socket { background: radial-gradient(circle, #000 38%, #1b1c1e 42%, #b9a15a 46%, #6d5a28 56%, #2a2b2d 60%, #4a4e53 70%, #1a1c1e 72%); }
+.plug { height: 44px; min-width: 44px; touch-action: none; -webkit-tap-highlight-color: transparent; cursor: grab; border-radius: 8px; }
+.jack-socket { top: 3px; bottom: auto; transition: box-shadow .15s; }
+.jack.empty .jack-socket { background: radial-gradient(circle, #000 34%, #2a2410 38%, #d8bf6a 42%, #8a7230 54%, #2a2b2d 58%, #4a4e53 70%, #1a1c1e 72%); }
+.patch-sel .jack .jack-socket { box-shadow: 0 0 0 2px rgb(98 214 255 / .45), 0 0 10px rgb(98 214 255 / .35); }
+.jack.hover .plug, .patch-sel .jack .plug:hover { background: rgb(98 214 255 / .14); box-shadow: inset 0 0 0 2px #62d6ff; }
+.jack.hover .jack-socket { box-shadow: 0 0 0 3px #62d6ff, 0 0 16px #62d6ff; }
+.jack.picked .plug { box-shadow: inset 0 0 0 2px #fff; }
 .jack.decoy .jack-socket { box-shadow: 0 0 0 2px var(--red), 0 0 12px var(--red); }
+.plug:focus-visible, .port-btn:focus-visible { outline: 2px solid #62d6ff; outline-offset: 1px; }
 
-/* ports d'ancrage sur la base (portrait : bande du haut, alignés par app.js sous les douilles) */
-.ports { grid-area: ports; position: relative; height: 24px; margin: -4px 0 -6px; }
-.port { position: absolute; top: 3px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%;
-  background: radial-gradient(circle, #020202 30%, #4a4e53 38%, #1a1c1e 66%); box-shadow: 0 0 0 2px color-mix(in srgb, var(--w) 75%, #000), 0 1px 3px #000; }
+/* ports d'ancrage de la base : cible 44 px ; portrait = bande du haut de la base, la fiche débranchée couchée à droite */
+.ports { grid-area: ports; position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); height: 44px; margin: -4px 0 -4px; }
+.port-btn { position: relative; min-width: 44px; height: 44px; border: 0; padding: 0; background: none; border-radius: 8px; touch-action: none; cursor: grab; -webkit-tap-highlight-color: transparent; }
+.port-hole { position: absolute; left: 18px; top: 6px; width: 12px; height: 12px; border-radius: 50%;
+  background: radial-gradient(circle, #020202 30%, #4a4e53 38%, #1a1c1e 66%); box-shadow: 0 0 0 2px color-mix(in srgb, var(--w) 80%, #000), 0 1px 3px #000; }
+.port-btn[data-color="noir"] .port-hole { box-shadow: 0 0 0 2px #7c8594, 0 1px 3px #000; }
+.port-btn.sel { background: rgb(98 214 255 / .12); box-shadow: inset 0 0 0 2px #62d6ff; animation: selPulse 1s ease-in-out infinite; }
+@keyframes selPulse { 50% { box-shadow: inset 0 0 0 2px #62d6ff, 0 0 14px rgb(98 214 255 / .6); } }
 
-/* câbles (SVG au-dessus des panneaux, n'intercepte aucun toucher) */
+/* câbles : boîtier sombre + liseré + âme colorée + reflet ; fiche moulée de la couleur du câble, pointe dorée */
 #face-mallette { position: relative; }
 .cables { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 6; }
-.cable path { fill: none; stroke-linecap: round; stroke-linejoin: round; transition: d .42s cubic-bezier(.3, .8, .35, 1); }
-.cable .c-shadow { stroke: rgb(0 0 0 / .55); stroke-width: 7.5; translate: 0 1.5px; }
+.cable path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.cable .c-shadow { stroke: rgb(0 0 0 / .6); stroke-width: 9; translate: 0 1.5px; }
+.cable .c-rim { stroke: rgb(0 0 0 / .7); stroke-width: 7; }
 .cable .c-core { stroke: var(--w); stroke-width: 5; }
-.cable .c-hi { stroke: rgb(255 255 255 / .38); stroke-width: 1.3; translate: -1px -.5px; }
-.cable[data-c="noir"] .c-core { stroke: #17181b; }
-.cable[data-c="noir"] .c-hi { stroke: rgb(185 195 205 / .6); }
-.cplug { transition: transform .42s cubic-bezier(.3, .8, .35, 1); }
+.cable .c-hi { stroke: rgb(255 255 255 / .4); stroke-width: 1.3; translate: -1px -.6px; }
+.cable[data-color="noir"] .c-rim { stroke: #7c8594; }
+.cable[data-color="noir"] .c-hi { stroke: rgb(190 200 212 / .55); }
+.cplug .pt { fill: #e3c45a; stroke: #8a6d1c; stroke-width: .5; }
 .cplug .pc { fill: #d2d7dc; stroke: #6b7177; stroke-width: .6; }
-.cplug .pb { fill: var(--w); stroke: rgb(0 0 0 / .55); stroke-width: 1; filter: drop-shadow(0 2px 2px rgb(0 0 0 / .6)); }
-.cable[data-c="noir"] .pb { fill: #17181b; stroke: #8d949b; }
-.cable[data-c="bleu"] .pb { filter: drop-shadow(0 0 4px rgb(43 124 255 / .55)); }
-.cplug .pg { fill: rgb(255 255 255 / .35); }
+.cplug .pb { fill: var(--w); stroke: rgb(0 0 0 / .6); stroke-width: 1; filter: drop-shadow(0 2px 2px rgb(0 0 0 / .6)); }
+.cable[data-color="noir"] .pb { stroke: #7c8594; stroke-width: 1.4; }
+.cplug .pg { fill: rgb(255 255 255 / .38); }
+.cable.sel .pb, .cable.drag .pb { stroke: #fff; stroke-width: 2; filter: drop-shadow(0 0 6px #62d6ff); }
+.cable.sel .c-rim { stroke: #62d6ff; animation: cableSel 1s ease-in-out infinite; }
+@keyframes cableSel { 50% { stroke: #e9f8ff; } }
 .cable.decoy .pb { stroke: var(--red); stroke-width: 2.5; }
-.cables.instant path, .cables.instant .cplug { transition: none; }
 
 @media (orientation: landscape) and (max-height: 520px), (min-width: 1000px) and (min-height: 600px) {
   #face-mallette .patchbay > .silk { display: none; }
-  .patchbay { padding-bottom: 46px; }                   /* goulotte : 5 voies de câble sous les douilles */
-  #face-mallette .base-panel { position: relative; padding-left: 34px; }
-  .ports { position: absolute; left: 7px; bottom: 9px; height: auto; margin: 0; display: flex; flex-direction: column-reverse; gap: 0; }
-  .port { position: relative; top: auto; width: 8px; height: 8px; margin: 0; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--w) 75%, #000), 0 1px 2px #000; }
+  .patchbay { padding-bottom: 46px; }                    /* goulotte : les câbles passent sous les prises */
+  #face-mallette .base-panel { position: relative; padding-left: 54px; }
+  /* goulotte de la base, au bord gauche : 5 cases de 44 px (fiches débranchées debout), ancrages groupés en bas */
+  .ports { grid-area: auto; position: absolute; left: 4px; top: 0; bottom: 0; width: 48px; height: auto; margin: 0; display: flex; flex-direction: column-reverse; justify-content: flex-start; gap: 2px; padding-bottom: 46px; }
+  .port-btn { position: static; width: 44px; height: 44px; flex: none; }
+  .port-btn::before { content: ""; display: block; width: 100%; height: 100%; border-radius: 8px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .06); background: rgb(0 0 0 / .18); }
+  .port-hole { left: 8px; top: auto; bottom: calc(8px + var(--c) * 8px); width: 8px; height: 8px; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--w) 80%, #000), 0 1px 2px #000; }
 }
-@media (orientation: landscape) and (max-height: 520px) { :root { --knob: 46px; --cyd1-h: 118px; --spk: 54px; --cyd2-h: 78px; } .key-row { gap: 4px; } .mod-keys .lock-btn { width: 36px; height: 36px; } .mod-keys .lock-face { width: 24px; height: 24px; } #face-mallette .base-panel { padding-left: 28px; } .ports { left: 6px; } .plug { height: 40px; } .jack-socket { width: 20px; height: 20px; margin-left: -10px; } }
+@media (orientation: landscape) and (max-height: 520px) { :root { --knob: 46px; --cyd1-h: 112px; --spk: 50px; --cyd2-h: 78px; --lid-w: 310px; } .key-row { gap: 4px; } .mod-keys .lock-btn { width: 36px; height: 36px; } .mod-keys .lock-face { width: 24px; height: 24px; } .jack-socket { width: 20px; height: 20px; margin-left: -10px; } }
 @media (min-width: 1000px) and (min-height: 600px) { :root { --knob: 56px; --cyd2-h: 122px; --joy: 140px; } .patchbay { padding-bottom: 50px; } }
 @media (max-width: 359px) and (orientation: portrait) {
   :root { --knob: 48px; --joy: 100px; --cyd2-h: 78px; }

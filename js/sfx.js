@@ -1,5 +1,5 @@
 // sfx.js : effets procéduraux WebAudio (aucun fichier). Branchés sur le bus d'effets d'audio.js (donc coupés par le bouton son).
-import { bus } from './audio.js';
+import { bus } from './audio.js?v=0.2.3';
 
 let noiseBuf = null;
 function ctx() { return bus(); }
@@ -41,6 +41,7 @@ export const sfx = {
   toggleSnap() { noise(0.018, { vol: 0.55, lp: 6000, hp: 1800 }); tone(95, 0.09, { vol: 0.2 }); },
   keyTurn() { noise(0.05, { vol: 0.3, lp: 3500, hp: 900 }); noise(0.04, { vol: 0.34, lp: 3500, hp: 900, at: 0.09 }); tone(85, 0.14, { vol: 0.18, at: 0.09 }); },
   plugPull() { noise(0.06, { vol: 0.4, lp: 5000, hp: 1400 }); tone(1800, 0.05, { type: 'triangle', vol: 0.06, slide: 0.5, at: 0.02 }); },
+  plugIn() { noise(0.018, { vol: 0.45, lp: 6500, hp: 1800 }); tone(950, 0.03, { type: 'square', vol: 0.05 }); tone(420, 0.04, { vol: 0.09, at: 0.012 }); },   // fiche banane enfoncée : clic sec
   servo() { tone(130, 0.5, { type: 'sawtooth', vol: 0.045, slide: 1.5, attack: 0.03 }); noise(0.5, { vol: 0.07, lp: 1800, hp: 600 }); noise(0.04, { vol: 0.3, lp: 4000, hp: 800, at: 0.52 }); },
   keypad() { tone(1480, 0.045, { type: 'square', vol: 0.05 }); },
   simon(c) { tone(SIMON[c] || 440, 0.22, { type: 'triangle', vol: 0.12 }); },

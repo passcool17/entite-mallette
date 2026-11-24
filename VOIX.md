@@ -3,6 +3,24 @@
 Pour le bot Voix. Ton : froid, grave, lent, sans émotion, légèrement métallique. L'Entité tutoie le joueur.
 Elle parle comme une machine qui a déjà calculé la suite. Pas de nom de film, d'acteur ni de personnage.
 
+## v0.2.3 : la source de vérité est `voix/manifest.json`
+
+Le tableau plus bas date de la v0.1.x. Depuis la v0.2.x, toutes les répliques (89) et leur texte exact sont dans
+`voix/manifest.json` (`mp3Ready: false` = synthèse française, aucun fichier demandé, 0 erreur 404). Seuls `intro` et
+`depart` (ElevenLabs) sont de vrais mp3. Nouveautés v0.2.3 :
+
+| id | Quand | Texte |
+|---|---|---|
+| `clue_enc1_ordre` / `clue_enc1_envers` | Étape 1 | Signal un. Tourne les quatre encodeurs rotatifs sur les quatre lettres du numéro de série, dans l'ordre / en partant de la fin. Puis clique. |
+| `clue_patch_route` + `cable_X` + `prise_N` | Étape 4 | La baie banane. Branche · le câble rouge · dans la prise trois. |
+| `clue_patch_double` + `cable_B` + `patch_laisse` + `cable_C` + `prise_M` | Étape 10 | Deuxième couche. J'ai remis les câbles droits. Débranche · le câble noir · et laisse-le débranché. Puis branche · le câble vert · dans la prise un. |
+| `taunt_branche` + `cable_X` + `prise_N` | Mensonge, étapes 4 / 10 | Non ! Branche plutôt · le câble … · dans la prise … |
+| `cable_rouge`, `cable_noir`, `cable_jaune`, `cable_vert`, `cable_bleu` | Couleurs des câbles | le câble rouge … |
+| `prise_1` … `prise_5` | Prises du couvercle | dans la prise un. … cinq. |
+
+Les rotatifs ne parlent plus jamais de chiffres (lettres seulement, `lettre_a` … `lettre_v`) ; les chiffres (`chiffre_0` …
+`chiffre_9`) servent aux fragments de code tapés au clavier et aux serrures. Aucune réplique n'écrit la réponse à l'écran.
+
 ## Livraison
 
 - Un fichier par réplique : `voix/<id>.mp3` (mono, 44,1 kHz, environ -16 LUFS, silence de 100 ms au début et à la fin).

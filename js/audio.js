@@ -1,7 +1,7 @@
 // audio.js : bus WebAudio, musique de tension, voix de l'Entité (manifeste voix/manifest.json : mp3 si prêt, sinon synthèse française),
 // routée dans un AnalyserNode pour animer l'œil.
-import { loadManifest, sentence, allReady, fileOf } from './voice-manifest.js';
-import { takePreloaded, MUSIC_URL } from './preload.js';
+import { loadManifest, sentence, allReady, fileOf } from './voice-manifest.js?v=0.2.3';
+import { takePreloaded, MUSIC_URL } from './preload.js?v=0.2.3';
 
 let ac = null, master, sfxBus, voiceBus, analyser, data, muted = false;
 let musicBus, musicDuck, musicLP, music = null, musicBuf = null, musicLoad = null;

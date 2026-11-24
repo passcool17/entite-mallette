@@ -40,17 +40,17 @@
     @keyframes b-scan { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
     @media (prefers-reduced-motion: reduce) { .b-eye i { animation-duration: 30s; } .b-scan { animation-duration: 3s; } .b-eye b { animation: none; } }
   </style>
-  <link rel="stylesheet" href="css/app.css?v=0.2.2" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="css/app.css?v=0.2.2"></noscript>
-  <link rel="modulepreload" href="js/eye.js">
-  <link rel="modulepreload" href="js/eye-config.js">
-  <link rel="modulepreload" href="js/game.js">
-  <link rel="modulepreload" href="js/audio.js">
-  <link rel="modulepreload" href="js/sfx.js">
-  <link rel="modulepreload" href="js/voice-manifest.js">
-  <link rel="modulepreload" href="js/preload.js">
-  <link rel="modulepreload" href="js/panel-config.js">
-  <script type="module" src="js/app.js?v=0.2.2"></script>
+  <link rel="stylesheet" href="css/app.css?v=0.2.3" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="css/app.css?v=0.2.3"></noscript>
+  <link rel="modulepreload" href="js/eye.js?v=0.2.3">
+  <link rel="modulepreload" href="js/eye-config.js?v=0.2.3">
+  <link rel="modulepreload" href="js/game.js?v=0.2.3">
+  <link rel="modulepreload" href="js/audio.js?v=0.2.3">
+  <link rel="modulepreload" href="js/sfx.js?v=0.2.3">
+  <link rel="modulepreload" href="js/voice-manifest.js?v=0.2.3">
+  <link rel="modulepreload" href="js/preload.js?v=0.2.3">
+  <link rel="modulepreload" href="js/panel-config.js?v=0.2.3">
+  <script type="module" src="js/app.js?v=0.2.3"></script>
 </head>
 <body>
   <div id="boot" aria-live="polite">
@@ -82,7 +82,25 @@
         $('bootErr').textContent = msg; $('bootErr').hidden = false;
         $('bootActions').hidden = false; $('bootSkip').hidden = !canSkip;
       };
-      $('bootRetry').onclick = function () { location.reload(); }; // remplacé par app.js quand il est chargé
+      // Réessayer (code bloqué) : désinscrit le service worker de CETTE app et vide ses anciens caches (jamais les archives
+      // entite-mallette-v015- / v016-), puis recharge. app.js remplace ce bouton par sa propre reprise une fois chargé.
+      B.purge = function () {
+        var dir = location.pathname.replace(/[^/]*$/, ''), jobs = [];
+        try {
+          if (navigator.serviceWorker) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.filter(function (r) { return new URL(r.scope).pathname === dir; }).map(function (r) { return r.unregister(); })); }));
+          if (window.caches) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k.indexOf('entite-mallette-') === 0 && k.indexOf('entite-mallette-v015-') !== 0 && k.indexOf('entite-mallette-v016-') !== 0; }).map(function (k) { return caches.delete(k); })); }));
+        } catch (e) { /* rien à purger */ }
+        return Promise.all(jobs).catch(function () {});
+      };
+      $('bootRetry').onclick = function () { B.purge().then(function () { location.reload(); }); };
+      // service worker enregistré dès le boot (sans cache HTTP) : un vieux SW se met à jour même si un module plante
+      try { if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(function () {}); } catch (e) { /* pas de SW */ }
+      // un module qui ne se charge pas (erreur de syntaxe / d'export) : on le dit tout de suite au lieu de rester bloqué
+      window.addEventListener('error', function (ev) {
+        if (B.ready) return;
+        var src = (ev && (ev.filename || (ev.target && ev.target.src))) || '';
+        if (/\/js\//.test(src) || /SyntaxError|import|export|module/i.test((ev && ev.message) || '')) B.problem('Le code de la mallette n\'a pas pu démarrer (ancienne version en cache). Touche « Réessayer » : on vide le cache et on recharge.', false);
+      }, true);
       try {
         var seen = 0;
         new PerformanceObserver(function (list) {
@@ -149,13 +167,13 @@
               <button class="pocket" id="btnPocket" type="button" aria-haspopup="dialog"><span class="pocket-card" aria-hidden="true"></span><span class="silk">POCHETTE</span></button>
               <div class="serial-plate" id="serialPlate"><span class="rivet"></span><span class="rivet"></span><span class="rivet"></span><span class="rivet"></span><span class="sp-label">N° DE SÉRIE</span><span class="sp-num" id="serial">———-———</span><span class="sp-lot" id="lot">LOT ———</span></div>
             </div>
-            <div class="patchbay"><div class="jacks" id="jacks" role="group" aria-label="Cinq douilles banane : câbles venant de la base"></div><span class="silk">KEADIC · 5 DOUILLES</span></div>
+            <div class="patchbay"><div class="jacks" id="jacks" role="group" aria-label="Baie banane : cinq prises, n'importe quel câble dans n'importe quelle prise"></div><span class="silk">KEADIC · 5 DOUILLES</span></div>
           </div>
         </div>
         <div class="base shell" aria-label="Base">
           <div class="base-panel panel">
             <span class="bolt tl"></span><span class="bolt tr"></span><span class="bolt bl"></span><span class="bolt br"></span>
-            <div class="ports" id="ports" aria-hidden="true"></div>
+            <div class="ports" id="ports" role="group" aria-label="Cinq câbles banane ancrés sur la base"></div>
             <div class="col col-a">
             <div class="mod mod-enc">
               <div class="enc-head">

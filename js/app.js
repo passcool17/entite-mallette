@@ -1,16 +1,17 @@
-// app.js : La mallette de l'Entité v0.2.2 : une seule vue, la mallette ouverte (couvercle intérieur + base).
+// app.js : La mallette de l'Entité v0.2.3 : une seule vue, la mallette ouverte (couvercle intérieur + base).
 // Tout est à l'intérieur de la valise. Deux leviers à capot : bleu (armement) et rouge (TRANSMIT, la fin).
-// KY-040 : on tourne le bouton lui-même (20 crans par tour, chiffres ou anneau de 20 lettres). 5 câbles banane base → couvercle.
+// KY-040 : on tourne le bouton lui-même (20 crans = anneau de 20 lettres A-V, JAMAIS de chiffres ; chiffres = clavier 4x4).
+// Baie banane 5x5 : n'importe quel câble dans n'importe quelle prise (glisser ou toucher). CYD 2 : moniteur cardiaque ECG.
 // Règle de Pascal : AUCUN code ni consigne écrit à l'écran. L'Entité dicte (voix), puis presse et ment (œil rouge)
 // pendant que tu choisis. Paliers cachés ~50/50, ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
-import { createEye } from './eye.js';
-import { EYE, deepMerge } from './eye-config.js';
-import { makeRun, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js';
-import { initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js';
-import { sfx } from './sfx.js';
-import { preloadAll } from './preload.js';
+import { createEye } from './eye.js?v=0.2.3';
+import { EYE, deepMerge } from './eye-config.js?v=0.2.3';
+import { makeRun, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.3';
+import { initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.3';
+import { sfx } from './sfx.js?v=0.2.3';
+import { preloadAll } from './preload.js?v=0.2.3';
 
-const VERSION = '0.2.2';
+const VERSION = '0.2.3';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -22,7 +23,7 @@ const canVibrate = typeof navigator.vibrate === 'function';
 const buzz = (p) => { if (canVibrate) { try { navigator.vibrate(p); } catch { /* rien */ } } };
 const fmtPct = (v) => v.toFixed(1).replace('.', ',') + ' %';
 const LED = { rouge: '#ff3b30', vert: '#36f08a', bleu: '#3d8bff', ambre: '#ffb020', cyan: '#62d6ff', off: null };
-const WIRE = { rouge: '#d8262b', noir: '#17181b', bleu: '#2b7cff', jaune: '#f2c230', vert: '#1f9d4f' };
+const WIRE = { rouge: '#e53935', noir: '#1b1d22', jaune: '#f5c518', vert: '#22c55e', bleu: '#2b7cff' }; // kit Keadic : 5 couleurs, une de chaque
 const ORD = ['1er', '2e', '3e', '4e', '5e'];
 
 // ================= état =================
@@ -36,8 +37,8 @@ function resetState() {
     endAt: 0, remaining: TIME_S, rate: 1, lastTick: 0, lastSec: null,
     prob: 99.7, errors: 0, lieUntil: 0, lies: 0,
     coverArm: false, coverTx: false, armed: false, txOn: false,
-    enc: [0, 0, 0, 0], encRaw: [0, 0, 0, 0], encMode: 'digit', trapOpen: [false, false, false], seqShow: null,
-    pulled: [false, false, false, false, false], wires: run.wires1.colors.slice(),
+    enc: [0, 0, 0, 0], encRaw: [0, 0, 0, 0], encMode: 'alpha', trapOpen: [false, false, false], seqShow: null,
+    cables: run.wires.map((color, i) => ({ color, socket: i })), sel: null, patchTok: 0, // câble c (port c de la base) → prise 0..4 ou null
     pos: null, code: '', keysTurned: [], hesitating: false, lastInput: 0,
     sabotage: false, sabT: 0, said30: false, said10: false,
     lastClue: null, pressure: [], decoy: null, startT: 0,
@@ -73,6 +74,8 @@ function flagLie(on) {
 const digit = (d) => `chiffre_${d}`;
 const color = (c) => `couleur_${c}`;
 const letter = (ch) => `lettre_${ch.toLowerCase()}`;
+const cableCue = (c) => `cable_${g.cables[c].color}`;
+const prise = (s) => `prise_${s + 1}`;
 
 // ================= vue unique : la mallette ouverte =================
 const face = 'mallette';
@@ -106,89 +109,233 @@ function buildParts() {
   $('#serial').textContent = run.serial;
   $('#lot').textContent = `LOT ${run.lot}`;
 }
+// ================= baie banane 5x5 =================
+// 5 câbles ancrés sur la base (ports 0..4, une couleur chacun). Chaque câble se branche dans N'IMPORTE LAQUELLE des
+// 5 prises femelles du couvercle (1..5) ; une prise = un câble au plus ; les câbles se croisent librement.
+// Gestes : glisser-déposer (fiche → prise ; sur une prise occupée = échange ; à côté = débrancher) OU toucher-choisir
+// puis toucher la prise (2e toucher sur la même prise, ou sur le port, = débrancher).
+const cableOf = (s) => g.cables.findIndex((k) => k.socket === s);
 function buildJacks() {
   const j = $('#jacks'); j.textContent = '';
-  g.wires.forEach((c, i) => {
-    const el = document.createElement('div'); el.className = 'jack'; el.dataset.i = i; el.dataset.c = c; el.style.setProperty('--w', WIRE[c]);
-    el.innerHTML = `<button class="plug" type="button" aria-label="Douille ${ORD[i]}, câble ${c} branché : débrancher"><span class="jack-socket"></span></button><span class="silk">${i + 1}</span>`;
+  for (let s = 0; s < 5; s++) {
+    const el = document.createElement('div'); el.className = 'jack'; el.dataset.s = s;
+    el.innerHTML = `<button class="plug" type="button"><span class="jack-socket"></span></button><span class="silk">${s + 1}</span>`;
     j.append(el);
-  });
-  // ports d'ancrage des câbles, sur la base
+  }
   const pt = $('#ports'); pt.textContent = '';
-  g.wires.forEach((c, i) => { const el = document.createElement('i'); el.className = 'port'; el.dataset.i = i; el.style.setProperty('--w', WIRE[c]); pt.append(el); });
-  drawCables(true);
+  g.cables.forEach((k, c) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'port-btn'; b.dataset.c = c; b.dataset.color = k.color;
+    b.style.setProperty('--w', WIRE[k.color]); b.style.setProperty('--c', c);
+    b.innerHTML = '<span class="port-hole"></span>';
+    pt.append(b);
+  });
+  $('#cables').dataset.sig = '';
+  syncPatchDom(); drawCables(true);
+}
+function syncPatchDom() {
+  $$('#jacks .jack').forEach((el) => {
+    const s = +el.dataset.s, c = cableOf(s);
+    el.classList.toggle('empty', c < 0); el.classList.toggle('picked', g.sel != null && c === g.sel);
+    el.dataset.c = c < 0 ? '' : g.cables[c].color;
+    $('.plug', el).setAttribute('aria-label', c < 0 ? `Prise ${s + 1} vide` + (g.sel != null ? ` : y brancher le câble ${g.cables[g.sel].color}` : '') : `Prise ${s + 1} : câble ${g.cables[c].color} branché`);
+  });
+  $$('#ports .port-btn').forEach((b) => {
+    const c = +b.dataset.c, k = g.cables[c];
+    b.classList.toggle('sel', g.sel === c); b.classList.toggle('dropped', k.socket == null); b.setAttribute('aria-pressed', String(g.sel === c));
+    b.setAttribute('aria-label', `Câble ${k.color} (port ${c + 1} de la base) : ${k.socket == null ? 'débranché, posé sur la base' : `branché dans la prise ${k.socket + 1}`}`);
+  });
+  $('#face-mallette').classList.toggle('patch-sel', g.sel != null);
 }
 
-// ================= câbles banane : 5 câbles souples, de la base (ports) vers les douilles du couvercle =================
-// Branché : la fiche est enfoncée par-dessous dans sa douille (1..5) du couvercle, le câble descend vers son port de la base.
-// Débranché : la douille reste vide et la fiche retombe couchée sur la base, à côté de son port (jamais pendue au couvercle).
-// Portrait : couvercle en haut, ports en haut de la base, juste sous les douilles. Paysage / bureau : couvercle à gauche,
-// les câbles passent sous les douilles (une voie chacun, sans se croiser) et rejoignent les ports au bord gauche de la base.
-let cableGeom = [];
+// ---- dessin (SVG au-dessus des panneaux, aucun toucher intercepté)
+let cableGeom = [], pose = [], tweens = [], lastLayout = null, rafOn = false, drag = null;
 const SVGNS = 'http://www.w3.org/2000/svg';
+const f1 = (n) => n.toFixed(1);
 function svgEl(tag, attrs, parent) { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent?.append(e); return e; }
-function drawCables(instant) {
-  const svg = $('#cables'), fm = $('#face-mallette');
-  if (!svg || !fm || $('#app').hidden) return;
-  const F = fm.getBoundingClientRect(); if (!F.width) return;
-  const sockets = $$('#jacks .jack-socket'), ports = $$('#ports .port');
-  if (sockets.length !== 5 || ports.length !== 5) return;
+function patchLayout() {
+  const fm = $('#face-mallette'), F = fm.getBoundingClientRect();
   const lidR = $('.lid', fm).getBoundingClientRect(), baseR = $('.base', fm).getBoundingClientRect();
   const stacked = lidR.bottom <= baseR.top + 2;
-  const pr = $('#ports').getBoundingClientRect();
-  sockets.forEach((s, i) => { const r = s.getBoundingClientRect(); ports[i].style.left = stacked ? `${(r.left + r.width / 2 - pr.left).toFixed(1)}px` : ''; });
-  const ctr = (el) => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2 - F.left, r.top + r.height / 2 - F.top, r.width]; };
-  if (svg.dataset.sig !== g.wires.join()) {
-    svg.textContent = ''; svg.dataset.sig = g.wires.join();
-    g.wires.forEach((c, i) => {
-      const gr = svgEl('g', { class: 'cable', 'data-i': i, 'data-c': c }, svg); gr.style.setProperty('--w', WIRE[c]);
-      for (const k of ['c-shadow', 'c-core', 'c-hi']) svgEl('path', { class: k }, gr);
+  const rel = (e) => { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2 - F.left, y: r.top + r.height / 2 - F.top, w: r.width, h: r.height }; };
+  const sockets = $$('#jacks .jack-socket').map(rel), holes = $$('#ports .port-hole').map(rel), btns = $$('#ports .port-btn').map(rel);
+  const d = sockets[0]?.w || 22;
+  return { F, stacked, hinge: stacked ? lidR.bottom - F.top : lidR.right - F.left, sockets, holes, btns, d, L: Math.round(d * 0.95), w: Math.max(9, Math.round(d * 0.5)) };
+}
+function restPose(P, c) {
+  const h = P.holes[c];
+  if (P.stacked) return { x: h.x + 12 + P.L, y: h.y + 13, rot: 90 };     // couchée à droite de son port, pointe vers la droite
+  const b = P.btns[c]; return { x: b.x + 8, y: b.y - P.L / 2 + 2, rot: 0 }; // debout dans sa case de la goulotte
+}
+function targetPose(P, c) {
+  const s = g.cables[c].socket; if (s == null) return restPose(P, c);
+  const lift = g.sel === c ? P.L * 0.3 : 0;                               // choisie : la fiche sort un peu de la prise
+  return { x: P.sockets[s].x, y: P.sockets[s].y + lift, rot: 0 };
+}
+const tailOf = (p, L) => { const a = p.rot * Math.PI / 180; return { x: p.x - Math.sin(a) * L, y: p.y + Math.cos(a) * L }; };
+function cablePath(P, c, p) {
+  const a = P.holes[c], t = tailOf(p, P.L), ang = p.rot * Math.PI / 180, ux = Math.sin(ang), uy = -Math.cos(ang);
+  const dist = Math.hypot(t.x - a.x, t.y - a.y);
+  const k1 = Math.min(120, Math.max(10, dist * 0.45)); let k2 = k1, c1;
+  if (P.stacked) c1 = { x: a.x, y: a.y + Math.sign(t.y - a.y || 1) * k1 };
+  else if (t.x < a.x - 20) { c1 = { x: a.x - k1, y: a.y }; k2 = Math.min(k2, Math.max(8, a.y - t.y + 6)); }
+  else c1 = { x: a.x + Math.min(k1, 14), y: a.y };
+  const c2 = { x: t.x - ux * k2, y: t.y - uy * k2 };
+  return `M ${f1(a.x)} ${f1(a.y)} C ${f1(c1.x)} ${f1(c1.y)} ${f1(c2.x)} ${f1(c2.y)} ${f1(t.x)} ${f1(t.y)}`;
+}
+function drawCables(instant) {
+  const svg = $('#cables'), fm = $('#face-mallette');
+  if (!svg || !fm || $('#app').hidden || !g.cables) return;
+  if ($$('#jacks .jack-socket').length !== 5 || $$('#ports .port-hole').length !== 5) return;
+  const P = patchLayout(); if (!P.F.width) return;
+  lastLayout = P;
+  const sig = g.cables.map((k) => k.color).join();
+  if (svg.dataset.sig !== sig) {
+    svg.textContent = ''; svg.dataset.sig = sig; pose = []; tweens = [];
+    g.cables.forEach((k, c) => {
+      const gr = svgEl('g', { class: 'cable', 'data-c': c, 'data-color': k.color }, svg); gr.style.setProperty('--w', WIRE[k.color]);
+      for (const cl of ['c-shadow', 'c-rim', 'c-core', 'c-hi']) svgEl('path', { class: cl }, gr);
       const pl = svgEl('g', { class: 'cplug' }, gr);
-      svgEl('rect', { class: 'pc' }, pl); svgEl('rect', { class: 'pb' }, pl); svgEl('rect', { class: 'pg' }, pl);
+      for (const cl of ['pt', 'pc', 'pb', 'pg']) svgEl('rect', { class: cl }, pl);
     });
     instant = true;
   }
-  svg.classList.toggle('instant', !!instant);
-  svg.setAttribute('viewBox', `0 0 ${F.width.toFixed(1)} ${F.height.toFixed(1)}`);
-  const f = (n) => n.toFixed(1);
-  const C2 = (p0, a1, b1, m, a2, b2, p1) => `M ${f(p0[0])} ${f(p0[1])} C ${f(a1[0])} ${f(a1[1])} ${f(b1[0])} ${f(b1[1])} ${f(m[0])} ${f(m[1])} C ${f(a2[0])} ${f(a2[1])} ${f(b2[0])} ${f(b2[1])} ${f(p1[0])} ${f(p1[1])}`;
-  cableGeom = [];
-  sockets.forEach((s, i) => {
-    const [sx, sy, sd] = ctr(s), [px, py] = ctr(ports[i]);
-    const L = Math.round(sd * 0.95), w = Math.max(9, Math.round(sd * 0.5));
-    const pulled = !!g.pulled[i];
-    let ax, ay, rot, d;
-    if (!pulled) {
-      ax = sx; ay = sy; rot = 0; const t = [sx, sy + L];
-      if (stacked) {
-        const m = [(px + t[0]) / 2 + (i % 2 ? 3 : -3), (py + t[1]) / 2], k = Math.max(4, (py - t[1]) * 0.3);
-        d = C2([px, py], [px, py - k], [m[0], m[1] + k * 0.6], m, [m[0], m[1] - k * 0.6], [t[0], t[1] + k], t);
-      } else {
-        const r = Math.max(4, Math.min(14, py - t[1] - 2)), cx = t[0] + r;
-        d = C2([px, py], [px - (px - cx) / 3, py], [cx + (px - cx) / 3, py], [cx, py], [t[0] + r * 0.45, py], [t[0], py - r * 0.45], t);
-      }
-    } else if (stacked) {
-      // couchée à droite de son port, pointe vers la droite
-      const t = [px + 12, py + 9]; ax = t[0] + L; ay = t[1]; rot = 90;
-      d = C2([px, py], [px, py + 4], [px + 1, py + 8], [px + 5, py + 9], [px + 8, py + 9.5], [t[0] - 3, t[1]], t);
-    } else {
-      // debout dans la goulotte de la base, à droite de son port
-      const t = [px + 14, py - 6]; ax = t[0]; ay = t[1] - L; rot = 0;
-      d = C2([px, py], [px + 4, py], [px + 8, py + 1], [px + 11, py - 1], [px + 13, py - 2], [t[0], t[1] + 3], t);
-    }
-    const gr = svg.children[i];
-    gr.classList.toggle('pulled', pulled);
-    for (const p of gr.querySelectorAll('path')) p.style.d = `path("${d}")`;
-    const pl = gr.querySelector('.cplug');
-    pl.style.transform = `translate(${f(ax)}px, ${f(ay)}px) rotate(${rot}deg)`;
-    const [pc, pb, pg] = pl.children;
-    Object.entries({ x: -w * 0.32, y: -sd * 0.28, width: w * 0.64, height: sd * 0.34, rx: 1.5 }).forEach(([k, v]) => pc.setAttribute(k, f(v)));
-    Object.entries({ x: -w / 2, y: sd * 0.02, width: w, height: L, rx: 3 }).forEach(([k, v]) => pb.setAttribute(k, f(v)));
-    Object.entries({ x: -w / 2 + 2, y: sd * 0.12, width: 2, height: L * 0.75, rx: 1 }).forEach(([k, v]) => pg.setAttribute(k, f(v)));
-    const hinge = stacked ? lidR.bottom - F.top : lidR.right - F.left;
-    cableGeom.push({ i, color: g.wires[i], pulled, stacked, hinge: +f(hinge), socket: [+f(sx), +f(sy)], port: [+f(px), +f(py)], plug: [+f(ax), +f(ay), rot], tail: rot === 90 ? [+f(ax - L), +f(ay)] : [+f(ax), +f(ay + L)] });
+  svg.setAttribute('viewBox', `0 0 ${f1(P.F.width)} ${f1(P.F.height)}`);
+  for (const pl of svg.querySelectorAll('.cplug')) {
+    const [pt, pc, pb, pg] = pl.children, { d, L, w } = P;
+    const at = (e, o) => { for (const k in o) e.setAttribute(k, f1(o[k])); };
+    at(pt, { x: -w * 0.16, y: -d * 0.42, width: w * 0.32, height: d * 0.3, rx: 1 });          // pointe dorée
+    at(pc, { x: -w * 0.34, y: -d * 0.2, width: w * 0.68, height: d * 0.26, rx: 1.5 });        // collier métal
+    at(pb, { x: -w / 2, y: d * 0.04, width: w, height: L, rx: 3 });                          // manchon moulé (couleur du câble)
+    at(pg, { x: -w / 2 + 2, y: d * 0.14, width: 2, height: L * 0.72, rx: 1 });               // reflet
+  }
+  const now = performance.now();
+  g.cables.forEach((k, c) => {
+    const tg = targetPose(P, c), cur = pose[c];
+    if (instant || !cur) { pose[c] = tg; tweens[c] = null; }
+    else if (Math.abs(cur.x - tg.x) + Math.abs(cur.y - tg.y) + Math.abs(cur.rot - tg.rot) > 0.5) tweens[c] = { from: { ...cur }, to: tg, t0: now };
   });
-  if (instant) requestAnimationFrame(() => svg.classList.remove('instant'));
+  cableGeom = g.cables.map((k, c) => {
+    const tg = targetPose(P, c), t = tailOf(tg, P.L);
+    return { c, color: k.color, socket: k.socket, stacked: P.stacked, hinge: +f1(P.hinge), anchor: [+f1(P.holes[c].x), +f1(P.holes[c].y)], plug: [+f1(tg.x), +f1(tg.y), tg.rot], tail: [+f1(t.x), +f1(t.y)], sockets: P.sockets.map((s) => [+f1(s.x), +f1(s.y)]) };
+  });
+  renderCables(); kick();
+}
+function renderCables() {
+  const svg = $('#cables'), P = lastLayout; if (!P || !svg.children.length) return;
+  g.cables.forEach((k, c) => {
+    const gr = svg.querySelector(`.cable[data-c="${c}"]`); if (!gr) return;
+    const dragging = drag?.on && drag.c === c, p = dragging ? drag.pose : pose[c];
+    const d = cablePath(P, c, p);
+    for (const path of gr.querySelectorAll('path')) path.setAttribute('d', d);
+    gr.querySelector('.cplug').setAttribute('transform', `translate(${f1(p.x)} ${f1(p.y)}) rotate(${f1(p.rot)})`);
+    gr.classList.toggle('sel', g.sel === c); gr.classList.toggle('drag', !!dragging); gr.classList.toggle('off', k.socket == null && !dragging);
+  });
+  const top = drag?.on ? drag.c : g.sel;
+  if (top != null && top >= 0) { const gr = svg.querySelector(`.cable[data-c="${top}"]`); if (gr && gr !== svg.lastElementChild) svg.append(gr); }
+}
+function kick() { if (!rafOn) { rafOn = true; requestAnimationFrame(animCables); } }
+function animCables(now) {
+  let busy = false;
+  tweens.forEach((tw, c) => {
+    if (!tw) return;
+    const u = Math.min(1, (now - tw.t0) / 280), e = 1 - Math.pow(1 - u, 3);
+    pose[c] = { x: tw.from.x + (tw.to.x - tw.from.x) * e, y: tw.from.y + (tw.to.y - tw.from.y) * e, rot: tw.from.rot + (tw.to.rot - tw.from.rot) * e };
+    if (u < 1) busy = true; else tweens[c] = null;
+  });
+  renderCables();
+  if (busy || drag?.on) requestAnimationFrame(animCables); else rafOn = false;
+}
+
+// ---- gestes
+function socketAt(x, y) {
+  const els = $$('#jacks .plug');
+  for (let s = 0; s < els.length; s++) { const r = els[s].getBoundingClientRect(); if (x >= r.left - 8 && x <= r.right + 8 && y >= r.top - 8 && y <= r.bottom + 8) return s; }
+  return null;
+}
+function setHover(s) { $$('#jacks .jack').forEach((el) => el.classList.toggle('hover', +el.dataset.s === s)); }
+function patchApply(c, s) {
+  const before = g.cables.map((k) => k.socket), from = g.cables[c].socket;
+  if (s != null) { const o = cableOf(s); if (o >= 0 && o !== c) g.cables[o].socket = from; g.cables[c].socket = s; } // prise occupée : échange (ou l'ancien retombe)
+  else g.cables[c].socket = null;
+  return before;
+}
+function plugCable(c, s) { input(); const before = patchApply(c, s); g.sel = null; sfx.plugIn(); buzz(12); afterPatch({ type: 'plug', c, s }, before); }
+function unplugCable(c) { input(); const before = patchApply(c, null); g.sel = null; sfx.plugPull(); afterPatch({ type: 'unplug', c }, before); }
+function tapPort(c) {
+  input();
+  if (g.sel === c) { if (g.cables[c].socket != null) unplugCable(c); else { g.sel = null; syncPatchDom(); drawCables(); } return; }
+  g.sel = c; sfx.push(); syncPatchDom(); drawCables();
+}
+function tapSocket(s) {
+  input(); const o = cableOf(s);
+  if (g.sel == null) { if (o >= 0) { g.sel = o; sfx.push(); syncPatchDom(); drawCables(); } return; }
+  const c = g.sel;
+  if (g.cables[c].socket === s) unplugCable(c); else plugCable(c, s);
+}
+// règle : on peut débrancher et déplacer librement pendant les étapes 4 et 10 ; seule une fiche branchée dans la
+// mauvaise prise est fautive. Hors de ces étapes, toucher aux câbles coûte du temps et l'Entité les remet en place.
+function afterPatch(ev, before) {
+  syncPatchDom(); drawCables();
+  const tok = ++g.patchTok;
+  const revert = (ms) => setTimeout(() => { if (g.patchTok !== tok) return; g.cables.forEach((k, i) => { k.socket = before[i]; }); g.sel = null; sfx.servo(); syncPatchDom(); drawCables(); }, ms);
+  if (g.phase !== 'play') { revert(700); return; }
+  if (g.step === 4) {
+    const { cable: A, socket: N } = run.patch1;
+    if (g.cables[A].socket === N) { good(5, 2); return; }
+    if (ev.type === 'plug' && ((ev.c === A && ev.s !== N) || (ev.c !== A && ev.s === N))) { bad(8); revert(900); }
+    return;
+  }
+  if (g.step === 10) {
+    const { off: B, cable: C, socket: M } = run.patch2;
+    if (g.cables[B].socket == null && g.cables[C].socket === M) { good(11); return; }
+    if (ev.type === 'plug' && (ev.c === B || (ev.c === C && ev.s !== M) || (ev.c !== C && ev.s === M))) { bad(8); revert(900); }
+    return;
+  }
+  bad(5); revert(900);
+}
+function straightCables() { g.cables.forEach((k, i) => { k.socket = i; }); g.sel = null; syncPatchDom(); drawCables(); }
+function wirePatchbay() {
+  const fm = $('#face-mallette');
+  fm.addEventListener('pointerdown', (e) => {
+    const jack = e.target.closest('#jacks .jack'), port = e.target.closest('#ports .port-btn');
+    if (!jack && !port) return;
+    e.preventDefault();
+    const s = jack ? +jack.dataset.s : null, c = port ? +port.dataset.c : cableOf(s);
+    drag = { c, s, from: port ? 'port' : 'socket', x0: e.clientX, y0: e.clientY, id: e.pointerId, on: false, pose: null, hover: null };
+  });
+  addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (!drag.on) {
+      if (drag.c < 0 || Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 10) return;
+      drag.on = true; input(); if (g.cables[drag.c].socket != null) sfx.plugPull();
+      g.sel = null; syncPatchDom();
+    }
+    e.preventDefault();
+    const P = lastLayout || patchLayout(), F = $('#face-mallette').getBoundingClientRect();
+    drag.pose = { x: e.clientX - F.left, y: e.clientY - F.top - P.L * 0.5, rot: 0 };
+    const h = socketAt(e.clientX, e.clientY); if (h !== drag.hover) { drag.hover = h; setHover(h); }
+    kick();
+  }, { passive: false });
+  const end = (e, cancel) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag; drag = null; setHover(null);
+    if (cancel) { drawCables(); return; }
+    if (!d.on) { if (d.from === 'port') tapPort(d.c); else tapSocket(d.s); return; }
+    // pose = position actuelle du doigt (le câble part de là vers sa destination)
+    pose[d.c] = { ...d.pose };
+    const s = socketAt(e.clientX, e.clientY);
+    if (s != null) { if (g.cables[d.c].socket === s) drawCables(); else plugCable(d.c, s); }
+    else if (g.cables[d.c].socket != null) unplugCable(d.c);
+    else drawCables();
+  };
+  addEventListener('pointerup', (e) => end(e, false));
+  addEventListener('pointercancel', (e) => end(e, true));
+  // clavier (Entrée / Espace) : même logique que le toucher
+  fm.addEventListener('click', (e) => {
+    if (e.detail !== 0) return;
+    const jack = e.target.closest('#jacks .jack'), port = e.target.closest('#ports .port-btn');
+    if (jack) tapSocket(+jack.dataset.s); else if (port) tapPort(+port.dataset.c);
+  });
 }
 
 // ================= affichages =================
@@ -221,44 +368,127 @@ function drawOled() {
     return;
   }
   const lie = performance.now() < g.lieUntil && (g.step === 1 || g.step === 8);
-  const alpha = g.encMode === 'alpha';
+  // v0.2.3 : les rotatifs ne portent QUE des lettres (anneau A-V) ; les chiffres se tapent au clavier 4x4
   c.fillText('E1  E2  E3  E4', 10, 4);
-  c.fillText(alpha ? 'A-V' : '0-9', 106, 4);
+  c.fillText('A-V', 106, 4);
   c.font = '500 22px "JetBrains Mono", monospace';
-  const sym = (v) => (alpha ? RING[v] : String(v));
+  const sym = (v) => RING[v];
   for (let i = 0; i < 4; i++) {
     const v = lie && g.decoy?.enc ? g.decoy.enc[i] : g.enc[i];
     c.fillText(sym(v), 12 + i * 30, 22);
   }
-  if (alpha) for (let i = 0; i < 4; i++) c.fillRect(12 + i * 30, 49, 14, 1);
-  if (lie) { for (let k = 0; k < 6; k++) { c.fillStyle = 'rgba(255,60,60,.7)'; c.fillRect(Math.random() * W, Math.random() * H, 20 + Math.random() * 40, 2); } }
+  for (let i = 0; i < 4; i++) c.fillRect(12 + i * 30, 49, 14, 1);
+  // mensonge : grésillement rouge volontaire, mais seulement dans le cadre (bord + bandeau du haut), jamais sur les caractères
+  if (lie) {
+    const a = 0.25 + Math.random() * 0.25; c.strokeStyle = `rgba(255,60,60,${a.toFixed(2)})`; c.lineWidth = 1; c.strokeRect(0.5, 0.5, W - 1, H - 1);
+    c.fillStyle = `rgba(255,60,60,${(a * 0.6).toFixed(2)})`;
+    for (let k = 0; k < 3; k++) { const y = Math.random() < 0.5 ? 1 + Math.random() * 1.2 : H - 2.4 + Math.random() * 1.2; c.fillRect(Math.random() * (W - 30), y, 10 + Math.random() * 24, 1); }
+  }
   $('#oledText').textContent = `Encodeurs ${g.enc.map(sym).join(' ')}`;
 }
 function setEncVisual() {
-  const alpha = g.encMode === 'alpha';
   $$('.enc').forEach((el, i) => {
     $('.knob-cap', el).style.transform = `rotate(${g.encRaw[i] * (360 / DETENTS)}deg)`; // 18° par cran : 20 crans = 1 tour
-    const k = $('.knob', el); k.setAttribute('aria-valuemax', alpha ? '19' : '9'); k.setAttribute('aria-valuenow', g.enc[i]);
-    k.setAttribute('aria-valuetext', alpha ? `lettre ${RING[g.enc[i]]}` : `chiffre ${g.enc[i]}`);
+    const k = $('.knob', el); k.setAttribute('aria-valuemax', String(DETENTS - 1)); k.setAttribute('aria-valuenow', g.enc[i]);
+    k.setAttribute('aria-valuetext', `lettre ${RING[g.enc[i]]}`);
   });
 }
 
 // CYD 2 : verrou de signal (labyrinthe visible), sinon oscilloscope en veille
+// ================= CYD 2 hors labyrinthe : moniteur cardiaque (ECG) du démineur =================
+// Purement visuel (aucun bip) : le pouls monte avec le chrono, les erreurs (adrénaline) et les répliques de l'Entité.
+const ecg = { bpm: 70, target: 70, adren: 0, jit: 0, ph: 0, head: 0, lastT: 0, buf: null, label: 'VEILLE', aria: '' };
+function ecgWave(p) {                       // un battement P-QRS-T, p ∈ [0,1)
+  const gs = (m, w, a) => a * Math.exp(-((p - m) * (p - m)) / (2 * w * w));
+  return gs(0.1, 0.022, 0.12) + gs(0.205, 0.007, -0.12) + gs(0.23, 0.009, 1) + gs(0.255, 0.008, -0.28) + gs(0.44, 0.04, 0.3);
+}
+function ecgSpike(n = 22) { ecg.adren = Math.min(60, ecg.adren + n); ecg.jit = 1; }
+function ecgTarget(now) {
+  if (g.phase === 'boom') return 0;
+  if (g.phase === 'win') return 72;
+  if (g.phase !== 'play') return 70;
+  const t = Math.min(1, Math.max(0, 1 - g.remaining / TIME_S)), r = g.remaining;
+  let b = 76 + 30 * Math.pow(t, 1.3);
+  if (r < 180) b += (180 - r) / 180 * 16;   // < 3 min : ça grimpe plus vite
+  if (r < 60) b += (60 - r) / 60 * 22;      // < 60 s : panique
+  b += Math.min(20, g.errors * 4) + ecg.adren;
+  if (now < g.lieUntil) b += 13;            // l'Entité ment / provoque
+  else if (voiceLevel() > 0.04) b += 6;     // l'Entité parle
+  if (g.hesitating) b += 8;
+  return Math.max(74, Math.min(176, b));
+}
+function ecgStyle(bpm) {
+  if (g.phase === 'boom') return { ink: '#ff3b30', hud: '#ff3b30', label: 'ARRÊT' };
+  if (g.phase !== 'play' && g.phase !== 'win') return { ink: '#38bdf8', hud: '#38bdf8', label: 'VEILLE' };
+  if (bpm < 95) return { ink: '#36f08a', hud: '#52d6ff', label: 'STABLE' };
+  if (bpm < 125) return { ink: '#ffb020', hud: '#ffb020', label: 'STRESS' };
+  return { ink: '#ff3b30', hud: '#ff3b30', label: bpm < 150 ? 'STRESS ÉLEVÉ' : 'CRITIQUE' };
+}
+function drawEcg(c, W, H, now) {
+  const dt = Math.min(0.1, ecg.lastT ? (now - ecg.lastT) / 1000 : 0); ecg.lastT = now;
+  ecg.target = ecgTarget(now);
+  ecg.adren *= Math.exp(-dt / 9); ecg.jit *= Math.exp(-dt / 0.8);
+  ecg.bpm += (ecg.target - ecg.bpm) * (1 - Math.exp(-dt / (g.phase === 'boom' ? 0.5 : 1.6)));
+  const st = ecgStyle(ecg.bpm), top = 26, bot = H - 14, mid = top + (bot - top) * 0.62, amp = (bot - top) * 0.55;
+  if (!ecg.buf || ecg.buf.length !== W) { ecg.buf = new Float32Array(W).fill(NaN); ecg.head = 0; }
+  // balayage gauche → droite (≈ 2,6 s par écran) ; la phase cardiaque avance au rythme du pouls
+  const flat = g.phase === 'boom' && ecg.bpm < 8;
+  ecg.acc = (ecg.acc || 0) + dt * W / 2.6; const steps = Math.floor(ecg.acc); ecg.acc -= steps;
+  for (let k = 0; k < steps; k++) {
+    ecg.ph = (ecg.ph + (ecg.bpm / 60) * (2.6 / W)) % 1;
+    const tremor = (st.ink === '#ff3b30' ? 1.2 : 0) + ecg.jit * 2.5;
+    const v = flat ? 0 : ecgWave(ecg.ph) * (g.phase === 'boom' ? ecg.bpm / 90 : 1);
+    ecg.head = (ecg.head + 1) % W;
+    ecg.buf[ecg.head] = mid - v * amp + (Math.random() - 0.5) * (0.8 + tremor);
+  }
+  // grille
+  c.strokeStyle = 'rgba(82,214,255,.12)'; c.lineWidth = 1;
+  for (let x = 0.5; x <= W; x += 20) { c.beginPath(); c.moveTo(x, top - 4); c.lineTo(x, bot); c.stroke(); }
+  for (let y = top - 3.5; y <= bot; y += 20) { c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+  // trace phosphore : plus vive près du spot, effacée juste devant lui
+  c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = st.ink;
+  for (let seg = 0; seg < 6; seg++) {
+    c.globalAlpha = 0.18 + seg * 0.16; c.lineWidth = seg === 5 ? 2.2 : 1.8; c.beginPath();
+    let started = false;
+    for (let d = W - 12 - Math.round((W - 12) * (seg + 1) / 6); d <= W - 12 - Math.round((W - 12) * seg / 6); d++) {
+      const x = (ecg.head - (W - 12 - d) + W * 2) % W, y = ecg.buf[x];
+      if (Number.isNaN(y) || (started && x === 0)) { started = false; continue; }
+      started ? c.lineTo(x, y) : c.moveTo(x, y); started = true;
+    }
+    c.stroke();
+  }
+  c.globalAlpha = 1;
+  const hy = ecg.buf[ecg.head];
+  if (!Number.isNaN(hy)) { c.fillStyle = '#fff'; c.shadowColor = st.ink; c.shadowBlur = 12; c.beginPath(); c.arc(ecg.head, hy, 2.6, 0, 7); c.fill(); c.shadowBlur = 0; }
+  // HUD : cœur qui bat + BPM + état ; barre de stress en bas
+  const beat = flat ? 0 : Math.max(0, 1 - Math.abs(ecg.ph - 0.24) * 9);
+  const hx = 14, hy0 = 13, s = 5 + beat * 1.6;
+  c.fillStyle = st.ink; c.shadowColor = st.ink; c.shadowBlur = 4 + beat * 10; c.beginPath();
+  c.moveTo(hx, hy0 + s * 0.9); c.bezierCurveTo(hx - s * 1.6, hy0 - s * 0.1, hx - s * 0.7, hy0 - s * 1.3, hx, hy0 - s * 0.35);
+  c.bezierCurveTo(hx + s * 0.7, hy0 - s * 1.3, hx + s * 1.6, hy0 - s * 0.1, hx, hy0 + s * 0.9); c.fill(); c.shadowBlur = 0;
+  const shown = Math.round(flat ? 0 : ecg.bpm);
+  c.textBaseline = 'middle'; c.fillStyle = st.hud; c.font = 'bold 16px ui-monospace, Menlo, Consolas, monospace'; c.textAlign = 'left';
+  c.fillText(String(shown), 26, 13); const tw = c.measureText(String(shown)).width;
+  c.font = 'bold 9px ui-monospace, Menlo, Consolas, monospace'; c.fillText('BPM', 30 + tw, 14);
+  c.textAlign = 'right'; c.font = 'bold 10px ui-monospace, Menlo, Consolas, monospace'; c.fillText(st.label, W - 8, 13);
+  const f = Math.max(0, Math.min(1, (ecg.bpm - 60) / 116));
+  c.fillStyle = 'rgba(255,255,255,.08)'; c.fillRect(8, H - 8, W - 16, 4);
+  c.fillStyle = st.ink; c.fillRect(8, H - 8, (W - 16) * f, 4);
+  ecg.label = st.label;
+  const aria = `Moniteur cardiaque : ${shown} BPM, ${st.label.toLowerCase()}`;
+  if (aria !== ecg.aria && (now - (ecg.ariaT || 0) > 2000 || st.label !== ecg.ariaL)) { ecg.aria = aria; ecg.ariaT = now; ecg.ariaL = st.label; c.canvas.setAttribute('aria-label', aria); }
+}
+
 function drawCyd2() {
   const cv = $('#cyd2'); if (!cv) return;
   const c = cv.getContext('2d'), W = cv.width, H = cv.height, now = performance.now();
   c.fillStyle = '#020a10'; c.fillRect(0, 0, W, H);
   const maze = g.phase === 'play' && (g.step === 5 ? run.maze1 : g.step === 9 ? run.maze2 : null);
   const sab = g.sabotage;
-  if (!maze) {
-    c.strokeStyle = 'rgba(98,214,255,.18)'; c.lineWidth = 1;
-    for (let x = 0; x <= W; x += 20) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke(); }
-    for (let y = 0; y <= H; y += 20) { c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
-    c.strokeStyle = g.phase === 'play' ? '#62d6ff' : '#2a6f8a'; c.lineWidth = 2; c.beginPath();
-    for (let x = 0; x <= W; x += 3) { const y = H / 2 + Math.sin(x / 14 + now / 300) * 18 * Math.sin(now / 1700) + Math.sin(x / 5 + now / 90) * 3; x ? c.lineTo(x, y) : c.moveTo(x, y); }
-    c.stroke();
+  if (!maze) { drawEcg(c, W, H, now);
     return;
   }
+  if (ecg.aria) { ecg.aria = ''; ecg.ariaL = ''; cv.setAttribute('aria-label', 'Écran 2 : verrou de signal'); }
   const n = maze.n, cs = Math.floor(Math.min((W - 20) / n, (H - 20) / n)), ox = Math.floor((W - cs * n) / 2), oy = Math.floor((H - cs * n) / 2);
   const ink = sab ? '#ff4b3e' : '#62d6ff';
   c.strokeStyle = sab ? 'rgba(255,75,62,.16)' : 'rgba(98,214,255,.14)'; c.lineWidth = 1;
@@ -289,14 +519,14 @@ function nextStep(n) {
   showStep();
   const hard = run.tier === 'difficile';
   switch (n) {
-    case 1: setEncMode('digit');
+    case 1: setEncMode('alpha');
       voice(hard ? 'clue_enc1_envers' : 'clue_enc1_ordre', { clue: true }); pressureEnc(); break;
     case 2: voice(hard ? 'clue_trappe_rare' : 'clue_trappe_frequente', { clue: true });
       pressure(5500, () => { const w = (run.trap + 1) % 3; decoy('trap', w); voice(['taunt_trappe', color(run.trapColors[w])], { lie: true, now: true }); }); break;
     case 3: g.code = ''; voice(hard ? 'clue_sequence_envers' : 'clue_sequence_ordre', { clue: true }).then(() => g.step === 3 && flashSeq(run.seq));
       pressure(9000, () => { voice('taunt_regarde', { lie: true, now: true }); flashSeq(run.seq.map((d) => (d % 8) + 1), true); }); break;
-    case 4: voice(hard ? 'clue_fils1_dur' : 'clue_fils1_moyen', { clue: true });
-      pressure(6000, () => { const w = run.decoys.wire1; decoy('wire', w); voice(['taunt_debranche', color(g.wires[w]), 'taunt_saute'], { lie: true, now: true }); }); break;
+    case 4: voice(['clue_patch_route', cableCue(run.patch1.cable), prise(run.patch1.socket)], { clue: true });
+      pressure(6000, () => { const w = run.decoys.wire1; decoy('wire', w); voice(['taunt_branche', cableCue(w.cable), prise(w.socket)], { lie: true, now: true }); }); break;
     case 5: g.pos = run.maze1.start.slice(); voice('clue_verrou', { clue: true });
       pressure(9000, () => voice('taunt_lent', { now: true })); break;
     case 6: g.code = ''; voice('clue_code1', { clue: true });
@@ -308,9 +538,9 @@ function nextStep(n) {
     case 8: setEncMode('alpha');
       voice([hard ? 'clue_mot_envers' : 'clue_mot_ordre', ...run.spell.split('').map(letter)], { clue: true }); pressureEnc(); break;
     case 9: g.pos = run.maze2.start.slice(); voice('clue_verrou', { clue: true }); g.sabT = performance.now() + 5000; break;
-    case 10: g.wires = run.wires2.colors.slice(); g.pulled = [false, false, false, false, false]; buildJacks();
-      sfx.servo(); voice(hard ? 'clue_fils2_dur' : 'clue_fils2_moyen', { clue: true });
-      if (run.lies.wire2False) pressure(6000, () => { const w = run.decoys.wire2; decoy('wire', w); voice(['taunt_debranche', color(g.wires[w]), 'taunt_saute'], { lie: true, now: true }); }); break;
+    case 10: straightCables(); sfx.servo();
+      voice(['clue_patch_double', cableCue(run.patch2.off), 'patch_laisse', cableCue(run.patch2.cable), prise(run.patch2.socket)], { clue: true });
+      if (run.lies.wire2False) pressure(6000, () => { const w = run.decoys.wire2; decoy('wire', w); voice(['taunt_branche', cableCue(w.cable), prise(w.socket)], { lie: true, now: true }); }); break;
     case 11: g.code = ''; voice('clue_code2', { clue: true });
       pressure(7000, () => { decoy('tx'); voice('taunt_rouge', { lie: true, now: true }); }); break;
     case 12: $('#gtTx').classList.add('armed'); voice('clue_transmit', { clue: true }); voice('taunt_sceller', { lie: true }); break;
@@ -321,13 +551,13 @@ function nextStep(n) {
 function pressure(ms, fn) { const s = g.step; g.pressure.push(setTimeout(() => { if (g.running && g.step === s) fn(); }, ms)); }
 function pressureEnc() {
   g._encTaunted = false;
-  if (run.lies.encFalse && g.step === 1) pressure(4000, () => { const tgt = curEncTarget(); g.decoy = { enc: tgt.map((d) => (d + 3) % 10) }; voice(['taunt_cetait', digit(g.decoy.enc[0]), 'taunt_depeche'], { lie: true, now: true }); });
+  if (run.lies.encFalse && g.step === 1) pressure(4000, () => { const tgt = curEncTarget(); g.decoy = { enc: tgt.map((d) => (d + 3) % DETENTS) }; voice(['taunt_cetait', letter(RING[g.decoy.enc[0]]), 'taunt_depeche'], { lie: true, now: true }); });
   if (run.lies.encFalse && g.step === 8) pressure(5000, () => voice(['taunt_cetait', letter(run.decoys.word), 'taunt_depeche'], { lie: true, now: true }));
 }
 const curEncTarget = () => (g.step === 1 ? run.enc1 : run.enc2);
-// mode des KY-040 : chiffres (0-9) ou anneau cryptex de 20 lettres (A-V) ; position de départ au hasard
-function setEncMode(mode) {
-  g.encMode = mode; const n = mode === 'alpha' ? DETENTS : 10;
+// KY-040 : toujours l'anneau cryptex de 20 lettres (A-V), jamais de chiffres ; position de départ au hasard
+function setEncMode() {
+  g.encMode = 'alpha'; const n = DETENTS;
   g.enc = [0, 0, 0, 0].map(() => Math.floor(Math.random() * n));
   g.encRaw = g.enc.slice();
   setEncVisual();
@@ -335,7 +565,7 @@ function setEncMode(mode) {
 function decoy(kind, i) {
   clearDecoys();
   if (kind === 'trap') $(`.trap[data-i="${i}"]`)?.classList.add('decoy');
-  if (kind === 'wire') { $(`.jack[data-i="${i}"]`)?.classList.add('decoy'); $(`#cables .cable[data-i="${i}"]`)?.classList.add('decoy'); }
+  if (kind === 'wire') { $(`#jacks .jack[data-s="${i.socket}"]`)?.classList.add('decoy'); $(`#cables .cable[data-c="${i.cable}"]`)?.classList.add('decoy'); }
   if (kind === 'tx') $('#gtTx').classList.add('decoy');
   setTimeout(clearDecoys, 3200);
 }
@@ -352,7 +582,7 @@ function good(nextN, fragIdx) {
 }
 function bad(sec = 5, line = 'outcome_faux') {
   sfx.strike(); buzz(70);
-  g.errors++; g.remaining -= sec; g.prob = Math.min(99.9, g.prob + 3.2); showProb();
+  g.errors++; ecgSpike(20 + Math.random() * 5); g.remaining -= sec; g.prob = Math.min(99.9, g.prob + 3.2); showProb();
   document.body.classList.remove('hit'); void document.body.offsetWidth; document.body.classList.add('hit');
   eye?.setMood('angry'); setTimeout(() => !g.lieUntil && g.running && eye?.setMood('watching'), 900);
   if (line) voice(line, { now: true });
@@ -456,21 +686,8 @@ function wire() {
   $('#leverArm').addEventListener('click', () => { input(); armToggle(); });
   $('#coverTx').addEventListener('click', () => coverTap('Tx'));
   $('#leverTx').addEventListener('click', txFlip);
-  // fiches banane (couvercle intérieur)
-  $('#jacks').addEventListener('click', (e) => {
-    const b = e.target.closest('.plug'); if (!b) return;
-    input(); const i = +b.closest('.jack').dataset.i;
-    if (g.pulled[i]) return;
-    sfx.plugPull();
-    const step = g.step, set = step === 4 ? run.wires1 : step === 10 ? run.wires2 : null;
-    const jack = b.closest('.jack');
-    if (!set && g.phase !== 'play') { jack.classList.add('wiggle'); setTimeout(() => jack.classList.remove('wiggle'), 400); return; }
-    if (set && i === set.cut) { g.pulled[i] = true; jack.classList.add('pulled'); b.setAttribute('aria-label', `Douille ${ORD[i]} vide : câble ${g.wires[i]} débranché, posé sur la base`); drawCables(); good(step === 4 ? 5 : 11, step === 4 ? 2 : null); }
-    else { // mauvais câble (ou hors étape) : la fiche retombe sur la base, pénalité, puis l'Entité la rebranche
-      const w = g.wires.join(); g.pulled[i] = true; jack.classList.add('pulled'); drawCables();
-      setTimeout(() => { if (g.wires.join() !== w) return; g.pulled[i] = false; jack.classList.remove('pulled'); drawCables(); }, 900); bad(set ? 8 : 5);
-    }
-  });
+  // baie banane 5x5 (couvercle ↔ base)
+  wirePatchbay();
 
   // encodeurs KY-040 : on tourne le bouton lui-même (aucun bouton + / −)
   //  - glisser : torsion autour du centre (18° = 1 cran) ou glissé horizontal (20 px = 1 cran), choisi aux 8 premiers px
@@ -563,13 +780,13 @@ function wire() {
 
 function turn(i, s) {
   input(); if (g.phase !== 'play') return;
-  const n = g.encMode === 'alpha' ? DETENTS : 10;
+  const n = DETENTS;
   g.encRaw[i] += s; g.enc[i] = (g.enc[i] + s + n) % n; sfx.detent(); setEncVisual(); drawOled();
   // pression : quand un encodeur tombe juste, l'Entité affirme le contraire (une fois par étape)
   if ((g.step === 1 || g.step === 8) && !g._encTaunted && g.enc[i] === curEncTarget()[i] && g.enc.filter((v, k) => v === curEncTarget()[k]).length >= 2) {
     g._encTaunted = true;
     const right = curEncTarget()[i], wrong = (right + 3 + Math.floor(Math.random() * 5)) % n;
-    setTimeout(() => g.running && voice(['taunt_cetait', g.encMode === 'alpha' ? letter(RING[wrong]) : digit(wrong), 'taunt_depeche'], { lie: true, now: true }), 300);
+    setTimeout(() => g.running && voice(['taunt_cetait', letter(RING[wrong]), 'taunt_depeche'], { lie: true, now: true }), 300);
   }
 }
 function pushEnc(i) {
@@ -634,6 +851,8 @@ let eye = null;
 const spkEl = document.getElementById('face-mallette');
 function loop(now) {
   requestAnimationFrame(loop);
+  // CYD 2 : ECG animé (~30 i/s) tant qu'il n'est pas en labyrinthe (étapes 5 et 9 inchangées)
+  if (now - (loop.ecgT || 0) > 32 && !(g.phase === 'play' && (g.step === 5 || g.step === 9)) && !$('#app').hidden) { loop.ecgT = now; drawCyd2(); }
   const vl = voiceLevel(); if (vl !== loop.vl) { loop.vl = vl; spkEl.style.setProperty('--vl', vl.toFixed(3)); } // haut-parleurs du couvercle
   if (eye) { eye.setVoice(vl); eye.lookAt(Math.sin(now / 2300) * 0.5, Math.sin(now / 3100) * 0.35); }
   if (g.running) {
@@ -736,7 +955,7 @@ function registerSW() {
   const hadController = !!navigator.serviceWorker.controller;
   const go = async () => {
     try {
-      const reg = await navigator.serviceWorker.register('./sw.js');
+      const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
       reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) w.postMessage('SKIP_WAITING'); }); });
       let reloaded = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadController || reloaded || g.running) return; reloaded = true; location.reload(); });
@@ -766,7 +985,7 @@ function init() {
       voiceLog, voiceStats, musicStats, ttsAvailable,
       forceSabotage(on) { if (on) startSabotage(); else endSabotage(); },
       idle(ms) { g.lastInput = performance.now() - ms; },
-      turn(i, s) { turn(i, s); }, pushEnc(i) { pushEnc(i); }, cables: () => cableGeom.map((c) => ({ ...c })), RING, DETENTS,
+      turn(i, s) { turn(i, s); }, pushEnc(i) { pushEnc(i); }, cables: () => cableGeom.map((c) => ({ ...c })), ecg: () => ({ bpm: Math.round(ecg.bpm), target: Math.round(ecg.target), label: ecg.label, adren: +ecg.adren.toFixed(1) }), ecgSpike, oled: () => drawOled(), get drag() { return drag; }, RING, DETENTS,
     };
   }
 }

@@ -9,6 +9,40 @@ Lien : https://passcool17.github.io/entite-mallette/
 Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/entite-mallette-v015/
 (dépôt passcool17/entite-mallette-v015, cache séparé `entite-mallette-v015-0.1.5`).
 
+## Version 0.2.3 (23 nov. 2026)
+
+- **Vraie baie banane 5×5** : les 5 câbles restent ancrés sur la base (un port par couleur), et n’importe quel câble se
+  branche dans n’importe laquelle des 5 prises du couvercle (1 à 5) ; une prise = un câble ; les câbles se croisent
+  librement (courbes de Bézier SVG, gaine sombre, fiche moulée de la couleur du câble, pointe dorée). Prise vide = alésage
+  laiton ouvert. Câble débranché = fiche posée sur la base à côté de son port.
+  - **Glisser-déposer** (doigt ou souris) : fiche → prise libre = branché (clic) ; → prise occupée = échange si le câble venait
+    d’une prise, sinon l’occupant retombe sur la base ; lâché ailleurs = débranché. La prise survolée s’allume.
+  - **Toucher-choisir** : toucher un port de la base (ou une prise branchée) = câble choisi (halo pulsé, prises en
+    surbrillance), puis toucher une prise = branché / déplacé / échangé ; re-toucher sa prise ou son port = débranché.
+    Cibles ≥ 44×44 px. Clavier : Entrée/Espace font pareil.
+- **5 couleurs Keadic distinctes, une de chaque** : rouge `#e53935`, noir `#1b1d22` (liseré `#7c8594`), jaune `#f5c518`,
+  vert `#22c55e`, bleu `#2b7cff`, mélangées selon la graine (fini les deux câbles qui semblaient bleus). Départ : 1→1 … 5→5.
+- **Étape 4** : « La baie banane. Branche le câble [couleur] dans la prise [N]. » **Étape 10** : « Deuxième couche. … Débranche
+  le câble [B] et laisse-le débranché. Puis branche le câble [C] dans la prise [M]. » Pendant ces étapes, débrancher ou
+  déplacer n’est jamais puni ; seule une fiche branchée dans la mauvaise prise coûte −8 s (puis l’Entité remet tout).
+  Hors de ces étapes, toucher aux câbles coûte −5 s et l’Entité rebranche. L’Entité ment aussi (« Non ! Branche plutôt… », œil rouge).
+- **Rotatifs = lettres, clavier = chiffres** (règle de Pascal) : E1–E4 n’affichent plus jamais de chiffres, seulement l’anneau
+  `A-V`. Le n° de série devient `L C L C-L C L C` (ex. `F9R0-T8B2`) : étape 1 = ses **4 lettres** (dans l’ordre en
+  moyen-difficile, en partant de la fin en difficile) sur E1–E4 ; les chiffres restent pour les serrures et le clavier 4×4.
+- **CYD 2 = moniteur cardiaque (ECG)** hors labyrinthe : tracé P-QRS-T balayé de gauche à droite avec traînée phosphore et
+  spot lumineux, cœur qui bat, BPM et état. Veille ~70 BPM (cyan, `VEILLE`) ; en jeu le pouls monte avec le chrono
+  (plus vite sous 3 min et sous 60 s), chaque erreur (+20 à 25 BPM d’adrénaline qui retombe lentement), les répliques et
+  mensonges de l’Entité, l’hésitation : vert `STABLE` < 95, ambre `STRESS` 95-125, rouge `STRESS ÉLEVÉ` / `CRITIQUE` ≥ 125
+  (léger tremblement). Victoire : retour à 72 BPM `STABLE` ; explosion : tracé plat `0 BPM · ARRÊT`. Purement visuel, aucun bip.
+  Étapes 5 et 9 : labyrinthe inchangé.
+- **OLED** : les traits rouges vus sur « L U L T » étaient le brouillage volontaire d’un mensonge, tiré au hasard sur tout
+  l’écran ; il reste mais seulement en cadre rouge et sur les bords, les lettres restent nettes.
+- **Chargement bloqué à 14 % corrigé** (mini PC avec un ancien service worker) : chaque module est importé avec `?v=0.2.3`
+  (un ancien SW ne peut plus servir un vieux `game.js` au nouvel `app.js`) ; `sw.js` fait `skipWaiting()` à l’installation
+  et sert `.js` / `.css` / `.json` réseau d’abord (cache seulement hors ligne) ; le SW est enregistré dès l’écran de chargement
+  (`updateViaCache: 'none'`) ; une erreur de module s’affiche aussitôt et « Réessayer » désinscrit le SW de l’app et vide ses
+  anciens caches (jamais `entite-mallette-v015-*` / `v016-*`) avant de recharger.
+
 ## Version 0.2.2 (23 nov. 2026)
 
 - **KY-040 sans boutons + / −** : on tourne le bouton lui-même (anneau de 20 crans, repère blanc, 18° par cran, tic à chaque cran).
@@ -84,18 +118,18 @@ Deux paliers cachés (moyen-difficile, difficile) tirés ~50/50 ; les règles ch
 
 - `?seed=N` : partie reproductible (même palier, même série, mêmes réponses).
 - `?debug=1` : expose `window.__entiteDebug` (run, state, face, voiceLog, voiceStats, musicStats,
-  ttsAvailable, forceSabotage(on), idle(ms)) pour les tests.
+  ttsAvailable, forceSabotage(on), idle(ms), cables(), ecg(), oled()) pour les tests.
 
 ## Voix : `voix/manifest.json`
 
-Toutes les répliques (79) sont listées dans `voix/manifest.json`. Chaque entrée :
+Toutes les répliques (89) sont listées dans `voix/manifest.json`. Chaque entrée :
 
 | champ | sens |
 |---|---|
 | `id` | identifiant (ex. `clue_code1`, `chiffre_7`, `taunt_debranche`) |
 | `file` | `voix/<id>.mp3` |
 | `dfplayerTrack` | numéro de piste DFPlayer Mini (`0001`, `0002`, …) pour la vraie mallette |
-| `category` | `intro`, `clue`, `digit`, `color`, `letter` (les 20 lettres de l’anneau), `taunt`, `sabotage`, `outcome` |
+| `category` | `intro`, `clue`, `digit`, `color` (dont `cable_*`), `socket` (`prise_1` … `prise_5`), `letter` (les 20 lettres de l’anneau), `taunt`, `sabotage`, `outcome` |
 | `source` | `elevenlabs`, `placeholder` ou `tts` |
 | `mp3Ready` | `true` seulement si le mp3 existe vraiment |
 | `text` | texte français exact à enregistrer |
@@ -122,15 +156,28 @@ jamais publiés.
   2 haut-parleurs `SPK-L` / `SPK-R` de part et d’autre du CYD 1 centré, aucune pièce sur la coque.
 - `js/audio.js`, `js/voice-manifest.js`, `js/sfx.js`, `js/eye.js`, `js/preload.js` : voix, sons, œil, préchargement.
 - `audio/tension.mp3` (192827 octets) : musique de tension.
-- `sw.js` : service worker, cache `entite-mallette-v0.2.2` (manifeste des voix inclus). À l’activation, les anciens
-  caches `entite-mallette-*` (dont `entite-mallette-v0.2.1`, `entite-mallette-v0.2.0-r2`, `entite-mallette-v0.2.0` et `entite-mallette-v0.1.5-base`) sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`).
+- `sw.js` : service worker, cache `entite-mallette-v0.2.3` (manifeste des voix inclus). À l’activation, les anciens
+  caches `entite-mallette-*` (dont `entite-mallette-v0.2.2`, `entite-mallette-v0.2.1`, `entite-mallette-v0.2.0-r2`, `entite-mallette-v0.2.0` et `entite-mallette-v0.1.5-base`) sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`).
 
 ## Tests
 
 ```
 python3 -m http.server 8794 --bind 127.0.0.1 &
-node tests/v022.mjs            # ou : node tests/v022.mjs <base> <graine>
+node tests/v023.mjs            # ou : node tests/v023.mjs <base> <graine>
 ```
+
+`tests/v023.mjs` (147 vérifications) : jeu de 5 couleurs exact et distinct ; glisser-déposer vers n’importe quelle prise,
+échange et débranchement (doigt en portrait et paysage, souris sur bureau, prise survolée) ; toucher-choisir, échange et
+débranchement ; cibles ≥ 44 ; étapes 4 et 10 (voix, pénalités, débrancher neutre) ; rotatifs en lettres seulement aux
+étapes 1 et 8 (OLED jamais en chiffres), plaque `L C L C-L C L C` ; partie complète graine 42 (cryptex compris), joystick 16/16,
+levier rouge trop tôt ; ECG du CYD 2 (veille, adrénaline après une erreur, ≥ 125 BPM sous 60 s, victoire 72, explosion 0) ;
+OLED net pendant un mensonge ; 400 graines au hasard cohérentes ; imports versionnés `?v=0.2.3`, SW (skipWaiting, réseau
+d’abord), démarrage 0 % → prêt sans erreur ; `voix/_test/` jamais indexé ; manifeste, mp3, symétrie du couvercle,
+0 débordement / chevauchement en 412×915, 915×412, 1280×800 et 320×640 ; 0 erreur. Captures dans
+`/workspace/qa/entite-mallette/v0.2.3-dev/` (`01-mallette-412.png`, `02-mallette-412-crossed-patchbay.png`,
+`03-mallette-915x412-crossed.png`, `04-mallette-1280x800-crossed.png`, `05-cyd2-ecg-stress.png`).
+
+Versions précédentes :
 
 `tests/v022.mjs` (Playwright) joue une partie complète (graine 42) jusqu’à la victoire et vérifie : 0 bouton + / − sur les
 KY-040 ; molette, glissé au doigt, torsion (18° par cran), bords −1/+1, clavier et clic au centre ; anneau de 20 lettres
@@ -144,6 +191,7 @@ Captures dans `/workspace/qa/entite-mallette/v0.2.2-dev/` (`01-mallette-412.png`
 
 ## Historique
 
+- 0.2.3 : baie banane 5×5 (glisser ou toucher), 5 couleurs distinctes, rotatifs = lettres seulement, ECG sur le CYD 2, chargement à 14 % corrigé.
 - 0.2.2 : KY-040 sans + / − (on tourne le bouton), cryptex de 20 lettres, câbles banane base → couvercle.
 - 0.2.1 : une seule vue, tout dans la valise ; haut-parleurs de part et d’autre de l’œil ; leviers à capot à la place du bouton TRANSMIT.
 - 0.2.0 : refonte « Cool Escape Props » en trois faces (Dessus, Flanc, Mallette). Plus de lecteur RFID, plus d’éléments Keep Talking.

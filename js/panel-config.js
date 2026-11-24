@@ -1,5 +1,5 @@
 // panel-config.js : dimensions réelles de la mallette et des pièces (simulateur ET futur panneau imprimé en 3D).
-// Toutes les valeurs sont en millimètres. Fiche officielle Lykus HC-3010 (v0.2.2, 23 nov. 2026).
+// Toutes les valeurs sont en millimètres. Fiche officielle Lykus HC-3010 (v0.2.3, 23 nov. 2026).
 // Rien n'est percé dans les parois étanches : les flancs restent vides, tout est sur les panneaux intérieurs.
 
 export const CASE = {
@@ -16,6 +16,9 @@ export const CASE = {
 // Pièces que Pascal a déjà (zéro achat de plus). w x h = encombrement vu de face.
 // v0.2.1 : TOUT est à l'intérieur de la valise ouverte. Coque (dessus, flancs) : aucun composant, aucun perçage.
 // v0.2.2 : 5 câbles banane qui partent de la base et montent se brancher dans les douilles du couvercle ; KY-040 sans boutons + / −.
+// v0.2.3 : vraie baie banane 5x5 (n'importe quel câble dans n'importe quelle prise, matrice GPIO), 5 couleurs Keadic
+//          distinctes (rouge, noir, jaune, vert, bleu : une de chaque), KY-040 = lettres seulement, CYD 2 = moniteur ECG.
+//          Toujours 0 pièce à l'extérieur de la valise.
 export const PARTS = {
   // Couvercle intérieur (32 mm)
   cyd1:      { w: 86, h: 50, screen: { w: 57.6, h: 43.2 }, note: 'CYD 1 ESP32-2432S028 2,8 po ILI9341 240x320 : œil de l’Entité, au centre du couvercle' },
@@ -23,14 +26,15 @@ export const PARTS = {
   ledBar:    { w: 53, h: 10, leds: 8, note: 'barrette WS2812B 8 DEL' },
   pocket:    { w: 90, h: 60, depth: 6, note: 'pochette à fiche (note tactique)' },
   serial:    { w: 70, h: 22, note: 'plaque de n° de série rivetée' },
-  jacks:     { count: 5, hole: 8, pitch: 18, note: 'douilles femelles banane Keadic (1..5) au bas du couvercle ; la fiche entre par-dessous' },
-  cables:    { count: 5, length: 250, from: 'base.cablePorts', to: 'lid.jacks', colors: ['rouge', 'noir', 'bleu', 'jaune', 'vert'], note: 'câbles silicone souples Keadic, fiche banane 4 mm mâle côté couvercle, ancrés à demeure sur la base ; débranché, le câble repose sur la base' },
-  cablePort: { hole: 6, count: 5, note: 'passe-câble encastré (ancrage) en haut de la base, sous chaque douille' },
+  jacks:     { count: 5, hole: 8, pitch: 18, note: 'prises femelles banane Keadic 4 mm (1..5) au bas du couvercle ; n\'importe quel câble dans n\'importe quelle prise' },
+  cables:    { count: 5, length: 300, from: 'base.cablePorts', to: 'lid.jacks', colors: ['rouge', 'noir', 'jaune', 'vert', 'bleu'], hex: { rouge: '#e53935', noir: '#1b1d22', jaune: '#f5c518', vert: '#22c55e', bleu: '#2b7cff' }, note: 'câbles silicone souples Keadic, 5 couleurs distinctes (une de chaque, jamais deux bleus), fiche banane 4 mm mâle côté couvercle, ancrés à demeure sur la base ; assez longs pour aller dans n\'importe quelle prise ; débranché, le câble repose sur la base' },
+  cablePort: { hole: 6, count: 5, note: 'passe-câble encastré (ancrage) en haut de la base, un par couleur' },
+  patchbay:  { matrix: '5x5', detect: 'GPIO : chaque fiche de câble = sortie (pilotée à tour de rôle), chaque prise = entrée pull-up ; scan 5x5 toutes les 20 ms → quel câble est dans quelle prise (1 câble max par prise)', pins: { cables: 5, sockets: 5 }, note: 'routage couleur → prise aux étapes 4 et 10 ; aucun composant extérieur' },
   // Base (83 mm)
   tm1637:    { w: 42, h: 24, note: 'afficheur 4 chiffres 0,56 po' },
   oled:      { w: 27, h: 27, screen: { w: 22, h: 11 }, note: 'OLED 0,96 po I2C 128x64' },
-  encoder:   { w: 26, h: 19, shaft: 6, count: 4, detents: 20, modes: { digits: '0123456789', cryptex: 'ABCDEFGHIJLMNOPRSTUV' }, note: 'KY-040 encodeur rotatif 20 crans/tour + poussoir ; aucun bouton + / − : on tourne le bouton ; mode chiffres ou anneau de 20 lettres (sans K Q W X Y Z), affiché sur l’OLED' },
-  cyd2:      { w: 86, h: 50, screen: { w: 57.6, h: 43.2 }, note: 'CYD 2 ESP32-2432S028 2,8 po : écran interactif (verrou de signal, labyrinthe)' },
+  encoder:   { w: 26, h: 19, shaft: 6, count: 4, detents: 20, modes: { cryptex: 'ABCDEFGHIJLMNOPRSTUV' }, note: 'KY-040 encodeur rotatif 20 crans/tour + poussoir ; aucun bouton + / − : on tourne le bouton ; LETTRES SEULEMENT (anneau de 20 lettres, sans K Q W X Y Z), affichées sur l’OLED ; les chiffres se tapent au clavier 4x4' },
+  cyd2:      { w: 86, h: 50, screen: { w: 57.6, h: 43.2 }, note: 'CYD 2 ESP32-2432S028 2,8 po : écran interactif : verrou de signal (labyrinthe, étapes 5 et 9), sinon moniteur cardiaque ECG (pouls qui monte avec le stress)' },
   joystick:  { w: 35, h: 35, note: 'joystick compact 2 axes + poussoir' },
   keySwitch: { hole: 12, w: 20.6, h: 26, count: 3, note: 'serrures Gebildet 12 mm métal, clés I, II, III, points rouge/vert' },
   keypad:    { w: 69, h: 77, note: 'clavier membrane 4x4 (clavier seul : pas de RFID, pas d’empreinte)' },

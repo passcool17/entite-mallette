@@ -1,4 +1,4 @@
-// game.js : tirage d'une partie v0.2.2 (logique pure, sans DOM). Même graine = même partie.
+// game.js : tirage d'une partie v0.2.3 (logique pure, sans DOM). Même graine = même partie.
 // Paliers cachés ~50/50 : 'moyen-difficile' et 'difficile'. Pas de mode facile.
 // Tout se déduit de la mallette elle-même (plaque du n° de série, écrans, barre DEL) : aucun manuel externe.
 
@@ -8,9 +8,9 @@ export function mulberry32(a) {
 
 export const TIME_S = 480;          // 8 min, comme la v0.1.5
 export const NSTEPS = 12;
-export const WIRE_COLORS = ['rouge', 'noir', 'bleu', 'jaune', 'vert']; // kit Keadic, 5 couleurs
+export const WIRE_COLORS = ['rouge', 'noir', 'jaune', 'vert', 'bleu']; // kit Keadic : 5 couleurs, une de chaque (jamais deux pareilles)
 export const TRAP_COLORS = ['rouge', 'vert', 'bleu'];
-const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXZ'; // sans I ni O (confondus avec 1 et 0)
+const SERIAL_LETTERS = 'ABCDEFGHJLMNPRSTUV';     // lettres de l'anneau sans I ni O (confondus avec 1 et 0)
 // Anneau cryptex des KY-040 : 20 crans = 1 tour = 20 lettres (sans K, Q, W, X, Y, Z)
 export const RING = 'ABCDEFGHIJLMNOPRSTUV';
 export const DETENTS = 20;
@@ -23,13 +23,13 @@ export const STEPS = [
   { face: 'base',   part: 'enc',    title: 'Signal 1 · encodeurs' },
   { face: 'base',   part: 'traps',  title: 'Trappe' },
   { face: 'base',   part: 'bar',    title: 'Séquence lumineuse' },
-  { face: 'base',   part: 'wires',  title: 'Fiches banane' },
+  { face: 'base',   part: 'wires',  title: 'Baie banane · brancher' },
   { face: 'base',   part: 'cyd2',   title: 'Verrou de signal' },
   { face: 'base',   part: 'keypad', title: 'Code 1' },
   { face: 'base',   part: 'keys',   title: 'Clés I · II · III' },
   { face: 'base',   part: 'enc',    title: 'Signal 2 · mot (cryptex)' },
   { face: 'base',   part: 'cyd2',   title: 'Verrou saboté' },
-  { face: 'base',   part: 'wires',  title: 'Fiches · 2e couche' },
+  { face: 'base',   part: 'wires',  title: 'Baie banane · 2e couche' },
   { face: 'base',   part: 'keypad', title: 'Code 2' },
   { face: 'base',   part: 'toggleTx', title: 'Levier rouge' },
 ];
@@ -42,14 +42,16 @@ export function makeRun(seed) {
   const tier = r() < 0.5 ? 'moyen-difficile' : 'difficile';
   const hard = tier === 'difficile';
 
-  // ---- n° de série : C L C - C C L (4 chiffres tous différents, 2 lettres différentes)
+  // ---- n° de série (v0.2.3) : L C L C - L C L C — 4 lettres de l'anneau (toutes différentes, sans I ni O) pour les
+  // encodeurs, 4 chiffres tous différents pour les serrures. Les rotatifs ne servent QU'AUX lettres, le clavier aux chiffres.
   const digits = shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).slice(0, 4);
-  const l1 = pick(LETTERS); let l2 = pick(LETTERS); while (l2 === l1) l2 = pick(LETTERS);
-  const serial = `${digits[0]}${l1}${digits[1]}-${digits[2]}${digits[3]}${l2}`;
+  const sLetters = shuffle(SERIAL_LETTERS.split('')).slice(0, 4);
+  const serial = `${sLetters[0]}${digits[0]}${sLetters[1]}${digits[1]}-${sLetters[2]}${digits[2]}${sLetters[3]}${digits[3]}`;
   const lot = 100 + int(900); // leurre sur la plaque
 
-  // ---- 1. encodeurs : chiffres du n° dans l'ordre (difficile : en partant de la fin)
-  const enc1 = hard ? digits.slice().reverse() : digits.slice();
+  // ---- 1. encodeurs (cryptex A-V) : les 4 lettres du n° dans l'ordre (difficile : en partant de la fin)
+  const encLetters = hard ? sLetters.slice().reverse() : sLetters.slice();
+  const enc1 = encLetters.map((ch) => RING.indexOf(ch));
 
   // ---- 2. trappe : barre WS2812B de 8 DEL, comptes 4/3/1 ou 5/2/1 ; moyen = la plus fréquente, difficile = la plus rare
   const counts = pick([[4, 3, 1], [5, 2, 1]]);
@@ -65,30 +67,16 @@ export function makeRun(seed) {
   const seq = shuffle([1, 2, 3, 4, 5, 6, 7, 8]).slice(0, 4);
   const seqCode = (hard ? seq.slice().reverse() : seq).join('');
 
-  // ---- 4 et 10. fils (5 fiches banane dans le couvercle)
-  const ruleWires1 = (w) => {
-    const reds = w.map((c, i) => (c === 'rouge' ? i : -1)).filter((i) => i >= 0);
-    if (reds.length > 1) return reds[reds.length - 1];
-    if (hard && digits[3] % 2 === 0) return 1;
-    return lonely(w);
-  };
-  const ruleWires2 = (w) => {
-    const blues = w.map((c, i) => (c === 'bleu' ? i : -1)).filter((i) => i >= 0);
-    if (hard && blues.length > 1) return blues[0];
-    return lonely(w);
-  };
-  const drawWires = (rule, avoidSame) => {
-    for (let t = 0; t < 400; t++) {
-      const w = Array.from({ length: 5 }, () => pick(WIRE_COLORS));
-      const ans = rule(w);
-      if (ans < 0) continue;
-      if (avoidSame && w.join() === avoidSame.join()) continue;
-      return { colors: w, cut: ans };
-    }
-    return { colors: ['rouge', 'noir', 'noir', 'bleu', 'bleu'], cut: 0 };
-  };
-  const wires1 = drawWires(ruleWires1);
-  const wires2 = drawWires(ruleWires2, wires1.colors);
+  // ---- 4 et 10. baie banane 5x5 : 5 câbles ancrés sur la base (ports 0..4, couleurs toutes différentes, ordre tiré),
+  // chacun se branche dans N'IMPORTE LAQUELLE des 5 prises du couvercle (0..4 = prises 1..5). Départ : câble c → prise c.
+  // 4 : « Branche le câble A dans la prise N » (N ≠ prise de départ de A : le câble se croise avec un autre).
+  // 10 : les câbles sont remis droits, puis « Débranche le câble B et laisse-le débranché. Puis branche le câble C dans la prise M ».
+  const wires = shuffle(WIRE_COLORS);
+  const pA = int(5); let pN = int(4); if (pN >= pA) pN++;
+  const patch1 = { cable: pA, socket: pN };
+  const pB = int(5); let pC = int(4); if (pC >= pB) pC++;
+  let pM = int(4); if (pM >= pC) pM++;
+  const patch2 = { off: pB, cable: pC, socket: pM };
 
   // ---- 5 et 9. verrous de signal : labyrinthe 5x5 visible sur le CYD 2
   const maze1 = makeMaze(5, r), maze2 = makeMaze(5, r);
@@ -104,9 +92,10 @@ export function makeRun(seed) {
   // ---- mensonges (œil rouge) : faux fragments ; le reste de la pression est dans app.js (pendant chaque choix)
   const fragLies = shuffle([0, 1, 2, 3]).slice(0, hard ? 3 : 2).sort();
   const lies = { fragLies, encFalse: hard, wire2False: hard, keysTwice: hard };
+  const otherThan = (n, ...no) => { let v = int(n); for (let k = 0; k < n && no.includes(v); k++) v = (v + 1) % n; return v; };
 
   const wrong = (n, good) => { let v = int(n); if (v === good) v = (v + 1 + int(n - 1)) % n; return v; };
-  const decoys = { wire1: wrong(5, wires1.cut), wire2: wrong(5, wires2.cut), seq: (seq[0] % 8) + 1, frags: frags.map((f) => (f + 1 + int(9)) % 10), keys: keyOrder.slice().reverse() };
+  const decoys = { wire1: { cable: otherThan(5, pA), socket: pN }, wire2: { cable: pB, socket: otherThan(5, pB) }, seq: (seq[0] % 8) + 1, frags: frags.map((f) => (f + 1 + int(9)) % 10), keys: keyOrder.slice().reverse() };
 
   // ---- 8. cryptex : 4 encodeurs en mode lettres (anneau de 20) ; l'Entité épelle un mot (difficile : épelé à l'envers,
   // on le compose à l'endroit). Tiré en dernier pour garder les mêmes parties qu'avant à graine égale.
@@ -115,17 +104,11 @@ export function makeRun(seed) {
   const spell = hard ? word.split('').reverse().join('') : word;
   decoys.word = RING[(enc2[0] + 3 + int(15)) % DETENTS];
   return {
-    seed: seed >>> 0, tier, serial, lot, digits, letters: [l1, l2],
+    seed: seed >>> 0, tier, serial, lot, digits, letters: sLetters, encLetters,
     enc1, enc2, word, spell, bar, trapColors, trap, seq, seqCode,
-    wires1, wires2, maze1, maze2, frags, code1, code2, keyOrder, lies,
+    wires, patch1, patch2, maze1, maze2, frags, code1, code2, keyOrder, lies,
     decoys,
   };
-}
-
-// fil sans jumeau (seule couleur présente une fois) ; -1 si zéro ou plusieurs
-function lonely(w) {
-  const once = w.map((c, i) => (w.filter((x) => x === c).length === 1 ? i : -1)).filter((i) => i >= 0);
-  return once.length === 1 ? once[0] : -1;
 }
 
 // Labyrinthe parfait (DFS) n x n. walls[y][x] = bits N1 E2 S4 W8 (1 = mur). Départ en bas à gauche, cible en haut à droite.
