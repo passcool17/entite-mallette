@@ -9,9 +9,19 @@ Lien : https://passcool17.github.io/entite-mallette/
 Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/entite-mallette-v015/
 (dépôt passcool17/entite-mallette-v015, cache séparé `entite-mallette-v015-0.1.5`).
 
+## Version 0.2.6a (24 nov. 2026)
+
+État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.2.6a`, imports `?v=0.2.6a`).
+
+- **v0.2.6a, cible tactile réelle et labyrinthe** : le bouton RÉÉCOUTER du CYD 2 mesure au moins 44 px *à l’écran*
+  après le zoom `fitPlayfield` (`getBoundingClientRect`, portrait 412×915 et paysage 915×412). Aux étapes 5 et 9,
+  le n° de série et RÉÉCOUTER ne chevauchent plus la grille du labyrinthe (en paysage : n° en haut à gauche, ≥ 11 px
+  visuels, bouton en bas à droite). `tests/fullrun.mjs` vérifie la taille réelle du bouton et l’absence de chevauchement
+  dans les deux orientations. Reprend tout le contenu de la 0.2.6 (CYD 2, barre 32 LED, CI).
+
 ## Version 0.2.6 (24 nov. 2026)
 
-État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.2.6`, imports `?v=0.2.6`).
+État : publiée (commit `220a199b119ceed71e9554453bd716d8c99a79db`, cache `entite-mallette-v0.2.6`), remplacée par la 0.2.6a.
 Balise git annotée `v0.2.5i` sur le commit `e1293e652ad0cfb8675c8f2626f56f09f023aa1a` (dernière 0.2.5 publiée).
 
 - **v0.2.6, écran du bas + barre 32 LED + CI** : le n° de série (`LCLC-LCLC`, ex. `F9R0-T8B2`, propre à chaque graine)
@@ -263,7 +273,7 @@ Si toutes les répliques d’une suite ont `mp3Ready: true`, les mp3 sont joués
 sinon la phrase est dite directement par la synthèse vocale. Aucun mp3 non prêt n’est demandé (0 erreur 404).
 
 Aujourd’hui les 172 répliques sont prêtes (voix ElevenLabs, pass de clarté v0.2.5g ; `intro` 43669 octets,
-`depart` 66656 octets). Les URL portent `?v=0.2.6`. Pour remplacer une voix : enregistrer `voix/<id>.mp3`
+`depart` 66656 octets). Les URL portent `?v=0.2.6a`. Pour remplacer une voix : enregistrer `voix/<id>.mp3`
 avec le texte exact, garder `mp3Ready` à `true` et `source` à `elevenlabs`, puis monter la version du
 service worker. Les fichiers numérotés `dfplayerTrack` se copient tels quels sur la carte SD du DFPlayer
 (`0001.mp3`, …).
@@ -282,7 +292,7 @@ jamais publiés.
 - `js/audio.js`, `js/voice-manifest.js`, `js/sfx.js`, `js/eye.js`, `js/preload.js` : voix, sons, œil, préchargement.
 - `audio/tension.mp3` (192827 octets) : musique de tension.
 - `js/guide.js` : objectifs, modules actifs, indices (v0.2.5 : bandeau étape 10 = consigne dictée). `js/battery.js` : modèle de batterie 3S (v0.2.4).
-- `sw.js` : service worker, cache `entite-mallette-v0.2.6` (manifeste des voix inclus). À l’activation, les anciens
+- `sw.js` : service worker, cache `entite-mallette-v0.2.6a` (manifeste des voix inclus). À l’activation, les anciens
   caches `entite-mallette-*` (dont `entite-mallette-v0.2.2`, `entite-mallette-v0.2.1`, `entite-mallette-v0.2.0-r2`, `entite-mallette-v0.2.0` et `entite-mallette-v0.1.5-base`) sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`).
 
 ## Tests

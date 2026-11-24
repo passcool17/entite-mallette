@@ -95,13 +95,13 @@ La couverture se calcule sur **l’ensemble des parties du run**, pas graine par
 | 0 | Armement | Ouvrir le capot (`#coverArm`) puis basculer le levier ARM (`#leverArm`). La partie passe à l’étape 1, voix `depart`. |
 | 1 | Encodeurs (KY-040) | Régler les 4 anneaux sur les lettres dictées (A–V seulement, jamais de chiffres ici) et valider au centre de l’encodeur. |
 | 2 | Trappes A / B / C | Ouvrir la bonne trappe. |
-| 3 | Barre `#bar` + clavier 4×4 | 32 LED groupées en 8 paquets de 4 (chiffres 1–8 centrés au-dessus de chaque groupe). Observer la séquence : la position *p* allume **exactement** les 4 LED du groupe (`4p−3` à `4p`), aucune autre. Saisir le code au clavier (chiffres seulement). **Réécouter** est un bouton tactile **sur le CYD 2** (écran du bas, libellé RÉÉCOUTER, cible ≥ 44 px), à côté du n° de série — plus sur le couvercle. Il rejoue la **même** séquence de groupes sur `#bar`, après la voix, comme la première fois. Un indice 1 ou 2 qui redit la séquence la rejoue aussi. Un faux code est refusé ; le bon fait avancer. Double appui : pas d’animations en double, pas de DEL coincées. Détail matériel : [`HARDWARE.md`](../HARDWARE.md). |
+| 3 | Barre `#bar` + clavier 4×4 | 32 LED groupées en 8 paquets de 4 (chiffres 1–8 centrés au-dessus de chaque groupe). Observer la séquence : la position *p* allume **exactement** les 4 LED du groupe (`4p−3` à `4p`), aucune autre. Saisir le code au clavier (chiffres seulement). **Réécouter** est un bouton tactile **sur le CYD 2** (écran du bas, libellé RÉÉCOUTER, cible ≥ 44 px *à l’écran après zoom* (`getBoundingClientRect`)), à côté du n° de série — plus sur le couvercle. Il rejoue la **même** séquence de groupes sur `#bar`, après la voix, comme la première fois. Un indice 1 ou 2 qui redit la séquence la rejoue aussi. Un faux code est refusé ; le bon fait avancer. Double appui : pas d’animations en double, pas de DEL coincées. Détail matériel : [`HARDWARE.md`](../HARDWARE.md). |
 | 4 | Baie banane (1re couche) | Vraie baie 5×5. Brancher selon la consigne dictée (pas de réponse écrite à l’écran). |
-| 5 | Labyrinthe, CYD 2 + joystick | Rejoindre le but. Le labyrinthe prend l’écran ; le n° de série reste visible en petit dans un coin, avec RÉÉCOUTER (≥ 44 px), sans chevaucher la jauge batterie. Le bouton reste utilisable. Pas de plaque rivetée sur le couvercle, pas d’ECG. |
+| 5 | Labyrinthe, CYD 2 + joystick | Rejoindre le but. Le labyrinthe prend l’écran ; le n° de série reste visible en petit dans un coin (≥ 11 px en paysage), avec RÉÉCOUTER (≥ 44 px réels), sans chevaucher ni la jauge batterie ni la grille du labyrinthe (412×915 et 915×412). Le bouton reste utilisable. Pas de plaque rivetée sur le couvercle, pas d’ECG. |
 | 6 | Code 1, clavier 4×4 | Saisir le code. Faux code refusé ; le bon avance tout de suite (voix `taunt_fini` / suite). |
 | 7 | Clés I, II, III | Les presser dans l’ordre dicté. |
 | 8 | Encodeurs, mot (cryptex) | Mot de 4 lettres sur les anneaux (A–V), validation au centre. |
-| 9 | Labyrinthe 2, CYD 2 | Rejoindre le but. Le joystick peut être inversé (sabotage). Comme à l’étape 5 : n° + RÉÉCOUTER visibles dans le coin. |
+| 9 | Labyrinthe 2, CYD 2 | Rejoindre le but. Le joystick peut être inversé (sabotage). Comme à l’étape 5 : n° + RÉÉCOUTER visibles, sans chevaucher la grille. |
 | 10 | Baie banane (2e couche) | Même baie 5×5, deuxième consigne. Le bandeau reprend la consigne dictée. |
 | 11 | Code 2, clavier 4×4 | Saisir le code. Faux code refusé ; le bon avance. |
 | 12 | Levier TRANSMIT (rouge) | Basculer le levier rouge. Victoire : « Mallette désamorcée », voix `outcome_victoire`. |
@@ -112,4 +112,4 @@ Règles permanentes : tout reste dans la mallette ; palier tiré au hasard entre
 
 ## Captures
 
-Dossier typique : `/workspace/qa/entite-mallette/` (rapports) et `/workspace/qa/entite-mallette/v0.2.6-live/` (captures). 2 ou 3 images, 412×915, plus 915×412 seulement si la mise en page a changé. Pour la v0.2.6 : `cyd2-412x915.png` (n° + RÉÉCOUTER sur l’écran du bas), `maze-412x915.png` (étape 5, n° petit dans un coin), `replay-412x915.png` (groupe allumé à l’étape 3).
+Dossier typique : `/workspace/qa/entite-mallette/` (rapports) et `/workspace/qa/entite-mallette/v0.2.6-live/` (captures). 2 ou 3 images, 412×915, plus 915×412 seulement si la mise en page a changé. Pour la v0.2.6a : `maze-412x915.png` et `maze-915x412.png` (étape 5, n° et RÉÉCOUTER hors de la grille).

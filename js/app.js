@@ -7,17 +7,17 @@
 // Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 // v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 2, variantes d'énigmes
 // tirées par étape (deux parties de suite ne se ressemblent pas : signature de la partie précédente dans localStorage).
-import { createEye } from './eye.js?v=0.2.6';
-import { EYE, deepMerge } from './eye-config.js?v=0.2.6';
-import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.6';
-import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.2.6';
-import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.6';
-import { sfx } from './sfx.js?v=0.2.6';
-import { preloadAll } from './preload.js?v=0.2.6';
-import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.2.6';
-import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.2.6';
+import { createEye } from './eye.js?v=0.2.6a';
+import { EYE, deepMerge } from './eye-config.js?v=0.2.6a';
+import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.6a';
+import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.2.6a';
+import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.6a';
+import { sfx } from './sfx.js?v=0.2.6a';
+import { preloadAll } from './preload.js?v=0.2.6a';
+import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.2.6a';
+import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.2.6a';
 
-const VERSION = '0.2.6';
+const VERSION = '0.2.6a';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -491,10 +491,24 @@ function drawCyd2() {
   c.fillStyle = '#020a10'; c.fillRect(0, 0, W, H);
   const maze = g.phase === 'play' && (g.step === 5 ? run.maze1 : g.step === 9 ? run.maze2 : null);
   const sab = g.sabotage;
-  if (!maze) { drawCyd2Idle(c, W, H); return; }
+  if (!maze) { drawCyd2Idle(c, W, H); g.mazeGridCss = null; return; }
   { const [ax, ay] = g.pos || maze.start, al = `Écran 2 : verrou de signal, point en colonne ${ax + 1}, ligne ${ay + 1}, numéro de série ${run.serial}${sab ? ', commandes inversées' : ''}`; if (cv.getAttribute('aria-label') !== al) cv.setAttribute('aria-label', al); }
-  // réserve haut (jauge) et bas (n° compact + RÉÉCOUTER, 46 px CSS ≈ proportionnel au canvas)
-  const topPad = Math.round(H * 0.12), botPad = Math.round(H * 0.30);
+  // réserve réelle (CSS après zoom) : jauge / n° en haut, RÉÉCOUTER en bas — pas de chevauchement avec la grille
+  const screen = cv.closest('.screen') || cv;
+  const s = screen.getBoundingClientRect();
+  const toY = (css) => (s.height > 0 ? Math.ceil(css / s.height * H) : 0);
+  const toX = (css) => (s.width > 0 ? Math.ceil(css / s.width * W) : 0);
+  const gap = 3;
+  let topPadCss = 4, botPadCss = 4;
+  for (const el of [$('#batt'), $('#serial'), $('#serialReadout'), $('#btnReplay')]) {
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) continue;
+    const cy = (r.top + r.bottom) / 2, mid = (s.top + s.bottom) / 2;
+    if (cy <= mid) topPadCss = Math.max(topPadCss, r.bottom - s.top + gap);
+    if (cy >= mid) botPadCss = Math.max(botPadCss, s.bottom - r.top + gap);
+  }
+  const topPad = Math.max(8, toY(topPadCss)), botPad = Math.max(8, toY(botPadCss));
   const n = maze.n, cs = Math.floor(Math.min((W - 16) / n, (H - topPad - botPad) / n)), ox = Math.floor((W - cs * n) / 2), oy = topPad + Math.floor((H - topPad - botPad - cs * n) / 2);
   const ink = sab ? '#ff4b3e' : '#62d6ff';
   c.strokeStyle = sab ? 'rgba(255,75,62,.16)' : 'rgba(98,214,255,.14)'; c.lineWidth = 1;
@@ -515,6 +529,14 @@ function drawCyd2() {
   c.fillStyle = sab ? '#ff4b3e' : '#e9f8ff'; c.shadowColor = ink; c.shadowBlur = 10;
   c.fillRect(ox + px * cs + cs * 0.3, oy + py * cs + cs * 0.3, cs * 0.4, cs * 0.4); c.shadowBlur = 0;
   if (sab) { for (let k = 0; k < 8; k++) { c.fillStyle = `rgba(255,${40 + Math.random() * 80},60,${0.2 + Math.random() * 0.4})`; c.fillRect(0, Math.random() * H, W, 1 + Math.random() * 3); } }
+  const scr = cv.getBoundingClientRect();
+  g.mazeGridCss = scr.height > 0 && cs > 0 ? {
+    left: scr.left + (ox / W) * scr.width,
+    top: scr.top + (oy / H) * scr.height,
+    right: scr.left + ((ox + cs * n) / W) * scr.width,
+    bottom: scr.top + ((oy + cs * n) / H) * scr.height,
+    cell: cs, n,
+  } : null;
 }
 
 // ================= déroulé =================
@@ -639,7 +661,17 @@ function fitPlayfield() {
     }
   }
   fm.style.zoom = next;
-  requestAnimationFrame(() => { fitLock = false; if (next !== prev) drawCables(true); });
+  const z = parseFloat(next || '1') || 1;
+  fm.style.setProperty('--fit-zoom', String(z));
+  // cible tactile ≥ 44 px *après* zoom (QA v0.2.6 : 44 CSS devenait 43,38 / 42,98)
+  fm.style.setProperty('--hit-min', `${(44.25 / z).toFixed(3)}px`);
+  requestAnimationFrame(() => {
+    fitLock = false;
+    if (next !== prev) {
+      drawCables(true);
+      if (g.phase === 'play' && (g.step === 5 || g.step === 9)) drawCyd2();
+    }
+  });
 }
 function showObjective() {
   clearTimeout(stripTimer);
@@ -1184,9 +1216,9 @@ function init() {
   eye = createEye($('#eye'), { config: deepMerge(EYE, { radiusOfMin: 0.3, center: { x: 0.5, y: 0.5 } }), reducedMotion: reduced });
   eye.start();
   wire(); initFullscreen(); initScrollPill();
-  new ResizeObserver(() => { fitPlayfield(); drawCables(true); }).observe($('#face-mallette'));
+  new ResizeObserver(() => { fitPlayfield(); drawCables(true); drawCyd2(); }).observe($('#face-mallette'));
   new ResizeObserver(fitPlayfield).observe($('.hud'));
-  addEventListener('resize', () => { fitPlayfield(); drawCables(true); });
+  addEventListener('resize', () => { fitPlayfield(); drawCables(true); drawCyd2(); });
   showTime(TIME_S); showProb();
   requestAnimationFrame(loop);
   runBoot(() => { $('#btnStart').disabled = false; $('#btnStart').focus({ preventScroll: true }); registerSW(); });
@@ -1204,7 +1236,7 @@ function init() {
       active: () => { const k = hintStep(); return k == null ? [] : MODULES[k].filter((sel) => $(sel)?.classList.contains('active-mod')); }, showTuto() { showTuto(null); },
       goto(n) { if (g.phase === 'play') nextStep(n); },
       get seqShow() { return g.seqShow; }, cancelSeq, clearVoice,
-      cables: () => cableGeom.map((c) => ({ ...c })), oled: () => drawOled(), get drag() { return drag; }, RING, DETENTS,
+      cables: () => cableGeom.map((c) => ({ ...c })), oled: () => drawOled(), mazeGrid: () => g.mazeGridCss, get drag() { return drag; }, RING, DETENTS,
     };
   }
 }

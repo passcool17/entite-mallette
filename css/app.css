@@ -24,6 +24,8 @@
   --f-tech: "Chakra Petch", system-ui, sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, monospace;
   --hit: 44px;
+  --fit-zoom: 1;
+  --hit-min: 44px;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); }
@@ -357,7 +359,7 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
   .mod-keys > .silk { display: block; }
 }
 @media (orientation: landscape) and (max-height: 520px) {
-  :root { --hud-h: 48px; --cyd1-h: 128px; --spk: 60px; --cyd2-h: 84px; --joy: 112px; --kp: 40px; --gt-h: 84px; --trap-h: 46px; --led-h: 12px; }
+  :root { --hud-h: 48px; --cyd1-h: 128px; --spk: 60px; --cyd2-h: 112px; --joy: 100px; --kp: 40px; --gt-h: 84px; --trap-h: 46px; --led-h: 12px; }
 }
 @media (min-width: 1000px) and (min-height: 600px) {
   :root { --hud-h: 56px; --lid-w: 480px; --cyd1-h: 176px; --spk: 92px; --cyd2-h: 130px; --joy: 150px; --kp: 50px; --gt-h: 116px; --trap-h: 62px; --led-h: 22px; }
@@ -458,7 +460,7 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
   .port-btn::before { content: ""; display: block; width: 100%; height: 100%; border-radius: 8px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .06); background: rgb(0 0 0 / .18); }
   .port-hole { left: 8px; top: auto; bottom: calc(8px + var(--c) * 8px); width: 8px; height: 8px; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--w) 80%, #000), 0 1px 2px #000; }
 }
-@media (orientation: landscape) and (max-height: 520px) { :root { --knob: 46px; --cyd1-h: 112px; --spk: 50px; --cyd2-h: 78px; --lid-w: 310px; } .key-row { gap: 4px; } .mod-keys .lock-btn { width: 36px; height: 36px; } .mod-keys .lock-face { width: 24px; height: 24px; } .jack-socket { width: 20px; height: 20px; margin-left: -10px; } }
+@media (orientation: landscape) and (max-height: 520px) { :root { --knob: 46px; --cyd1-h: 112px; --spk: 50px; --cyd2-h: 112px; --joy: 96px; --lid-w: 310px; } .key-row { gap: 4px; } .mod-keys .lock-btn { width: 36px; height: 36px; } .mod-keys .lock-face { width: 24px; height: 24px; } .jack-socket { width: 20px; height: 20px; margin-left: -10px; } }
 @media (min-width: 1000px) and (min-height: 600px) { :root { --knob: 56px; --cyd2-h: 122px; --joy: 140px; } .patchbay { padding-bottom: 50px; } }
 @media (max-width: 359px) and (orientation: portrait) {
   :root { --knob: 48px; --joy: 100px; --cyd2-h: 78px; }
@@ -473,16 +475,16 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
 .cyd2-slabel { font: 700 7px/1 var(--f-tech); letter-spacing: .16em; color: #7ad7ff; text-shadow: 0 0 6px rgb(82 214 255 / .45); }
 .cyd2-snum { font: 700 18px/1.05 var(--f-mono); letter-spacing: .04em; color: #e9f8ff; text-shadow: 0 0 8px rgb(98 214 255 / .55); white-space: nowrap; }
 .cyd2-slot { font: 500 7px/1 var(--f-mono); color: #7b93a3; letter-spacing: .08em; }
-.cyd2-replay { pointer-events: auto; position: relative; z-index: 2; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 44px; min-height: 44px; padding: 0 8px; border-radius: 6px; border: 1px solid rgb(98 214 255 / .55); background: rgb(2 16 24 / .82); color: #cfefff; font: 700 9px/1 var(--f-tech); letter-spacing: .08em; text-transform: uppercase; box-shadow: 0 0 10px rgb(82 214 255 / .18); }
+.cyd2-replay { pointer-events: auto; position: relative; z-index: 2; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: var(--hit-min, 44px); min-height: var(--hit-min, 44px); padding: 0 8px; border-radius: 6px; border: 1px solid rgb(98 214 255 / .55); background: rgb(2 16 24 / .82); color: #cfefff; font: 700 9px/1 var(--f-tech); letter-spacing: .08em; text-transform: uppercase; box-shadow: 0 0 10px rgb(82 214 255 / .18); }
 .cyd2-replay svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .cyd2-replay:disabled { opacity: .35; }
 .cyd2-replay:not(:disabled):active { background: rgb(8 40 56 / .95); }
 /* étapes 5 et 9 : le labyrinthe prend l'écran, n° + bouton restent visibles en bas, sans chevaucher la jauge */
-.cyd2.maze .cyd2-hud { inset: auto 0 0 0; height: 46px; padding: 1px 4px 1px 6px; align-content: center; flex-wrap: nowrap; background: linear-gradient(180deg, transparent, rgb(0 8 14 / .82) 28%); }
+.cyd2.maze .cyd2-hud { inset: auto 0 0 0; height: calc(var(--hit-min, 44px) + 2px); padding: 1px 4px 1px 6px; align-content: center; flex-wrap: nowrap; background: linear-gradient(180deg, transparent, rgb(0 8 14 / .82) 28%); }
 .cyd2.maze .cyd2-slabel, .cyd2.maze .cyd2-slot { display: none; }
-.cyd2.maze .cyd2-serial { max-width: calc(100% - 48px); }
-.cyd2.maze .cyd2-snum { font-size: 10px; letter-spacing: .02em; min-width: 0; overflow: visible; }
-.cyd2.maze .cyd2-replay { width: 44px; min-width: 44px; min-height: 44px; padding: 0; gap: 0; }
+.cyd2.maze .cyd2-serial { max-width: calc(100% - 52px); }
+.cyd2.maze .cyd2-snum { font-size: calc(11px / var(--fit-zoom, 1)); letter-spacing: .02em; min-width: 0; overflow: visible; }
+.cyd2.maze .cyd2-replay { width: var(--hit-min, 44px); min-width: var(--hit-min, 44px); min-height: var(--hit-min, 44px); padding: 0; gap: 0; }
 .cyd2.maze .cyd2-replay span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .cyd2.maze .cyd2-replay svg { width: 16px; height: 16px; }
 @media (min-width: 1000px) and (min-height: 600px) {
@@ -497,7 +499,11 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
   .cyd2-slot { font-size: 6px; }
   .cyd2-replay { font-size: 8px; padding: 0 6px; }
   .batt { max-width: 46%; }
-  .cyd2.maze .cyd2-snum { font-size: 8px; letter-spacing: 0; }
+  /* paysage : n° en haut à gauche (≥ 11 px visuels), RÉÉCOUTER en bas à droite, grille au milieu */
+  .cyd2.maze .cyd2-hud { inset: 0; height: auto; flex-direction: column; justify-content: space-between; align-items: stretch; background: none; padding: 2px 2px 2px 4px; }
+  .cyd2.maze .cyd2-serial { align-self: flex-start; max-width: calc(100% - 58px); }
+  .cyd2.maze .cyd2-snum { font-size: calc(11px / var(--fit-zoom, 1)); letter-spacing: 0; }
+  .cyd2.maze .cyd2-replay { align-self: flex-end; margin-top: auto; }
 }
 
 /* ---------- v0.2.5e : jauge batterie 3S sur le CYD 2 (coin haut droit), pas sur le CYD 1 ---------- */

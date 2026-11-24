@@ -37,8 +37,8 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS } from '../js/game.js?v=0.2.6';
-import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.2.6';
+import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS } from '../js/game.js?v=0.2.6a';
+import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.2.6a';
 
 const require = createRequire(import.meta.url);
 function loadChromium() {
@@ -514,6 +514,15 @@ async function readCyd2Hud(p) {
     };
     const br = r(btn), sr = r(serialEl), scr = r(screen), btr = r(batt), rr = r(readout);
     const zoom = parseFloat(document.getElementById('face-mallette')?.style.zoom || '1') || 1;
+    const grid = window.__entiteDebug?.mazeGrid?.() || null;
+    const inter = (a, b) => {
+      if (!a || !b) return 0;
+      const w = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+      const h = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      return w * h;
+    };
+    const se = document.scrollingElement || document.documentElement;
+    const fontCss = serialEl ? parseFloat(getComputedStyle(serialEl).fontSize) || 0 : 0;
     return {
       plate: !!plate,
       lidReplay: !!document.querySelector('.lid #btnReplay, .lid-ctrls #btnReplay'),
@@ -521,16 +530,26 @@ async function readCyd2Hud(p) {
       want,
       inCyd: !!(cyd && serialEl && btn && cyd.contains(serialEl) && cyd.contains(btn)),
       mazeClass: !!cyd?.classList.contains('maze'),
+      view: `${window.innerWidth}×${window.innerHeight}`,
       zoom: Math.round(zoom * 1000) / 1000,
-      btnW: br ? Math.round((br.width / zoom) * 10) / 10 : 0,
-      btnH: br ? Math.round((br.height / zoom) * 10) / 10 : 0,
+      btnW: br ? Math.round(br.width * 100) / 100 : 0,
+      btnH: br ? Math.round(br.height * 100) / 100 : 0,
       btnLabel: (btn?.textContent || '').replace(/\s+/g, ' ').trim(),
       serialVisible: visibleIn(serialEl, scr),
       btnVisible: visibleIn(btn, scr),
       battVisible: visibleIn(batt, scr),
+      serialFontCss: Math.round(fontCss * 100) / 100,
+      serialVisual: Math.round(fontCss * zoom * 100) / 100,
+      serialH: sr ? Math.round(sr.height * 100) / 100 : 0,
       battPct: (document.querySelector('#battPct')?.textContent || '').trim(),
       overlapBattSerial: overlap(btr, sr),
       overlapBattBtn: overlap(btr, br),
+      overlapMazeSerial: !!(grid && inter(grid, sr) > 0.25),
+      overlapMazeBtn: !!(grid && inter(grid, br) > 0.25),
+      mazeGrid: grid ? { w: Math.round(grid.right - grid.left), h: Math.round(grid.bottom - grid.top), n: grid.n } : null,
+      mazeVisible: !!(grid && scr && grid.left >= scr.left - 1 && grid.right <= scr.right + 1 && grid.top >= scr.top - 1 && grid.bottom <= scr.bottom + 1 && (grid.right - grid.left) > 8 && (grid.bottom - grid.top) > 8),
+      overflowY: Math.max(0, se.scrollHeight - se.clientHeight),
+      overflowX: Math.max(0, se.scrollWidth - se.clientWidth),
     };
   });
 }
@@ -628,21 +647,46 @@ async function playOne(b, seed, opts) {
 
   const extras = { replay: null, hintSeq: null, hintOther: null, wrong: [], voice: 0, hud: 0 };
 
-  const hud = async (step, maze = false) => {
+  const LANDSCAPE = { width: 915, height: 412 };
+  const setView = async (size) => {
+    await p.setViewportSize(size);
+    await D(p, () => { window.dispatchEvent(new Event('resize')); });
+    await W(p, 220);
+  };
+
+  const checkHudOnce = async (step, maze, label) => {
     const info = await readCyd2Hud(p);
-    const ok = !info.plate && !info.lidReplay && info.inCyd
+    const land = (info.view || '').startsWith('915');
+    let ok = !info.plate && !info.lidReplay && info.inCyd
       && info.serialText === info.want && /^[A-Z][0-9][A-Z][0-9]-[A-Z][0-9][A-Z][0-9]$/.test(info.serialText)
       && info.serialVisible && info.btnVisible && info.battVisible
       && info.btnW >= 44 && info.btnH >= 44
       && /RÉÉCOUTER|RÉECOUTER/i.test(info.btnLabel)
       && info.mazeClass === maze
       && !info.overlapBattSerial && !info.overlapBattBtn
-      && /%/.test(info.battPct);
+      && /%/.test(info.battPct)
+      && info.overflowY === 0 && info.overflowX === 0;
+    if (maze) {
+      ok = ok && !!info.mazeGrid && info.mazeVisible && !info.overlapMazeSerial && !info.overlapMazeBtn;
+      if (land) ok = ok && info.serialVisual >= 11 && info.serialH >= 11;
+    }
     rec(ok, step, step, ok
-      ? `CYD 2 n° ${info.serialText} + RÉÉCOUTER ${info.btnW}×${info.btnH}${maze ? ' (labyrinthe, coin)' : ''}, batterie ${info.battPct}`
-      : `CYD 2 HUD ${JSON.stringify(info)}`);
+      ? `CYD 2 ${label} n° ${info.serialText} + RÉÉCOUTER ${info.btnW}×${info.btnH} px réel${maze ? `, grille ${info.mazeGrid?.w}×${info.mazeGrid?.h}, n° ${info.serialVisual} px` : ''}, batterie ${info.battPct}`
+      : `CYD 2 HUD ${label} ${JSON.stringify(info)}`);
     if (ok) extras.hud = (extras.hud || 0) + 1;
     return ok;
+  };
+
+  const hud = async (step, maze = false) => {
+    if (!(await checkHudOnce(step, maze, '412×915'))) return false;
+    if (maze || step === 3) {
+      await setView(LANDSCAPE);
+      const okL = await checkHudOnce(step, maze, '915×412');
+      await setView(VIEW);
+      if (!okL) return false;
+      if (!(await checkHudOnce(step, maze, '412×915-retour'))) return false;
+    }
+    return true;
   };
 
   const fail = async (from, to, why) => {
