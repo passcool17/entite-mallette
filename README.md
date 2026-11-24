@@ -9,6 +9,21 @@ Lien : https://passcool17.github.io/entite-mallette/
 Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/entite-mallette-v015/
 (dépôt passcool17/entite-mallette-v015, cache séparé `entite-mallette-v015-0.1.5`).
 
+## Version 0.2.2 (23 nov. 2026)
+
+- **KY-040 sans boutons + / −** : on tourne le bouton lui-même (anneau de 20 crans, repère blanc, 18° par cran, tic à chaque cran).
+  - Glisser : torsion autour du bouton (départ sur le bord) ou glissé horizontal (départ au centre ; 20 px = 1 cran, droite = +1).
+  - Molette : haut = +1, bas = −1. Toucher le tiers gauche = −1, le tiers droit = +1, **le centre = clic** (valider).
+  - Clavier : ←/↓ = −1, →/↑ = +1, Entrée/Espace = clic.
+- **Cryptex à 20 lettres** : 20 crans = 1 tour = l’anneau `A B C D E F G H I J L M N O P R S T U V` (sans K, Q, W, X, Y, Z).
+  Étape 1 : chiffres (0-9). Étape 8 : l’Entité épelle un mot français de 4 lettres (NORD, CODE, LUNE, STOP, MARS, PORT, VENT,
+  NUIT, CAGE, BLEU, NOIR, SOIR, TOUR, FILS ; en palier difficile, épelé à l’envers) ; on le compose sur les 4 encodeurs,
+  l’OLED affiche les lettres choisies (jamais la réponse), puis clic au centre d’un bouton.
+- **5 câbles banane base → couvercle** : chaque câble de couleur part d’un port de la base et monte se brancher par-dessous
+  dans sa douille (1 à 5) du couvercle. Débranché, la douille reste vide et la fiche retombe sur la base, à côté de son port.
+  Un mauvais câble retombe aussi (pénalité), puis l’Entité le rebranche. En paysage et sur ordinateur, les câbles passent
+  sous les douilles, chacun sur sa voie, et rejoignent les ports au bord gauche de la base.
+
 ## Version 0.2.1 (23 nov. 2026)
 
 Tout est dans la valise : une seule vue, la mallette ouverte, sans onglet et sans aucune pièce sur la coque extérieure.
@@ -58,8 +73,8 @@ Armement : lever le capot bleu puis basculer le levier ARM. Le chrono part.
 
 1. Encodeurs (fragment 1) · 2. Trappe · 3. Séquence lumineuse sur la barre, retapée au clavier (fragment 2) ·
 4. Fiches banane (fragment 3) · 5. Labyrinthe (fragment 4) · 6. Code 1 au clavier — une trappe libère les clés ·
-7. Serrures à clé (I, II, III), dans le bon ordre · 8. Encodeurs, couche 2 · 9. Labyrinthe saboté (axes inversés par moments) ·
-10. Fiches, couche 2 · 11. Code 2 · 12. Lever le capot rouge et basculer le levier TRANSMIT.
+7. Serrures à clé (I, II, III), dans le bon ordre · 8. Cryptex : mot de 4 lettres épelé · 9. Labyrinthe saboté (axes inversés par moments) ·
+10. Câbles, couche 2 · 11. Code 2 · 12. Lever le capot rouge et basculer le levier TRANSMIT.
 
 Erreur : −5 s ou −8 s et +3,2 % d’échec. Avertissements à 30 s et 10 s ; à zéro, la mallette saute.
 Deux paliers cachés (moyen-difficile, difficile) tirés ~50/50 ; les règles changent selon le palier
@@ -73,14 +88,14 @@ Deux paliers cachés (moyen-difficile, difficile) tirés ~50/50 ; les règles ch
 
 ## Voix : `voix/manifest.json`
 
-Toutes les répliques (59) sont listées dans `voix/manifest.json`. Chaque entrée :
+Toutes les répliques (79) sont listées dans `voix/manifest.json`. Chaque entrée :
 
 | champ | sens |
 |---|---|
 | `id` | identifiant (ex. `clue_code1`, `chiffre_7`, `taunt_debranche`) |
 | `file` | `voix/<id>.mp3` |
 | `dfplayerTrack` | numéro de piste DFPlayer Mini (`0001`, `0002`, …) pour la vraie mallette |
-| `category` | `intro`, `clue`, `digit`, `color`, `taunt`, `sabotage`, `outcome` |
+| `category` | `intro`, `clue`, `digit`, `color`, `letter` (les 20 lettres de l’anneau), `taunt`, `sabotage`, `outcome` |
 | `source` | `elevenlabs`, `placeholder` ou `tts` |
 | `mp3Ready` | `true` seulement si le mp3 existe vraiment |
 | `text` | texte français exact à enregistrer |
@@ -107,27 +122,29 @@ jamais publiés.
   2 haut-parleurs `SPK-L` / `SPK-R` de part et d’autre du CYD 1 centré, aucune pièce sur la coque.
 - `js/audio.js`, `js/voice-manifest.js`, `js/sfx.js`, `js/eye.js`, `js/preload.js` : voix, sons, œil, préchargement.
 - `audio/tension.mp3` (192827 octets) : musique de tension.
-- `sw.js` : service worker, cache `entite-mallette-v0.2.1` (manifeste des voix inclus). À l’activation, les anciens
-  caches `entite-mallette-*` (dont `entite-mallette-v0.2.0-r2`, `entite-mallette-v0.2.0` et `entite-mallette-v0.1.5-base`) sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`).
+- `sw.js` : service worker, cache `entite-mallette-v0.2.2` (manifeste des voix inclus). À l’activation, les anciens
+  caches `entite-mallette-*` (dont `entite-mallette-v0.2.1`, `entite-mallette-v0.2.0-r2`, `entite-mallette-v0.2.0` et `entite-mallette-v0.1.5-base`) sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`).
 
 ## Tests
 
 ```
 python3 -m http.server 8794 --bind 127.0.0.1 &
-node tests/v021.mjs            # ou : node tests/v021.mjs <base> <graine>
+node tests/v022.mjs            # ou : node tests/v022.mjs <base> <graine>
 ```
 
-`tests/v021.mjs` (Playwright) joue une partie complète (graine 42) en portrait puis vérifie le paysage et le bureau :
-aucun onglet Dessus/Flanc, aucun bouton TRANSMIT rond, plaque de série + 5 fiches + 3 serrures + 2 leviers à capot
-+ 2 haut-parleurs dans la valise et dans le premier écran (412×915, 915×412, 1280×800, sans chevauchement ni défilement),
-couvercle symétrique, levier rouge trop tôt = −8 s + 1 erreur, joystick 4 directions × 2 orientations (normal + sabotage),
-aucun code écrit, mensonges (œil rouge), hésitation ×1,6, victoire, tailles des mp3, manifeste propre, cache du service worker,
-pastille de défilement en 360×600, 0 erreur console/réseau.
-Captures dans `/workspace/qa/entite-mallette/v0.2.1-dev/` (`01-mallette-412.png`, `02-mallette-915x412.png`, `03-mallette-1280x800.png`).
-`tests/v020.mjs` concerne la v0.2.0 (trois faces). Les anciens tests (`tests/v011*.mjs` … `v015`, `paliers.mjs`, `run.mjs`) concernent la v0.1.x.
+`tests/v022.mjs` (Playwright) joue une partie complète (graine 42) jusqu’à la victoire et vérifie : 0 bouton + / − sur les
+KY-040 ; molette, glissé au doigt, torsion (18° par cran), bords −1/+1, clavier et clic au centre ; anneau de 20 lettres
+(20 crans = 1 tour) ; l’étape cryptex (mot épelé à la voix, jamais écrit, composé sur l’OLED) et l’étape chiffres ;
+5 câbles base → couvercle branchés, puis fiche retombée côté base une fois débranchée (portrait, paysage, bureau) ;
+couvercle symétrique, 0 débordement et 0 chevauchement en 412×915, 915×412, 1280×800 et 320×640 ; joystick 16/16 ;
+levier rouge trop tôt ; aucune réponse écrite ; mp3 ElevenLabs intacts ; manifeste ; cache du service worker ; 0 erreur.
+Captures dans `/workspace/qa/entite-mallette/v0.2.2-dev/` (`01-mallette-412.png`, `02-mallette-412-cryptex-unplug.png`,
+`03-mallette-915x412.png`, `04-mallette-1280x800.png`).
+`tests/v021.mjs` concerne la v0.2.1 (boutons + / −), `tests/v020.mjs` la v0.2.0 (trois faces). Les anciens tests (`tests/v011*.mjs` … `v015`, `paliers.mjs`, `run.mjs`) concernent la v0.1.x.
 
 ## Historique
 
+- 0.2.2 : KY-040 sans + / − (on tourne le bouton), cryptex de 20 lettres, câbles banane base → couvercle.
 - 0.2.1 : une seule vue, tout dans la valise ; haut-parleurs de part et d’autre de l’œil ; leviers à capot à la place du bouton TRANSMIT.
 - 0.2.0 : refonte « Cool Escape Props » en trois faces (Dessus, Flanc, Mallette). Plus de lecteur RFID, plus d’éléments Keep Talking.
 - 0.1.5 : 12 étapes en deux couches, 8 minutes (archivée sur entite-mallette-v015).

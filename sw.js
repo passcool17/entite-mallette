@@ -1,10 +1,10 @@
 // sw.js : service worker versionné, écrit à la main. Changer VERSION à chaque publication.
-const VERSION = '0.2.1';
+const VERSION = '0.2.2';
 const CACHE = `entite-mallette-v${VERSION}`;
 const MEDIA = ['./audio/tension.mp3', './voix/intro.mp3', './voix/depart.mp3', './fonts/chakra-petch-latin-500-normal.woff2', './fonts/chakra-petch-latin-700-normal.woff2', './fonts/jetbrains-mono-latin-500-normal.woff2'];
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
-  './css/app.css?v=0.2.1', './js/app.js?v=0.2.1', './voix/manifest.json', './voix/voix.json',
+  './css/app.css?v=0.2.2', './js/app.js?v=0.2.2', './voix/manifest.json', './voix/voix.json',
   './js/eye.js', './js/eye-config.js', './js/game.js', './js/panel-config.js', './js/audio.js', './js/sfx.js', './js/voice-manifest.js', './js/preload.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
 ];

@@ -40,8 +40,8 @@
     @keyframes b-scan { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
     @media (prefers-reduced-motion: reduce) { .b-eye i { animation-duration: 30s; } .b-scan { animation-duration: 3s; } .b-eye b { animation: none; } }
   </style>
-  <link rel="stylesheet" href="css/app.css?v=0.2.1" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="css/app.css?v=0.2.1"></noscript>
+  <link rel="stylesheet" href="css/app.css?v=0.2.2" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="css/app.css?v=0.2.2"></noscript>
   <link rel="modulepreload" href="js/eye.js">
   <link rel="modulepreload" href="js/eye-config.js">
   <link rel="modulepreload" href="js/game.js">
@@ -50,7 +50,7 @@
   <link rel="modulepreload" href="js/voice-manifest.js">
   <link rel="modulepreload" href="js/preload.js">
   <link rel="modulepreload" href="js/panel-config.js">
-  <script type="module" src="js/app.js?v=0.2.1"></script>
+  <script type="module" src="js/app.js?v=0.2.2"></script>
 </head>
 <body>
   <div id="boot" aria-live="polite">
@@ -149,12 +149,13 @@
               <button class="pocket" id="btnPocket" type="button" aria-haspopup="dialog"><span class="pocket-card" aria-hidden="true"></span><span class="silk">POCHETTE</span></button>
               <div class="serial-plate" id="serialPlate"><span class="rivet"></span><span class="rivet"></span><span class="rivet"></span><span class="rivet"></span><span class="sp-label">N° DE SÉRIE</span><span class="sp-num" id="serial">———-———</span><span class="sp-lot" id="lot">LOT ———</span></div>
             </div>
-            <div class="patchbay"><div class="jacks" id="jacks" role="group" aria-label="Cinq fiches banane"></div><span class="silk">KEADIC · 5 FICHES</span></div>
+            <div class="patchbay"><div class="jacks" id="jacks" role="group" aria-label="Cinq douilles banane : câbles venant de la base"></div><span class="silk">KEADIC · 5 DOUILLES</span></div>
           </div>
         </div>
         <div class="base shell" aria-label="Base">
           <div class="base-panel panel">
             <span class="bolt tl"></span><span class="bolt tr"></span><span class="bolt bl"></span><span class="bolt br"></span>
+            <div class="ports" id="ports" aria-hidden="true"></div>
             <div class="col col-a">
             <div class="mod mod-enc">
               <div class="enc-head">
@@ -162,7 +163,7 @@
                 <div class="oled" id="oled" aria-live="off"><canvas id="oledCanvas" width="128" height="64" aria-hidden="true"></canvas><span class="sr-only" id="oledText"></span></div>
               </div>
               <div class="enc-row" id="encRow"></div>
-              <span class="silk">KY-040 ×4 · TOURNE · CLIQUE</span>
+              <span class="silk">KY-040 ×4 · 20 CRANS · TOURNE · CLIQUE</span>
             </div>
             <div class="mod mod-toggles" role="group" aria-label="Interrupteurs à capot">
               <div class="gtoggle blue" id="gtArm">
@@ -215,6 +216,7 @@
             </div>
           </div>
         </div>
+        <svg class="cables" id="cables" aria-hidden="true"></svg>
       </section>
     </main>
     <button class="scroll-pill" id="scrollPill" type="button" aria-label="Défiler vers les commandes du bas" hidden>↓ COMMANDES</button>

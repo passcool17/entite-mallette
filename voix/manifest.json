@@ -1,5 +1,5 @@
 {
- "version": "0.2.1",
+ "version": "0.2.2",
  "note": "Voix de l'Entité. Chaque réplique = un id ou une suite d'ids. mp3Ready true : voix/<id>.mp3 est joué (repli synthèse française si échec). mp3Ready false : synthèse française directe, aucun fichier demandé. Pour remplacer une voix : déposer voix/<id>.mp3 puis mettre mp3Ready à true, sans toucher au code. dfplayerTrack = nom du fichier sur la microSD du DFPlayer Mini (dossier mp3/0001.mp3…).",
  "cues": [
   {
@@ -282,22 +282,22 @@
    "text": "Trois serrures dans le couvercle. Chacune pèse un chiffre du numéro : la première, la deuxième, la troisième. De la plus lourde à la plus légère."
   },
   {
-   "id": "clue_enc2_croissant",
-   "file": "voix/clue_enc2_croissant.mp3",
+   "id": "clue_mot_ordre",
+   "file": "voix/clue_mot_ordre.mp3",
    "dfplayerTrack": "0033",
    "category": "clue",
    "source": "tts",
    "mp3Ready": false,
-   "text": "Signal deux. Les chiffres du numéro de série, du plus petit au plus grand. Puis clique."
+   "text": "Signal deux. Les quatre encodeurs tournent sur vingt lettres. Compose le mot que j'épelle, puis clique un encodeur."
   },
   {
-   "id": "clue_enc2_decroissant",
-   "file": "voix/clue_enc2_decroissant.mp3",
+   "id": "clue_mot_envers",
+   "file": "voix/clue_mot_envers.mp3",
    "dfplayerTrack": "0034",
    "category": "clue",
    "source": "tts",
    "mp3Ready": false,
-   "text": "Signal deux. Les chiffres du numéro de série, du plus grand au plus petit. Puis clique."
+   "text": "Signal deux. Les quatre encodeurs tournent sur vingt lettres. J'épelle le mot à l'envers : compose-le à l'endroit, puis clique un encodeur."
   },
   {
    "id": "clue_fils2_moyen",
@@ -532,6 +532,186 @@
    "source": "tts",
    "mp3Ready": false,
    "text": "Prévisible."
+  },
+  {
+   "id": "lettre_a",
+   "file": "voix/lettre_a.mp3",
+   "dfplayerTrack": "0061",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "A."
+  },
+  {
+   "id": "lettre_b",
+   "file": "voix/lettre_b.mp3",
+   "dfplayerTrack": "0062",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "B."
+  },
+  {
+   "id": "lettre_c",
+   "file": "voix/lettre_c.mp3",
+   "dfplayerTrack": "0063",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "C."
+  },
+  {
+   "id": "lettre_d",
+   "file": "voix/lettre_d.mp3",
+   "dfplayerTrack": "0064",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "D."
+  },
+  {
+   "id": "lettre_e",
+   "file": "voix/lettre_e.mp3",
+   "dfplayerTrack": "0065",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "E."
+  },
+  {
+   "id": "lettre_f",
+   "file": "voix/lettre_f.mp3",
+   "dfplayerTrack": "0066",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "F."
+  },
+  {
+   "id": "lettre_g",
+   "file": "voix/lettre_g.mp3",
+   "dfplayerTrack": "0067",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "G."
+  },
+  {
+   "id": "lettre_h",
+   "file": "voix/lettre_h.mp3",
+   "dfplayerTrack": "0068",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "H."
+  },
+  {
+   "id": "lettre_i",
+   "file": "voix/lettre_i.mp3",
+   "dfplayerTrack": "0069",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "I."
+  },
+  {
+   "id": "lettre_j",
+   "file": "voix/lettre_j.mp3",
+   "dfplayerTrack": "0070",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "J."
+  },
+  {
+   "id": "lettre_l",
+   "file": "voix/lettre_l.mp3",
+   "dfplayerTrack": "0071",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "L."
+  },
+  {
+   "id": "lettre_m",
+   "file": "voix/lettre_m.mp3",
+   "dfplayerTrack": "0072",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "M."
+  },
+  {
+   "id": "lettre_n",
+   "file": "voix/lettre_n.mp3",
+   "dfplayerTrack": "0073",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "N."
+  },
+  {
+   "id": "lettre_o",
+   "file": "voix/lettre_o.mp3",
+   "dfplayerTrack": "0074",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "O."
+  },
+  {
+   "id": "lettre_p",
+   "file": "voix/lettre_p.mp3",
+   "dfplayerTrack": "0075",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "P."
+  },
+  {
+   "id": "lettre_r",
+   "file": "voix/lettre_r.mp3",
+   "dfplayerTrack": "0076",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "R."
+  },
+  {
+   "id": "lettre_s",
+   "file": "voix/lettre_s.mp3",
+   "dfplayerTrack": "0077",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "S."
+  },
+  {
+   "id": "lettre_t",
+   "file": "voix/lettre_t.mp3",
+   "dfplayerTrack": "0078",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "T."
+  },
+  {
+   "id": "lettre_u",
+   "file": "voix/lettre_u.mp3",
+   "dfplayerTrack": "0079",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "U."
+  },
+  {
+   "id": "lettre_v",
+   "file": "voix/lettre_v.mp3",
+   "dfplayerTrack": "0080",
+   "category": "letter",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "V."
   }
  ]
 }

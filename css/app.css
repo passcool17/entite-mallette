@@ -142,8 +142,6 @@ svg { display: block; }
 .knob-cap::before { content: ""; position: absolute; inset: -3px; border-radius: 50%; background: repeating-conic-gradient(#3a3e43 0 5deg, #15171a 5deg 10deg); z-index: -1; }
 .knob-mark { position: absolute; left: 50%; top: 5px; width: 3px; height: 13px; margin-left: -1.5px; border-radius: 2px; background: #e8edf1; box-shadow: 0 0 4px rgb(255 255 255 / .5); }
 .enc.locked .knob-mark { background: var(--green); box-shadow: 0 0 8px var(--green); }
-.enc-step { width: var(--hit); height: 32px; border-radius: 6px; border: 1px solid #2b2f34; background: linear-gradient(#202327, #15171a); color: var(--silk); font: 500 18px/1 var(--f-mono); }
-.enc-step.plus { order: -1; }
 .enc .silk { order: 3; }
 
 .mod-signal { display: grid; grid-template-columns: 1fr auto; gap: var(--s-3); align-items: center; width: 100%; }
@@ -267,22 +265,13 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
 .jack { position: relative; display: grid; justify-items: center; gap: 1px; }
 .plug { position: relative; width: var(--hit); height: 46px; border: 0; background: none; padding: 0; display: block; }
 .jack-socket { position: absolute; left: 50%; bottom: 2px; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%; background: radial-gradient(circle, #000 30%, #b9a15a 33%, #6d5a28 52%, #2a2b2d 56%, #4a4e53 70%, #1a1c1e 72%); box-shadow: 0 1px 2px #000; }
-.plug-body { position: absolute; left: 50%; bottom: 8px; width: 18px; height: 24px; margin-left: -9px; border-radius: 5px 5px 3px 3px; transition: transform .25s, opacity .25s;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--w) 60%, #000), var(--w) 45%, color-mix(in srgb, var(--w) 70%, #fff) 60%, color-mix(in srgb, var(--w) 60%, #000)); box-shadow: 0 3px 5px rgb(0 0 0 / .6), inset 0 0 0 1px rgb(0 0 0 / .4); }
-.plug-wire { position: absolute; left: 50%; top: 0; width: 6px; height: 16px; margin-left: -3px; border-radius: 3px; transition: transform .25s, opacity .25s;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--w) 55%, #000), var(--w), color-mix(in srgb, var(--w) 55%, #000)); }
 .jack .silk { font-size: 7px; }
-.jack.pulled .plug-body, .jack.pulled .plug-wire { transform: translate(8px, -12px) rotate(16deg); opacity: .35; }
 .jack.wiggle .plug { animation: bump .3s; }
-.jack.decoy .plug-body { box-shadow: 0 0 0 2px var(--red), 0 0 14px var(--red); }
-.jack[data-c="noir"] .plug-body { background: linear-gradient(90deg, #0b0c0d, #3a3e43 45%, #6b7177 60%, #0b0c0d); box-shadow: 0 3px 5px rgb(0 0 0 / .6), inset 0 0 0 1px #8d949b; }
-.jack[data-c="noir"] .plug-wire { background: linear-gradient(90deg, #050505, #3c4045, #050505); box-shadow: 0 0 0 1px #6b7177; }
-.jack[data-c="bleu"] .plug-body { box-shadow: 0 3px 5px rgb(0 0 0 / .6), 0 0 8px rgb(43 124 255 / .45), inset 0 0 0 1px rgb(0 0 0 / .4); }
 
 /* ---------- base ---------- */
 .col { display: contents; }
 .base-panel { display: grid; gap: 8px 8px; grid-template-columns: minmax(0, 206px) minmax(0, 1fr) 62px;
-  grid-template-areas: "enc enc enc" "sig sig keys" "kp traps traps" "kp tg tg"; grid-template-rows: auto auto auto 1fr; align-items: start; }
+  grid-template-areas: "ports ports ports" "enc enc enc" "sig sig keys" "kp traps traps" "kp tg tg"; grid-template-rows: auto auto auto auto 1fr; align-items: start; }
 .mod-enc { grid-area: enc; gap: 4px; }
 .mod-signal { grid-area: sig; display: grid; grid-template-columns: auto 1fr; justify-items: center; align-items: center; gap: 8px; width: 100%; }
 .mod-keys { grid-area: keys; align-self: center; gap: 2px; }
@@ -294,8 +283,6 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
 .oled { padding: 3px; } .oled canvas { width: 96px; height: 48px; }
 .enc-row { gap: 4px; }
 .enc { gap: 3px; }
-.enc-step { width: 100%; max-width: 64px; height: 30px; font-size: 17px; }
-.enc-step.plus { order: -1; } .knob { order: 0; } .enc-step.minus { order: 1; }
 .knob { width: var(--knob, 48px); height: var(--knob, 48px); }
 .knob-cap { width: calc(var(--knob, 48px) - 8px); height: calc(var(--knob, 48px) - 8px); margin: 4px; }
 .knob-mark { height: 11px; top: 4px; }
@@ -374,12 +361,10 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
   .mod-keys > .silk { display: block; }
 }
 @media (orientation: landscape) and (max-height: 520px) {
-  :root { --hud-h: 48px; --cyd1-h: 128px; --spk: 60px; --cyd2-h: 84px; --joy: 112px; --kp: 40px; --knob: 44px; --gt-h: 84px; --trap-h: 46px; --led-h: 12px; }
-  .enc-step { height: 32px; }
-  .jacks { padding: 2px 6px 1px; }
+  :root { --hud-h: 48px; --cyd1-h: 128px; --spk: 60px; --cyd2-h: 84px; --joy: 112px; --kp: 40px; --gt-h: 84px; --trap-h: 46px; --led-h: 12px; }
 }
 @media (min-width: 1000px) and (min-height: 600px) {
-  :root { --hud-h: 56px; --lid-w: 480px; --cyd1-h: 176px; --spk: 92px; --cyd2-h: 130px; --joy: 150px; --kp: 50px; --knob: 56px; --gt-h: 116px; --trap-h: 62px; --led-h: 22px; }
+  :root { --hud-h: 56px; --lid-w: 480px; --cyd1-h: 176px; --spk: 92px; --cyd2-h: 130px; --joy: 150px; --kp: 50px; --gt-h: 116px; --trap-h: 62px; --led-h: 22px; }
   .hud { max-width: 1220px; margin: 0 auto; }
   .tm-digits { font-size: 28px; }
   .icon-btn { width: 44px; height: 44px; }
@@ -387,7 +372,6 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
   #face-mallette .shell { padding: 8px; }
   #face-mallette .panel { padding: 16px; }
   .lid-panel, .col { justify-content: space-evenly; align-content: space-evenly; }
-  .enc-step { height: 38px; max-width: 56px; }
   .enc-row { gap: 6px; }
   .oled canvas { width: 128px; height: 64px; }
   .tm-small .tm-digits { font-size: 24px; }
@@ -396,7 +380,7 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
   .gt-body { width: 70px; }
   .gt-lid span { font-size: 10px; }
   .mod-keys .lock-btn { width: 52px; height: 52px; } .mod-keys .lock-face { width: 34px; height: 34px; }
-  .plug { height: 56px; } .jack-socket { width: 28px; height: 28px; margin-left: -14px; } .plug-body { width: 22px; height: 30px; margin-left: -11px; } .plug-wire { height: 18px; }
+  .plug { height: 56px; } .jack-socket { width: 28px; height: 28px; margin-left: -14px; }
   .sp-num { font-size: 20px; } .sp-label { font-size: 7px; }
   .mod .silk, .lid-panel .silk { font-size: 9px; }
 }
@@ -407,4 +391,69 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
   :root { --cyd1-h: 88px; --spk: 64px; --kp: 36px; }
   .lid-ctrls .silk, .serial-plate { font-size: 7px; }
   .mod-toggles { gap: 6px; } .gt-body { width: 50px; }
+}
+
+/* ================= v0.2.2 : KY-040 sans + / − (anneau de 20 crans) ; 5 câbles banane base → couvercle ================= */
+/* KY-040 : le bouton se tourne lui-même ; anneau fixe de 20 crans, repère blanc (18° par cran) */
+:root { --knob: 56px; }
+.knob { position: relative; width: var(--knob); height: var(--knob); touch-action: none; cursor: grab; -webkit-tap-highlight-color: transparent;
+  background: radial-gradient(circle, #050505 60%, #1c1f22 62%, #0d0e10 72%); }
+.knob.held { cursor: grabbing; }
+.knob-ring { position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  background: repeating-conic-gradient(from -1deg, #b9c0c6 0 2deg, transparent 2deg 18deg);
+  -webkit-mask: radial-gradient(circle, transparent calc(50% - 4px), #000 calc(50% - 3.5px)); mask: radial-gradient(circle, transparent calc(50% - 4px), #000 calc(50% - 3.5px)); opacity: .7; }
+.knob-cap { position: absolute; left: 50%; top: 50%; width: calc(var(--knob) - 14px); height: calc(var(--knob) - 14px); margin: calc((var(--knob) - 14px) / -2) 0 0 calc((var(--knob) - 14px) / -2); transition: transform .07s; }
+.knob-cap::before { background: repeating-conic-gradient(#3a3e43 0 4.5deg, #15171a 4.5deg 9deg); }
+.knob-mark { height: 12px; top: 3px; }
+.knob.press .knob-cap { scale: .9; filter: brightness(.82); transition: scale .06s; }
+.knob:focus-visible { outline: 2px solid var(--cyan, #62d6ff); outline-offset: 2px; }
+.enc-row { gap: 6px; justify-items: center; }
+.enc .silk { display: block; font-size: 7px; }
+
+/* douilles femelles du couvercle : numéro au-dessus, la fiche entre par-dessous */
+.patchbay { position: relative; }
+.jacks { padding: 2px 6px 0; }
+.jack .silk { order: -1; line-height: 1; }
+.plug { height: 44px; -webkit-tap-highlight-color: transparent; }
+.jack-socket { top: 3px; bottom: auto; }
+.jack.pulled .jack-socket { background: radial-gradient(circle, #000 38%, #1b1c1e 42%, #b9a15a 46%, #6d5a28 56%, #2a2b2d 60%, #4a4e53 70%, #1a1c1e 72%); }
+.jack.decoy .jack-socket { box-shadow: 0 0 0 2px var(--red), 0 0 12px var(--red); }
+
+/* ports d'ancrage sur la base (portrait : bande du haut, alignés par app.js sous les douilles) */
+.ports { grid-area: ports; position: relative; height: 24px; margin: -4px 0 -6px; }
+.port { position: absolute; top: 3px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%;
+  background: radial-gradient(circle, #020202 30%, #4a4e53 38%, #1a1c1e 66%); box-shadow: 0 0 0 2px color-mix(in srgb, var(--w) 75%, #000), 0 1px 3px #000; }
+
+/* câbles (SVG au-dessus des panneaux, n'intercepte aucun toucher) */
+#face-mallette { position: relative; }
+.cables { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 6; }
+.cable path { fill: none; stroke-linecap: round; stroke-linejoin: round; transition: d .42s cubic-bezier(.3, .8, .35, 1); }
+.cable .c-shadow { stroke: rgb(0 0 0 / .55); stroke-width: 7.5; translate: 0 1.5px; }
+.cable .c-core { stroke: var(--w); stroke-width: 5; }
+.cable .c-hi { stroke: rgb(255 255 255 / .38); stroke-width: 1.3; translate: -1px -.5px; }
+.cable[data-c="noir"] .c-core { stroke: #17181b; }
+.cable[data-c="noir"] .c-hi { stroke: rgb(185 195 205 / .6); }
+.cplug { transition: transform .42s cubic-bezier(.3, .8, .35, 1); }
+.cplug .pc { fill: #d2d7dc; stroke: #6b7177; stroke-width: .6; }
+.cplug .pb { fill: var(--w); stroke: rgb(0 0 0 / .55); stroke-width: 1; filter: drop-shadow(0 2px 2px rgb(0 0 0 / .6)); }
+.cable[data-c="noir"] .pb { fill: #17181b; stroke: #8d949b; }
+.cable[data-c="bleu"] .pb { filter: drop-shadow(0 0 4px rgb(43 124 255 / .55)); }
+.cplug .pg { fill: rgb(255 255 255 / .35); }
+.cable.decoy .pb { stroke: var(--red); stroke-width: 2.5; }
+.cables.instant path, .cables.instant .cplug { transition: none; }
+
+@media (orientation: landscape) and (max-height: 520px), (min-width: 1000px) and (min-height: 600px) {
+  #face-mallette .patchbay > .silk { display: none; }
+  .patchbay { padding-bottom: 46px; }                   /* goulotte : 5 voies de câble sous les douilles */
+  #face-mallette .base-panel { position: relative; padding-left: 34px; }
+  .ports { position: absolute; left: 7px; bottom: 9px; height: auto; margin: 0; display: flex; flex-direction: column-reverse; gap: 0; }
+  .port { position: relative; top: auto; width: 8px; height: 8px; margin: 0; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--w) 75%, #000), 0 1px 2px #000; }
+}
+@media (orientation: landscape) and (max-height: 520px) { :root { --knob: 46px; --cyd1-h: 118px; --spk: 54px; --cyd2-h: 78px; } .key-row { gap: 4px; } .mod-keys .lock-btn { width: 36px; height: 36px; } .mod-keys .lock-face { width: 24px; height: 24px; } #face-mallette .base-panel { padding-left: 28px; } .ports { left: 6px; } .plug { height: 40px; } .jack-socket { width: 20px; height: 20px; margin-left: -10px; } }
+@media (min-width: 1000px) and (min-height: 600px) { :root { --knob: 56px; --cyd2-h: 122px; --joy: 140px; } .patchbay { padding-bottom: 50px; } }
+@media (max-width: 359px) and (orientation: portrait) {
+  :root { --knob: 48px; --joy: 100px; --cyd2-h: 78px; }
+  .base-panel { grid-template-columns: minmax(0, 168px) minmax(0, 1fr) 58px; }
+  .keypad { padding: 4px; gap: 3px; }
+  .mod-keys .lock-btn { width: 36px; height: 36px; }
 }

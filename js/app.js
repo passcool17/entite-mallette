@@ -1,15 +1,16 @@
-// app.js : La mallette de l'Entité v0.2.1 : une seule vue, la mallette ouverte (couvercle intérieur + base).
+// app.js : La mallette de l'Entité v0.2.2 : une seule vue, la mallette ouverte (couvercle intérieur + base).
 // Tout est à l'intérieur de la valise. Deux leviers à capot : bleu (armement) et rouge (TRANSMIT, la fin).
+// KY-040 : on tourne le bouton lui-même (20 crans par tour, chiffres ou anneau de 20 lettres). 5 câbles banane base → couvercle.
 // Règle de Pascal : AUCUN code ni consigne écrit à l'écran. L'Entité dicte (voix), puis presse et ment (œil rouge)
 // pendant que tu choisis. Paliers cachés ~50/50, ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 import { createEye } from './eye.js';
 import { EYE, deepMerge } from './eye-config.js';
-import { makeRun, TIME_S, NSTEPS, STEPS, canMove, DIRS } from './game.js';
+import { makeRun, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js';
 import { initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js';
 import { sfx } from './sfx.js';
 import { preloadAll } from './preload.js';
 
-const VERSION = '0.2.1';
+const VERSION = '0.2.2';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -35,7 +36,7 @@ function resetState() {
     endAt: 0, remaining: TIME_S, rate: 1, lastTick: 0, lastSec: null,
     prob: 99.7, errors: 0, lieUntil: 0, lies: 0,
     coverArm: false, coverTx: false, armed: false, txOn: false,
-    enc: [0, 0, 0, 0], trapOpen: [false, false, false], seqShow: null,
+    enc: [0, 0, 0, 0], encRaw: [0, 0, 0, 0], encMode: 'digit', trapOpen: [false, false, false], seqShow: null,
     pulled: [false, false, false, false, false], wires: run.wires1.colors.slice(),
     pos: null, code: '', keysTurned: [], hesitating: false, lastInput: 0,
     sabotage: false, sabT: 0, said30: false, said10: false,
@@ -71,10 +72,11 @@ function flagLie(on) {
 }
 const digit = (d) => `chiffre_${d}`;
 const color = (c) => `couleur_${c}`;
+const letter = (ch) => `lettre_${ch.toLowerCase()}`;
 
 // ================= vue unique : la mallette ouverte =================
 const face = 'mallette';
-function refreshView() { requestAnimationFrame(() => { eye?.resize?.(); drawCyd2(); }); }
+function refreshView() { requestAnimationFrame(() => { eye?.resize?.(); drawCyd2(); drawCables(); }); }
 
 // ================= construction des pièces =================
 function buildParts() {
@@ -82,9 +84,7 @@ function buildParts() {
   const er = $('#encRow'); er.textContent = '';
   for (let i = 0; i < 4; i++) {
     const el = document.createElement('div'); el.className = 'enc'; el.dataset.i = i;
-    el.innerHTML = `<button class="enc-step minus" type="button" aria-label="E${i + 1} : un cran à gauche">−</button>
-      <button class="knob" type="button" aria-label="Encodeur E${i + 1} : tourner (glisser) ou cliquer pour valider"><span class="knob-cap"><span class="knob-mark"></span></span></button>
-      <button class="enc-step plus" type="button" aria-label="E${i + 1} : un cran à droite">+</button><span class="silk">E${i + 1}</span>`;
+    el.innerHTML = `<button class="knob" type="button" role="slider" aria-valuemin="0" aria-valuemax="19" aria-valuenow="0" aria-label="Encodeur E${i + 1} : tourner le bouton (glisser, molette, bords), toucher le centre pour cliquer"><span class="knob-ring"></span><span class="knob-cap"><span class="knob-mark"></span></span></button><span class="silk">E${i + 1}</span>`;
     er.append(el);
   }
   // clavier 4x4
@@ -110,9 +110,85 @@ function buildJacks() {
   const j = $('#jacks'); j.textContent = '';
   g.wires.forEach((c, i) => {
     const el = document.createElement('div'); el.className = 'jack'; el.dataset.i = i; el.dataset.c = c; el.style.setProperty('--w', WIRE[c]);
-    el.innerHTML = `<button class="plug" type="button" aria-label="Fiche ${ORD[i]}, fil ${c} : débrancher"><span class="plug-wire"></span><span class="jack-socket"></span><span class="plug-body"></span></button><span class="silk">${i + 1}</span>`;
+    el.innerHTML = `<button class="plug" type="button" aria-label="Douille ${ORD[i]}, câble ${c} branché : débrancher"><span class="jack-socket"></span></button><span class="silk">${i + 1}</span>`;
     j.append(el);
   });
+  // ports d'ancrage des câbles, sur la base
+  const pt = $('#ports'); pt.textContent = '';
+  g.wires.forEach((c, i) => { const el = document.createElement('i'); el.className = 'port'; el.dataset.i = i; el.style.setProperty('--w', WIRE[c]); pt.append(el); });
+  drawCables(true);
+}
+
+// ================= câbles banane : 5 câbles souples, de la base (ports) vers les douilles du couvercle =================
+// Branché : la fiche est enfoncée par-dessous dans sa douille (1..5) du couvercle, le câble descend vers son port de la base.
+// Débranché : la douille reste vide et la fiche retombe couchée sur la base, à côté de son port (jamais pendue au couvercle).
+// Portrait : couvercle en haut, ports en haut de la base, juste sous les douilles. Paysage / bureau : couvercle à gauche,
+// les câbles passent sous les douilles (une voie chacun, sans se croiser) et rejoignent les ports au bord gauche de la base.
+let cableGeom = [];
+const SVGNS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs, parent) { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent?.append(e); return e; }
+function drawCables(instant) {
+  const svg = $('#cables'), fm = $('#face-mallette');
+  if (!svg || !fm || $('#app').hidden) return;
+  const F = fm.getBoundingClientRect(); if (!F.width) return;
+  const sockets = $$('#jacks .jack-socket'), ports = $$('#ports .port');
+  if (sockets.length !== 5 || ports.length !== 5) return;
+  const lidR = $('.lid', fm).getBoundingClientRect(), baseR = $('.base', fm).getBoundingClientRect();
+  const stacked = lidR.bottom <= baseR.top + 2;
+  const pr = $('#ports').getBoundingClientRect();
+  sockets.forEach((s, i) => { const r = s.getBoundingClientRect(); ports[i].style.left = stacked ? `${(r.left + r.width / 2 - pr.left).toFixed(1)}px` : ''; });
+  const ctr = (el) => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2 - F.left, r.top + r.height / 2 - F.top, r.width]; };
+  if (svg.dataset.sig !== g.wires.join()) {
+    svg.textContent = ''; svg.dataset.sig = g.wires.join();
+    g.wires.forEach((c, i) => {
+      const gr = svgEl('g', { class: 'cable', 'data-i': i, 'data-c': c }, svg); gr.style.setProperty('--w', WIRE[c]);
+      for (const k of ['c-shadow', 'c-core', 'c-hi']) svgEl('path', { class: k }, gr);
+      const pl = svgEl('g', { class: 'cplug' }, gr);
+      svgEl('rect', { class: 'pc' }, pl); svgEl('rect', { class: 'pb' }, pl); svgEl('rect', { class: 'pg' }, pl);
+    });
+    instant = true;
+  }
+  svg.classList.toggle('instant', !!instant);
+  svg.setAttribute('viewBox', `0 0 ${F.width.toFixed(1)} ${F.height.toFixed(1)}`);
+  const f = (n) => n.toFixed(1);
+  const C2 = (p0, a1, b1, m, a2, b2, p1) => `M ${f(p0[0])} ${f(p0[1])} C ${f(a1[0])} ${f(a1[1])} ${f(b1[0])} ${f(b1[1])} ${f(m[0])} ${f(m[1])} C ${f(a2[0])} ${f(a2[1])} ${f(b2[0])} ${f(b2[1])} ${f(p1[0])} ${f(p1[1])}`;
+  cableGeom = [];
+  sockets.forEach((s, i) => {
+    const [sx, sy, sd] = ctr(s), [px, py] = ctr(ports[i]);
+    const L = Math.round(sd * 0.95), w = Math.max(9, Math.round(sd * 0.5));
+    const pulled = !!g.pulled[i];
+    let ax, ay, rot, d;
+    if (!pulled) {
+      ax = sx; ay = sy; rot = 0; const t = [sx, sy + L];
+      if (stacked) {
+        const m = [(px + t[0]) / 2 + (i % 2 ? 3 : -3), (py + t[1]) / 2], k = Math.max(4, (py - t[1]) * 0.3);
+        d = C2([px, py], [px, py - k], [m[0], m[1] + k * 0.6], m, [m[0], m[1] - k * 0.6], [t[0], t[1] + k], t);
+      } else {
+        const r = Math.max(4, Math.min(14, py - t[1] - 2)), cx = t[0] + r;
+        d = C2([px, py], [px - (px - cx) / 3, py], [cx + (px - cx) / 3, py], [cx, py], [t[0] + r * 0.45, py], [t[0], py - r * 0.45], t);
+      }
+    } else if (stacked) {
+      // couchée à droite de son port, pointe vers la droite
+      const t = [px + 12, py + 9]; ax = t[0] + L; ay = t[1]; rot = 90;
+      d = C2([px, py], [px, py + 4], [px + 1, py + 8], [px + 5, py + 9], [px + 8, py + 9.5], [t[0] - 3, t[1]], t);
+    } else {
+      // debout dans la goulotte de la base, à droite de son port
+      const t = [px + 14, py - 6]; ax = t[0]; ay = t[1] - L; rot = 0;
+      d = C2([px, py], [px + 4, py], [px + 8, py + 1], [px + 11, py - 1], [px + 13, py - 2], [t[0], t[1] + 3], t);
+    }
+    const gr = svg.children[i];
+    gr.classList.toggle('pulled', pulled);
+    for (const p of gr.querySelectorAll('path')) p.style.d = `path("${d}")`;
+    const pl = gr.querySelector('.cplug');
+    pl.style.transform = `translate(${f(ax)}px, ${f(ay)}px) rotate(${rot}deg)`;
+    const [pc, pb, pg] = pl.children;
+    Object.entries({ x: -w * 0.32, y: -sd * 0.28, width: w * 0.64, height: sd * 0.34, rx: 1.5 }).forEach(([k, v]) => pc.setAttribute(k, f(v)));
+    Object.entries({ x: -w / 2, y: sd * 0.02, width: w, height: L, rx: 3 }).forEach(([k, v]) => pb.setAttribute(k, f(v)));
+    Object.entries({ x: -w / 2 + 2, y: sd * 0.12, width: 2, height: L * 0.75, rx: 1 }).forEach(([k, v]) => pg.setAttribute(k, f(v)));
+    const hinge = stacked ? lidR.bottom - F.top : lidR.right - F.left;
+    cableGeom.push({ i, color: g.wires[i], pulled, stacked, hinge: +f(hinge), socket: [+f(sx), +f(sy)], port: [+f(px), +f(py)], plug: [+f(ax), +f(ay), rot], tail: rot === 90 ? [+f(ax - L), +f(ay)] : [+f(ax), +f(ay + L)] });
+  });
+  if (instant) requestAnimationFrame(() => svg.classList.remove('instant'));
 }
 
 // ================= affichages =================
@@ -145,17 +221,26 @@ function drawOled() {
     return;
   }
   const lie = performance.now() < g.lieUntil && (g.step === 1 || g.step === 8);
+  const alpha = g.encMode === 'alpha';
   c.fillText('E1  E2  E3  E4', 10, 4);
+  c.fillText(alpha ? 'A-V' : '0-9', 106, 4);
   c.font = '500 22px "JetBrains Mono", monospace';
+  const sym = (v) => (alpha ? RING[v] : String(v));
   for (let i = 0; i < 4; i++) {
     const v = lie && g.decoy?.enc ? g.decoy.enc[i] : g.enc[i];
-    c.fillText(String(v), 12 + i * 30, 22);
+    c.fillText(sym(v), 12 + i * 30, 22);
   }
+  if (alpha) for (let i = 0; i < 4; i++) c.fillRect(12 + i * 30, 49, 14, 1);
   if (lie) { for (let k = 0; k < 6; k++) { c.fillStyle = 'rgba(255,60,60,.7)'; c.fillRect(Math.random() * W, Math.random() * H, 20 + Math.random() * 40, 2); } }
-  $('#oledText').textContent = `Encodeurs ${g.enc.join(' ')}`;
+  $('#oledText').textContent = `Encodeurs ${g.enc.map(sym).join(' ')}`;
 }
 function setEncVisual() {
-  $$('.enc').forEach((el, i) => { $('.knob-cap', el).style.transform = `rotate(${g.enc[i] * 36}deg)`; $('.knob', el).setAttribute('aria-valuenow', g.enc[i]); });
+  const alpha = g.encMode === 'alpha';
+  $$('.enc').forEach((el, i) => {
+    $('.knob-cap', el).style.transform = `rotate(${g.encRaw[i] * (360 / DETENTS)}deg)`; // 18° par cran : 20 crans = 1 tour
+    const k = $('.knob', el); k.setAttribute('aria-valuemax', alpha ? '19' : '9'); k.setAttribute('aria-valuenow', g.enc[i]);
+    k.setAttribute('aria-valuetext', alpha ? `lettre ${RING[g.enc[i]]}` : `chiffre ${g.enc[i]}`);
+  });
 }
 
 // CYD 2 : verrou de signal (labyrinthe visible), sinon oscilloscope en veille
@@ -204,7 +289,7 @@ function nextStep(n) {
   showStep();
   const hard = run.tier === 'difficile';
   switch (n) {
-    case 1: g.enc = [0, 0, 0, 0].map(() => Math.floor(Math.random() * 10)); setEncVisual();
+    case 1: setEncMode('digit');
       voice(hard ? 'clue_enc1_envers' : 'clue_enc1_ordre', { clue: true }); pressureEnc(); break;
     case 2: voice(hard ? 'clue_trappe_rare' : 'clue_trappe_frequente', { clue: true });
       pressure(5500, () => { const w = (run.trap + 1) % 3; decoy('trap', w); voice(['taunt_trappe', color(run.trapColors[w])], { lie: true, now: true }); }); break;
@@ -220,8 +305,8 @@ function nextStep(n) {
       voice(hard ? 'clue_cles_lourde' : 'clue_cles_legere', { clue: true });
       pressure(5000, () => voice(['taunt_cles', ...run.decoys.keys.map((k) => digit(k + 1))], { lie: true, now: true }));
       if (run.lies.keysTwice) pressure(14000, () => voice(['taunt_cles', ...run.decoys.keys.map((k) => digit(k + 1))], { lie: true, now: true })); break;
-    case 8: g.enc = [0, 0, 0, 0].map(() => Math.floor(Math.random() * 10)); setEncVisual();
-      voice(hard ? 'clue_enc2_decroissant' : 'clue_enc2_croissant', { clue: true }); pressureEnc(); break;
+    case 8: setEncMode('alpha');
+      voice([hard ? 'clue_mot_envers' : 'clue_mot_ordre', ...run.spell.split('').map(letter)], { clue: true }); pressureEnc(); break;
     case 9: g.pos = run.maze2.start.slice(); voice('clue_verrou', { clue: true }); g.sabT = performance.now() + 5000; break;
     case 10: g.wires = run.wires2.colors.slice(); g.pulled = [false, false, false, false, false]; buildJacks();
       sfx.servo(); voice(hard ? 'clue_fils2_dur' : 'clue_fils2_moyen', { clue: true });
@@ -237,12 +322,20 @@ function pressure(ms, fn) { const s = g.step; g.pressure.push(setTimeout(() => {
 function pressureEnc() {
   g._encTaunted = false;
   if (run.lies.encFalse && g.step === 1) pressure(4000, () => { const tgt = curEncTarget(); g.decoy = { enc: tgt.map((d) => (d + 3) % 10) }; voice(['taunt_cetait', digit(g.decoy.enc[0]), 'taunt_depeche'], { lie: true, now: true }); });
+  if (run.lies.encFalse && g.step === 8) pressure(5000, () => voice(['taunt_cetait', letter(run.decoys.word), 'taunt_depeche'], { lie: true, now: true }));
 }
 const curEncTarget = () => (g.step === 1 ? run.enc1 : run.enc2);
+// mode des KY-040 : chiffres (0-9) ou anneau cryptex de 20 lettres (A-V) ; position de départ au hasard
+function setEncMode(mode) {
+  g.encMode = mode; const n = mode === 'alpha' ? DETENTS : 10;
+  g.enc = [0, 0, 0, 0].map(() => Math.floor(Math.random() * n));
+  g.encRaw = g.enc.slice();
+  setEncVisual();
+}
 function decoy(kind, i) {
   clearDecoys();
   if (kind === 'trap') $(`.trap[data-i="${i}"]`)?.classList.add('decoy');
-  if (kind === 'wire') $(`.jack[data-i="${i}"]`)?.classList.add('decoy');
+  if (kind === 'wire') { $(`.jack[data-i="${i}"]`)?.classList.add('decoy'); $(`#cables .cable[data-i="${i}"]`)?.classList.add('decoy'); }
   if (kind === 'tx') $('#gtTx').classList.add('decoy');
   setTimeout(clearDecoys, 3200);
 }
@@ -285,6 +378,7 @@ function startGame() {
   g.phase = 'arm-toggle'; showStep(); refreshView();
   $('#face-mallette').classList.remove('opening'); void $('#face-mallette').offsetWidth; $('#face-mallette').classList.add('opening'); sfx.lidOpen();
   $('#gtArm').classList.add('armed');
+  setTimeout(() => drawCables(true), 760);
   voice('intro'); voice('arm_cache', { clue: true });
   showTime(TIME_S); showProb();
   if (DEBUG) $('#seedTag').textContent = ` · graine ${run.seed} · ${run.tier}`;
@@ -370,37 +464,56 @@ function wire() {
     sfx.plugPull();
     const step = g.step, set = step === 4 ? run.wires1 : step === 10 ? run.wires2 : null;
     const jack = b.closest('.jack');
-    if (!set) { jack.classList.add('wiggle'); setTimeout(() => jack.classList.remove('wiggle'), 400); if (g.phase === 'play') bad(5); return; }
-    if (i === set.cut) { g.pulled[i] = true; jack.classList.add('pulled'); b.setAttribute('aria-label', `Fiche ${ORD[i]} débranchée`); good(step === 4 ? 5 : 11, step === 4 ? 2 : null); }
-    else { jack.classList.add('pulled'); setTimeout(() => jack.classList.remove('pulled'), 650); bad(8); }
+    if (!set && g.phase !== 'play') { jack.classList.add('wiggle'); setTimeout(() => jack.classList.remove('wiggle'), 400); return; }
+    if (set && i === set.cut) { g.pulled[i] = true; jack.classList.add('pulled'); b.setAttribute('aria-label', `Douille ${ORD[i]} vide : câble ${g.wires[i]} débranché, posé sur la base`); drawCables(); good(step === 4 ? 5 : 11, step === 4 ? 2 : null); }
+    else { // mauvais câble (ou hors étape) : la fiche retombe sur la base, pénalité, puis l'Entité la rebranche
+      const w = g.wires.join(); g.pulled[i] = true; jack.classList.add('pulled'); drawCables();
+      setTimeout(() => { if (g.wires.join() !== w) return; g.pulled[i] = false; jack.classList.remove('pulled'); drawCables(); }, 900); bad(set ? 8 : 5);
+    }
   });
 
-  // encodeurs : − / + (crans), glisser sur le bouton, molette ; clic = valider
-  $('#encRow').addEventListener('click', (e) => {
-    const st = e.target.closest('.enc-step'); if (!st) return;
-    const i = +st.closest('.enc').dataset.i; turn(i, st.classList.contains('plus') ? 1 : -1);
-  });
+  // encodeurs KY-040 : on tourne le bouton lui-même (aucun bouton + / −)
+  //  - glisser : torsion autour du centre (18° = 1 cran) ou glissé horizontal (20 px = 1 cran), choisi aux 8 premiers px
+  //  - molette : haut = +1, bas = −1
+  //  - toucher sans glisser : tiers gauche = −1, tiers droit = +1, centre = clic du poussoir (valider)
+  //  - clavier : ←/↓ = −1, →/↑ = +1, Entrée/Espace = clic
   // délégation sur #encRow : les boutons sont reconstruits à chaque partie (buildParts)
   const er = $('#encRow');
-  let kn = null, ki = 0, sx = 0, sy = 0, acc = 0, moved = false;
+  let kn = null, ki = 0, sx = 0, sy = 0, cx = 0, cy = 0, aAcc = 0, aPrev = 0, done = 0, mode = null;
+  const angle = (x, y) => Math.atan2(y - cy, x - cx) * 180 / Math.PI;
   er.addEventListener('pointerdown', (e) => {
     kn = e.target.closest('.knob'); if (!kn) return;
-    ki = +kn.closest('.enc').dataset.i; sx = e.clientX; sy = e.clientY; acc = 0; moved = false;
-    kn.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    const r = kn.getBoundingClientRect(); cx = r.left + r.width / 2; cy = r.top + r.height / 2;
+    ki = +kn.closest('.enc').dataset.i; sx = e.clientX; sy = e.clientY; aPrev = angle(sx, sy); aAcc = 0; done = 0; mode = null;
+    kn.setPointerCapture?.(e.pointerId); kn.classList.add('held');
   });
   er.addEventListener('pointermove', (e) => {
-    if (!kn || !kn.hasPointerCapture(e.pointerId)) return;
-    const d = (e.clientX - sx) - (e.clientY - sy); // droite ou haut = sens horaire
-    if (Math.abs(d - acc) >= 16) { const s = Math.sign(d - acc); acc += s * 16; moved = true; turn(ki, s); }
-  });
-  // clic du KY-040 : relâché sans avoir tourné, ou Entrée/Espace au clavier (click sans pointeur)
-  er.addEventListener('pointerup', (e) => {
     if (!kn) return;
-    if (kn.hasPointerCapture(e.pointerId)) kn.releasePointerCapture(e.pointerId);
-    if (!moved) pushEnc(); kn = null;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    const a = angle(e.clientX, e.clientY); let da = a - aPrev; if (da > 180) da -= 360; if (da < -180) da += 360; aPrev = a; aAcc += da;
+    if (!mode) {
+      if (Math.hypot(dx, dy) < 8) return;
+      // départ sur le bord + geste tangent (le long du cercle) = torsion ; départ près du centre = glissé horizontal
+      const rx = sx - cx, ry = sy - cy, rr = Math.hypot(rx, ry) || 1, half = kn.getBoundingClientRect().width / 2;
+      const radial = Math.abs((dx * rx + dy * ry) / rr), tang = Math.abs((dx * -ry + dy * rx) / rr);
+      mode = rr > half * 0.45 && tang > radial ? 'twist' : 'h';
+    }
+    const want = mode === 'h' ? Math.trunc(dx / 20) : Math.trunc(aAcc / (360 / DETENTS));
+    while (done < want) { done++; turn(ki, 1); }
+    while (done > want) { done--; turn(ki, -1); }
   });
-  er.addEventListener('pointercancel', () => { kn = null; });
-  er.addEventListener('click', (e) => { if (e.detail === 0 && e.target.closest('.knob')) pushEnc(); });
+  const endKnob = (e, cancel) => {
+    if (!kn) return;
+    const k = kn; kn = null; k.classList.remove('held');
+    if (k.hasPointerCapture?.(e.pointerId)) k.releasePointerCapture(e.pointerId);
+    if (cancel || mode) return;
+    const r = k.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width;
+    if (fx < 1 / 3) turn(ki, -1); else if (fx > 2 / 3) turn(ki, 1); else pushEnc(ki);
+  };
+  er.addEventListener('pointerup', (e) => endKnob(e, false));
+  er.addEventListener('pointercancel', (e) => endKnob(e, true));
+  er.addEventListener('click', (e) => { const k = e.target.closest('.knob'); if (e.detail === 0 && k) pushEnc(+k.closest('.enc').dataset.i); });
   er.addEventListener('wheel', (e) => { const k = e.target.closest('.knob'); if (!k) return; e.preventDefault(); turn(+k.closest('.enc').dataset.i, e.deltaY < 0 ? 1 : -1); }, { passive: false });
   er.addEventListener('keydown', (e) => {
     const k = e.target.closest('.knob'); if (!k) return; const i = +k.closest('.enc').dataset.i;
@@ -450,16 +563,19 @@ function wire() {
 
 function turn(i, s) {
   input(); if (g.phase !== 'play') return;
-  g.enc[i] = (g.enc[i] + s + 10) % 10; sfx.detent(); setEncVisual(); drawOled();
+  const n = g.encMode === 'alpha' ? DETENTS : 10;
+  g.encRaw[i] += s; g.enc[i] = (g.enc[i] + s + n) % n; sfx.detent(); setEncVisual(); drawOled();
   // pression : quand un encodeur tombe juste, l'Entité affirme le contraire (une fois par étape)
   if ((g.step === 1 || g.step === 8) && !g._encTaunted && g.enc[i] === curEncTarget()[i] && g.enc.filter((v, k) => v === curEncTarget()[k]).length >= 2) {
     g._encTaunted = true;
-    const right = curEncTarget()[i], wrong = (right + 3 + Math.floor(Math.random() * 5)) % 10;
-    setTimeout(() => g.running && voice(['taunt_cetait', digit(wrong), 'taunt_depeche'], { lie: true, now: true }), 300);
+    const right = curEncTarget()[i], wrong = (right + 3 + Math.floor(Math.random() * 5)) % n;
+    setTimeout(() => g.running && voice(['taunt_cetait', g.encMode === 'alpha' ? letter(RING[wrong]) : digit(wrong), 'taunt_depeche'], { lie: true, now: true }), 300);
   }
 }
-function pushEnc() {
+function pushEnc(i) {
   input(); sfx.push();
+  const kn = i != null ? $(`.enc[data-i="${i}"] .knob`) : null;
+  if (kn) { kn.classList.remove('press'); void kn.offsetWidth; kn.classList.add('press'); setTimeout(() => kn.classList.remove('press'), 180); }
   if (g.step !== 1 && g.step !== 8) return;
   const ok = g.enc.every((v, k) => v === curEncTarget()[k]);
   if (ok) { $$('.enc').forEach((e) => e.classList.add('locked')); setTimeout(() => $$('.enc').forEach((e) => e.classList.remove('locked')), 900); good(g.step === 1 ? 2 : 9, g.step === 1 ? 0 : null); }
@@ -638,6 +754,8 @@ function init() {
   eye = createEye($('#eye'), { config: deepMerge(EYE, { radiusOfMin: 0.3, center: { x: 0.5, y: 0.5 } }), reducedMotion: reduced });
   eye.start();
   wire(); initFullscreen(); initScrollPill();
+  new ResizeObserver(() => drawCables(true)).observe($('#face-mallette'));
+  addEventListener('resize', () => drawCables(true));
   showTime(TIME_S); showProb();
   requestAnimationFrame(loop);
   runBoot(() => { $('#btnStart').disabled = false; $('#btnStart').focus({ preventScroll: true }); registerSW(); });
@@ -648,6 +766,7 @@ function init() {
       voiceLog, voiceStats, musicStats, ttsAvailable,
       forceSabotage(on) { if (on) startSabotage(); else endSabotage(); },
       idle(ms) { g.lastInput = performance.now() - ms; },
+      turn(i, s) { turn(i, s); }, pushEnc(i) { pushEnc(i); }, cables: () => cableGeom.map((c) => ({ ...c })), RING, DETENTS,
     };
   }
 }

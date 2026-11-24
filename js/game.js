@@ -1,4 +1,4 @@
-// game.js : tirage d'une partie v0.2.1 (logique pure, sans DOM). Même graine = même partie.
+// game.js : tirage d'une partie v0.2.2 (logique pure, sans DOM). Même graine = même partie.
 // Paliers cachés ~50/50 : 'moyen-difficile' et 'difficile'. Pas de mode facile.
 // Tout se déduit de la mallette elle-même (plaque du n° de série, écrans, barre DEL) : aucun manuel externe.
 
@@ -11,6 +11,11 @@ export const NSTEPS = 12;
 export const WIRE_COLORS = ['rouge', 'noir', 'bleu', 'jaune', 'vert']; // kit Keadic, 5 couleurs
 export const TRAP_COLORS = ['rouge', 'vert', 'bleu'];
 const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXZ'; // sans I ni O (confondus avec 1 et 0)
+// Anneau cryptex des KY-040 : 20 crans = 1 tour = 20 lettres (sans K, Q, W, X, Y, Z)
+export const RING = 'ABCDEFGHIJLMNOPRSTUV';
+export const DETENTS = 20;
+// Mots de 4 lettres français, toutes leurs lettres sur l'anneau
+export const WORDS = ['NORD', 'CODE', 'LUNE', 'STOP', 'MARS', 'PORT', 'VENT', 'NUIT', 'CAGE', 'BLEU', 'NOIR', 'SOIR', 'TOUR', 'FILS'];
 
 // Étapes : face où elle se joue + titre court (bandeau d'état).
 export const STEPS = [
@@ -22,7 +27,7 @@ export const STEPS = [
   { face: 'base',   part: 'cyd2',   title: 'Verrou de signal' },
   { face: 'base',   part: 'keypad', title: 'Code 1' },
   { face: 'base',   part: 'keys',   title: 'Clés I · II · III' },
-  { face: 'base',   part: 'enc',    title: 'Signal 2 · encodeurs' },
+  { face: 'base',   part: 'enc',    title: 'Signal 2 · mot (cryptex)' },
   { face: 'base',   part: 'cyd2',   title: 'Verrou saboté' },
   { face: 'base',   part: 'wires',  title: 'Fiches · 2e couche' },
   { face: 'base',   part: 'keypad', title: 'Code 2' },
@@ -45,8 +50,6 @@ export function makeRun(seed) {
 
   // ---- 1. encodeurs : chiffres du n° dans l'ordre (difficile : en partant de la fin)
   const enc1 = hard ? digits.slice().reverse() : digits.slice();
-  // ---- 8. encodeurs : chiffres du n° du plus petit au plus grand (difficile : du plus grand au plus petit)
-  const enc2 = digits.slice().sort((a, b) => (hard ? b - a : a - b));
 
   // ---- 2. trappe : barre WS2812B de 8 DEL, comptes 4/3/1 ou 5/2/1 ; moyen = la plus fréquente, difficile = la plus rare
   const counts = pick([[4, 3, 1], [5, 2, 1]]);
@@ -103,11 +106,19 @@ export function makeRun(seed) {
   const lies = { fragLies, encFalse: hard, wire2False: hard, keysTwice: hard };
 
   const wrong = (n, good) => { let v = int(n); if (v === good) v = (v + 1 + int(n - 1)) % n; return v; };
+  const decoys = { wire1: wrong(5, wires1.cut), wire2: wrong(5, wires2.cut), seq: (seq[0] % 8) + 1, frags: frags.map((f) => (f + 1 + int(9)) % 10), keys: keyOrder.slice().reverse() };
+
+  // ---- 8. cryptex : 4 encodeurs en mode lettres (anneau de 20) ; l'Entité épelle un mot (difficile : épelé à l'envers,
+  // on le compose à l'endroit). Tiré en dernier pour garder les mêmes parties qu'avant à graine égale.
+  const word = pick(WORDS);
+  const enc2 = word.split('').map((ch) => RING.indexOf(ch));
+  const spell = hard ? word.split('').reverse().join('') : word;
+  decoys.word = RING[(enc2[0] + 3 + int(15)) % DETENTS];
   return {
     seed: seed >>> 0, tier, serial, lot, digits, letters: [l1, l2],
-    enc1, enc2, bar, trapColors, trap, seq, seqCode,
+    enc1, enc2, word, spell, bar, trapColors, trap, seq, seqCode,
     wires1, wires2, maze1, maze2, frags, code1, code2, keyOrder, lies,
-    decoys: { wire1: wrong(5, wires1.cut), wire2: wrong(5, wires2.cut), seq: (seq[0] % 8) + 1, frags: frags.map((f) => (f + 1 + int(9)) % 10), keys: keyOrder.slice().reverse() },
+    decoys,
   };
 }
 
