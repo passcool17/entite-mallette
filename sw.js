@@ -1,10 +1,10 @@
 // sw.js : service worker versionné, écrit à la main. Changer VERSION à chaque publication.
-const VERSION = '0.2.5e';
+const VERSION = '0.2.5f';
 const CACHE = `entite-mallette-v${VERSION}`;
-const MEDIA = ['./audio/tension.mp3', './voix/intro.mp3', './voix/depart.mp3', './fonts/chakra-petch-latin-500-normal.woff2', './fonts/chakra-petch-latin-700-normal.woff2', './fonts/jetbrains-mono-latin-500-normal.woff2'];
+const MEDIA = ['./audio/tension.mp3', `./voix/intro.mp3?v=${VERSION}`, `./voix/depart.mp3?v=${VERSION}`, './fonts/chakra-petch-latin-500-normal.woff2', './fonts/chakra-petch-latin-700-normal.woff2', './fonts/jetbrains-mono-latin-500-normal.woff2'];
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
-  `./css/app.css?v=${VERSION}`, `./js/app.js?v=${VERSION}`, './voix/manifest.json', './voix/voix.json',
+  `./css/app.css?v=${VERSION}`, `./js/app.js?v=${VERSION}`, `./voix/manifest.json?v=${VERSION}`, './voix/voix.json',
   // chaque module est importé avec ?v=VERSION : un ancien service worker (v0.1.x / v0.2.0-v0.2.3) ne peut plus servir un
   // vieux game.js à un nouvel app.js (cause du blocage à 14 % « code de la mallette » sur le mini PC)
   ...['eye', 'eye-config', 'game', 'panel-config', 'audio', 'sfx', 'voice-manifest', 'preload', 'battery', 'guide'].map((m) => `./js/${m}.js?v=${VERSION}`),

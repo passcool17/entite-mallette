@@ -503,7 +503,12 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
 .hud .icon-btn { width: 44px; height: 44px; margin-left: 0; }
 @media (orientation: portrait) and (max-width: 599px) { .tm-digits { font-size: 22px; } .tm { padding: 4px 6px; } }
 @media (orientation: portrait) and (max-width: 359px) { #btnFs { display: none !important; } .hud-meta { min-width: 0; } .tm-digits { font-size: 19px; } .obj-text { font-size: 10.5px; } .hint-btn { min-width: 46px; } .hud-row { gap: 5px; } }
-@media (orientation: landscape) and (max-height: 520px) { :root { --hud-h: 54px; } .obj-text { -webkit-line-clamp: 2; } body.obj-long { --hud-h: 96px; } body.obj-long .obj-text { -webkit-line-clamp: 5; font-size: 11px; } }
+@media (orientation: landscape) and (max-height: 520px) { :root { --hud-h: 54px; } .obj-text { -webkit-line-clamp: 2; } body.obj-long { --hud-h: 96px; } body.obj-long .obj-text { -webkit-line-clamp: 5; font-size: 11px; }
+  /* CYD 2 ~104×78 : la jauge (icône + % + V) doit tenir sans couper le « V » ni chevaucher l'ECG */
+  .batt { max-width: 76%; gap: 2px; padding: 1px 2px; }
+  .batt-ico { width: 12px; height: 7px; }
+  .batt-txt { gap: 2px; }
+}
 @media (min-width: 1000px) and (min-height: 600px) { :root { --hud-h: 60px; } .obj-text { font-size: 14px; } .obj-label { font-size: 9px; } body.obj-long { --hud-h: 100px; } }
 .case { padding-top: 4px; padding-bottom: 2px; }
 

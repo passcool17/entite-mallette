@@ -1,7 +1,7 @@
 // audio.js (v0.2.5) : graphe WebAudio unique (voix / musique / effets, limiteur, L/R), musique de tension, voix de l'Entité (manifeste voix/manifest.json : mp3 si prêt, sinon synthèse française),
 // routée dans un AnalyserNode pour animer l'œil.
-import { loadManifest, sentence, fileOf, cue } from './voice-manifest.js?v=0.2.5e';
-import { takePreloaded, MUSIC_URL } from './preload.js?v=0.2.5e';
+import { loadManifest, sentence, fileOf, cue } from './voice-manifest.js?v=0.2.5f';
+import { takePreloaded, MUSIC_URL } from './preload.js?v=0.2.5f';
 
 let ac = null, master, limiter, sfxBus, voiceBus, analyser, data, muted = false, volume = 0.9;
 let musicBus, musicDuck, musicLP, music = null, musicBuf = null, musicLoad = null;
@@ -213,7 +213,7 @@ function loadVoice(id) {
   return (async () => {
     const url = fileOf(id);
     let ab = await takePreloaded(url);
-    if (!ab) { const res = await fetch(url); if (!res.ok) throw new Error('voix absente'); ab = await res.arrayBuffer(); }
+    if (!ab) { const res = await fetch(url, { cache: 'no-cache' }); if (!res.ok) throw new Error('voix absente'); ab = await res.arrayBuffer(); }
     const buf = await ac.decodeAudioData(ab);
     buffers.set(id, buf);
     return buf;

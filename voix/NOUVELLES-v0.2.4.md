@@ -1,12 +1,14 @@
 # Nouvelles voix v0.2.4
 
-Enregistrées le 24 novembre 2026 (heure de Toronto) avec la recette v2 (`voix/_test/RECETTE.txt`) :
-Piper officiel 2023.11.14-2, voix stock `fr_FR-tom-medium`, `--length-scale 0.9 --noise-scale 0.4 --noise-w 0.4 --sentence_silence 0.08`,
-puis la chaîne ffmpeg v2 et un loudnorm en deux passes (I=−12, TP=−1), mono 44,1 kHz 80 kbps.
+Enregistrées le 24 novembre 2026 (heure de Toronto) avec ElevenLabs, voix **The Curator** (`gJ4a5qWqzRc6NDQT0dIz`), modèle `eleven_v4`, une prise par réplique.
+Préfixe de style : `[cold, calm, deep, emotionless] `.
+Puis la chaîne ffmpeg légère : asetrate 0,94, atempo 1,064, afftfilt de phase, aecho, highpass 80 Hz, lowpass 8 kHz, loudnorm (I=−16, LRA=11, TP=−1,5), 0,1 s de silence aux deux bouts, mono 44,1 kHz 80 kbps.
+
+Les prises Piper v0.2.4 restent en sauvegarde dans `voix/raw/v0.2.4-piper/` et n’ont pas été effacées.
 
 Source des textes : `voix/manifest.json` (version 0.2.4), 172 répliques au total.
 Déjà présentes et **non écrasées** : `intro.mp3` et `depart.mp3` (ElevenLabs, `mp3Ready: true`).
-Nouveaux fichiers : **170**. Les 31 anciennes répliques v0.1.5 (caches, trappe, …) ne sont plus dans le manifeste v0.2.x ; elles n’ont pas été remises.
+Nouveaux fichiers : **170**, mêmes noms que les prises Piper, écrasées par ces prises ElevenLabs.
 
 Les fichiers sont prêts. Pour les jouer à la place de la synthèse du navigateur, APP doit passer `mp3Ready` à `true` dans `voix/manifest.json` (aucun autre changement de code n’est requis, voir `js/voice-manifest.js`).
 
@@ -35,12 +37,15 @@ Jeu fini et petit : toutes les valeurs possibles ont un fichier (10 chiffres, 5 
 
 ## Vérifications techniques
 
-- 170/170 ok, aucun fichier silencieux, aucun clipping (max sample < 0 dB).
-- LUFS intégré : -15.06 à -12.14 (cible −12 ; les très courtes répliques mesurent un peu plus bas).
-- True peak (loudnorm) : -4.98 à 0.22 dBTP. Quelques fichiers dépassent légèrement 0 dBTP à la mesure loudnorm, mais le max volumedetect reste négatif (pas de saturation échantillon).
-- 11 fichiers avaient un léger dépassement après encodage MP3 ; recette v2 conservée, avec un plafond de crête plus serré et un limiteur : chiffre_5, clue_sequence_envers, clue_code1, obj_transmit, hint1_barre, hint2_trappe_moyenne, hint2_trappe_gauche, hint2_patch_route, hint2_code1_ordre, hint2_code2_envers, hint2_cles_lourde.
+- 170/170 ok, mono 44,1 kHz ≈ 80 kbps, aucun fichier silencieux, aucun clipping (max volumedetect −3,3 à −1,1 dB, tous ≤ −1 dB).
+- LUFS intégré : −23,18 à −16,17 (cible loudnorm I=−16 ; les très courtes répliques mesurent plus bas).
+- True peak (loudnorm) : −2,84 à −1,0 dBTP.
+- `outcome_trente` (crête −0,9 dB) et `clue_mot_suivante` (−1,2 dB) ont été repassés depuis l’audio brut ElevenLabs, même chaîne plus un limiteur (`alimiter`, sans auto-niveau), sans nouveau crédit. Crêtes après coup : −1,6 dB et −1,8 dB.
+- Contrôle d’identité : les 170 fichiers bruts correspondent au SHA-256 de l’URL de leur propre `generation_id`. Aucun mélange restant.
+- Neuf prises courtes un peu longues (`lettre_b`, `lettre_d`, `lettre_h`, `lettre_i`, `lettre_m`, `lettre_v`, `patch_et`, `chiffre_5`, `couleur_rouge`) : silencedetect montre un silence au milieu et une deuxième salve de parole, pas seulement un pad en tête ou en queue. Laissées telles quelles. Même profil, hors liste demandée : `chiffre_2` (2,51 s pour « Deux. »).
+- Crêtes encore proches de −1 dB (toutes ≤ −1,1 dB, pas de limiteur supplémentaire) : `hint2_patch_debranche` −1,1 ; `hint2_trappe_frequente` −1,2 ; `hint2_verrou` −1,3 ; `chiffre_6`, `clue_enc1_ordre`, `cable_jaune`, `clue_patch2_echange` −1,4.
 
-Les contrôles sont techniques seulement (ffprobe, volumedetect, loudnorm). Pas d’écoute, pas de transcription : le libellé exact n’est pas confirmé à l’oreille.
+Les contrôles sont techniques seulement (ffprobe, volumedetect, loudnorm, silencedetect, comparaison de hachage). Pas d’écoute, pas de transcription : le libellé exact n’est pas confirmé à l’oreille.
 
 ## Tableau
 

@@ -1,9 +1,9 @@
-// Test léger v0.2.5e : bandeau étape 10, overflow 0, jauge batterie sur le CYD 2.
+// Test léger v0.2.5f : voix ElevenLabs, jauge CYD 2 (y compris 915×412), overflow 0.
 // Usage : node tests/v025.mjs [base]
 import { chromium } from '/home/box/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/index.mjs';
 import { mkdirSync, readFileSync } from 'node:fs';
-import { makeRun } from '../js/game.js?v=0.2.5e';
-import { OBJECTIVE, objectiveIds, hintCues, HINT_COST, AUTO_HINT_MS } from '../js/guide.js?v=0.2.5e';
+import { makeRun } from '../js/game.js?v=0.2.5f';
+import { OBJECTIVE, objectiveIds, hintCues, HINT_COST, AUTO_HINT_MS } from '../js/guide.js?v=0.2.5f';
 
 const base = process.argv[2] || 'http://127.0.0.1:8794/';
 const shots = process.env.SHOTS || '/workspace/qa/entite-mallette/v0.2.5-dev/';
@@ -17,8 +17,8 @@ const VAGUE = 'Rebranche les câbles : nouvelle consigne.';
 
 // ================= 1. logique pure =================
 {
-  const ready = man.cues.filter((c) => c.mp3Ready); const el = ready.filter((c) => c.source === 'elevenlabs').map((c) => c.id); const piper = ready.filter((c) => c.source === 'piper');
-  ok('manifeste v0.2.5 : 172 répliques toutes prêtes, intro/depart ElevenLabs, 170 Piper', man.version === '0.2.5' && man.cues.length === 172 && ready.length === 172 && el.join() === 'intro,depart' && piper.length === 170 && piper.every((c) => c.file === `voix/${c.id}.mp3`));
+  const ready = man.cues.filter((c) => c.mp3Ready); const el = ready.filter((c) => c.source === 'elevenlabs');
+  ok('manifeste v0.2.5f : 172 répliques toutes prêtes, toutes ElevenLabs (intro/depart inchangés)', man.version === '0.2.5f' && man.cues.length === 172 && ready.length === 172 && el.length === 172 && el.every((c) => c.mp3Ready && c.file === `voix/${c.id}.mp3`) && el.filter((c) => c.id === 'intro' || c.id === 'depart').length === 2);
   ok('coûts d’indice inchangés (0 / 15 / 30) et auto 45 s', HINT_COST[1] === 0 && HINT_COST[2] === 15 && HINT_COST[3] === 30 && AUTO_HINT_MS === 45000);
   const kinds = { double: 0, echange: 7, serie: 2 };
   const samples = {};
@@ -97,7 +97,7 @@ async function openTo(p, step) {
   await p.tap('#btnHint'); await W(p, 250);
   const h3 = await D(p, () => ({ hint: __entiteDebug.state.hint, rem: __entiteDebug.state.remaining, dis: document.querySelector('#btnHint').disabled, heard: __entiteDebug.voiceLog.map((v) => v.ids[0]), text: document.querySelector('#objText').textContent }));
   ok('étape 10 : Indice 3 coûte −30 s, dit le premier geste (voix seulement), bouton épuisé', h3.hint === 3 && rem2 - h3.rem > 29.5 && rem2 - h3.rem < 31.5 && (h3.heard.includes('hint3_geste') || h3.heard.includes('hint3_debranche')) && h3.dis, { ...h3, rem2 });
-  ok('démarrage sans erreur, 0 404, imports ?v=0.2.5e, mp3 Piper demandés', errs.length === 0 && !errs.some((e) => /404/.test(e)) && reqs.filter((u) => /\/js\/\w[\w-]*\.js/.test(u)).every((u) => /\?v=0\.2\.5e$/.test(u)) && reqs.some((u) => /guide\.js\?v=0\.2\.5e/.test(u)) && reqs.some((u) => /voix\/clue_patch_double\.mp3/.test(u)), { errs: errs.slice(0, 6), js: reqs.filter((u) => /\.js/.test(u)).map((u) => u.split('/').pop()) });
+  ok('démarrage sans erreur, 0 404, imports ?v=0.2.5f, mp3 ElevenLabs demandés', errs.length === 0 && !errs.some((e) => /404/.test(e)) && reqs.filter((u) => /\/js\/\w[\w-]*\.js/.test(u)).every((u) => /\?v=0\.2\.5f$/.test(u)) && reqs.some((u) => /guide\.js\?v=0\.2\.5f/.test(u)) && reqs.some((u) => /voix\/clue_patch_double\.mp3/.test(u)), { errs: errs.slice(0, 6), js: reqs.filter((u) => /\.js/.test(u)).map((u) => u.split('/').pop()) });
   await done();
 }
 
@@ -244,6 +244,33 @@ const measureBatt = () => {
   ok('batterie (labyrinthe étape 5) : overflow 0×0', ov.dx <= 0 && ov.dy <= 0 && ov.pill === false, ov);
   await p.screenshot({ path: shots + 'cyd2-batterie-labyrinthe-412.png' });
   ok('batterie (labyrinthe) : 0 erreur console', errs.length === 0, errs);
+  await done();
+}
+
+// ---------- jauge 915×412 : le « V » n'est plus coupé ----------
+{
+  const { p, errs, done } = await page({ width: 915, height: 412 }, { query: '&seed=0&voix=rapide&notuto=1' });
+  await openTo(p, 1);
+  const b = await D(p, () => {
+    const e = document.querySelector('#batt'), v = document.querySelector('#battV'), s = document.querySelector('.cyd2 .screen');
+    const er = e.getBoundingClientRect(), vr = v.getBoundingClientRect(), sr = s.getBoundingClientRect();
+    const mid = { left: sr.left + sr.width * 0.12, right: sr.right - sr.width * 0.12, top: sr.top + sr.height * 0.4, bottom: sr.bottom - 6 };
+    const overlapMid = !(er.right <= mid.left || er.left >= mid.right || er.bottom <= mid.top || er.top >= mid.bottom);
+    return {
+      onCyd2: !!e.closest('.cyd2 .screen'),
+      txt: (e.innerText || '').replace(/\s+/g, ' ').trim(),
+      hasV: /V/.test(v.textContent || '') && /V/.test(e.innerText || ''),
+      vFits: vr.right <= sr.right + 0.5 && vr.left >= sr.left - 0.5 && vr.bottom <= sr.bottom + 0.5,
+      eFits: er.right <= sr.right + 0.5 && er.left >= sr.left - 0.5,
+      overlapMid,
+      sw: +sr.width.toFixed(1), ew: +er.width.toFixed(1), vRight: +vr.right.toFixed(1), sRight: +sr.right.toFixed(1),
+    };
+  });
+  const ov = await D(p, measureOverflow);
+  ok('batterie (915×412, ECG) : « V » entier dans l’écran, pas de chevauchement avec l’ECG', b.onCyd2 && b.hasV && b.vFits && b.eFits && !b.overlapMid, b);
+  ok('batterie (915×412) : overflow 0×0', ov.dx <= 0 && ov.dy <= 0, ov);
+  await p.screenshot({ path: shots + 'cyd2-batterie-ecg-915x412.png' });
+  ok('batterie (915×412) : 0 erreur console', errs.length === 0, errs);
   await done();
 }
 

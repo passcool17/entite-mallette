@@ -11,17 +11,18 @@ Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/ent
 
 ## Version 0.2.5 (24 nov. 2026)
 
-État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.2.5e`, imports `?v=0.2.5e`).
+État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.2.5f`, imports `?v=0.2.5f`).
 
 - **Étape 10, bandeau clair** : plus de « Rebranche les câbles : nouvelle consigne. ». Le bandeau affiche la consigne
   exacte dictée par l’Entité (couleur du câble et prise, ou rang d’une lettre sur la plaque), et reste visible jusqu’à
   la réussite. Ce n’est pas une réponse calculée : c’est le même indice que la voix. Le bouton « Indice » fonctionne
   comme aux autres étapes (gratuit à 45 s, puis −15 s, puis −30 s). Les autres bandeaux, déjà assez clairs, sont inchangés.
-- **Voix : 172 mp3 branchés, synthèse en secours** : les 170 nouvelles répliques (Piper `fr_FR-tom-medium`, recette v2,
-  liste et mesures dans `voix/NOUVELLES-v0.2.4.md` et `voix/verification-v0.2.4.json`) sont jouées en fichier. `intro` et
-  `depart` restent les voix ElevenLabs d’origine. Une phrase assemblée (étape 10, fragments de code, lettres…) enchaîne
-  les mp3 dans l’ordre. Si un fichier manque ou échoue, ce morceau bascule en synthèse française. Le tutoriel et la
-  jauge batterie n’ont pas de réplique parlée (inchangé). Les 170 ids restent documentés dans `voix/A-ENREGISTRER-v0.2.5.md`.
+- **Voix : 172 mp3 ElevenLabs, synthèse en secours** : les 170 répliques (voix The Curator, `eleven_v4`,
+  liste et mesures dans `voix/NOUVELLES-v0.2.4.md` et `voix/verification-v0.2.4.json`) remplacent les fichiers Piper
+  (copie de secours dans `voix/raw/v0.2.4-piper/`, non publiée). `intro` et `depart` restent les voix ElevenLabs
+  d’origine. Les URL des mp3 portent `?v=0.2.5f` pour que le cache ne serve plus les anciens octets Piper.
+  Une phrase assemblée (étape 10, fragments…) enchaîne les mp3 dans l’ordre. Si un fichier manque ou échoue, ce morceau
+  bascule en synthèse française. Le tutoriel et la jauge batterie n’ont pas de réplique parlée (inchangé).
   Les 170 mp3 ne sont pas dans le précache du service worker (comme avant : seulement `intro`, `depart` et `tension.mp3`) ;
   le préchargement les tire depuis le manifeste.
 - **v0.2.5d, overflow portrait** : à l’étape 10 en 412×915, le bandeau long ne fait plus défiler la page
@@ -31,6 +32,8 @@ Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/ent
 - **v0.2.5e, jauge batterie sur le CYD 2** : le niveau de pile (icône + % + tension) est dans le coin haut droit
   du 2e écran (ECG, ou labyrinthe aux étapes 5 et 9), plus sur le CYD 1. L’alerte < 15 % (clignotement + un bip)
   est inchangée. Le tracé ECG et le labyrinthe restent dégagés.
+- **v0.2.5f, voix ElevenLabs + jauge paysage** : les 170 nouvelles répliques sont les voix ElevenLabs ; le cache
+  audio est invalidé (`?v=0.2.5f`). En 915×412, le « V » de la jauge n’est plus coupé.
 
 ### Toujours vrai
 Rotatifs E1–E4 = lettres seulement, chiffres au clavier 4×4, baie banane 5×5 (5 couleurs, glisser + toucher), ECG sur le
@@ -71,7 +74,7 @@ CYD 2 (labyrinthe aux étapes 5 et 9), tout dans la valise ouverte. Les archives
 
 ### Jauge batterie (CYD 2, coin haut droit)
 - Batterie réelle : Mspalocell 12 V 5600 mAh Li-ion 3S (12,6 V pleine, ~9,0 V vide, 67,2 Wh). Icône + % + tension dans
-  le coin haut droit du CYD 2 (à partir de la v0.2.5e ; plus sur le CYD 1). Tension tirée d’une courbe OCV Li-ion réaliste ×3 (100 % 12,6 V · 50 % 11,4 V · 15 % 10,7 V · 0 % 9,0 V).
+  le coin haut droit du CYD 2 (à partir de la v0.2.5f ; plus sur le CYD 1). Tension tirée d’une courbe OCV Li-ion réaliste ×3 (100 % 12,6 V · 50 % 11,4 V · 15 % 10,7 V · 0 % 9,0 V).
 - Simulation accélérée : −0,5 %/min en partie (≈ −4 % sur 8 min), −0,1 %/min hors partie ; −0,3 % par servo / trappe,
   −0,5 % par sabotage, −1 % à l’explosion. Vert ≥ 40 %, ambre, rouge < 15 % : icône qui clignote + un bip discret, une fois,
   aucune pénalité.
@@ -246,7 +249,7 @@ jamais publiés.
 - `js/audio.js`, `js/voice-manifest.js`, `js/sfx.js`, `js/eye.js`, `js/preload.js` : voix, sons, œil, préchargement.
 - `audio/tension.mp3` (192827 octets) : musique de tension.
 - `js/guide.js` : objectifs, modules actifs, indices (v0.2.5 : bandeau étape 10 = consigne dictée). `js/battery.js` : modèle de batterie 3S (v0.2.4).
-- `sw.js` : service worker, cache `entite-mallette-v0.2.5e` (manifeste des voix inclus). À l’activation, les anciens
+- `sw.js` : service worker, cache `entite-mallette-v0.2.5f` (manifeste des voix inclus). À l’activation, les anciens
   caches `entite-mallette-*` (dont `entite-mallette-v0.2.2`, `entite-mallette-v0.2.1`, `entite-mallette-v0.2.0-r2`, `entite-mallette-v0.2.0` et `entite-mallette-v0.1.5-base`) sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`).
 
 ## Tests
@@ -258,7 +261,7 @@ node tests/v025.mjs            # ou : node tests/v025.mjs <base>
 
 `tests/v025.mjs` (test léger v0.2.5) : bandeau de l’étape 10 = consigne dictée (les 3 variantes), persistant jusqu’à
 la réussite ; bouton Indice à l’étape 10 (gratuit, −15 s, −30 s) ; 172 mp3 prêts, fragments de l’étape 10 enchaînés,
-repli synthèse si un id est absent ; imports `?v=0.2.5e` ; overflow 0 en 412×915 à l’étape 10 (graines 0, 2, 7 et variante la plus longue) ; jauge batterie sur le CYD 2 ; 0 erreur 404. Captures dans `/workspace/qa/entite-mallette/v0.2.5-live/`.
+repli synthèse si un id est absent ; imports `?v=0.2.5f` ; overflow 0 en 412×915 à l’étape 10 (graines 0, 2, 7 et variante la plus longue) ; jauge batterie sur le CYD 2 ; voix ElevenLabs `?v=0.2.5f` ; 0 erreur 404. Captures dans `/workspace/qa/entite-mallette/v0.2.5-live/`.
 
 `tests/v024.mjs` concerne la v0.2.4 (clarté, son mixé, batterie, paliers).
 

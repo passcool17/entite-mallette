@@ -2,7 +2,7 @@
 // % = octets reçus / octets attendus. Les octets attendus viennent de Content-Length dès que l'en-tête arrive
 // (sinon d'une estimation par fichier). Les polices comptent pour leur taille connue, d'un bloc quand elles sont prêtes.
 // Les fichiers téléchargés sont gardés ici (une promesse par URL) : audio.js les reprend, sans second téléchargement.
-import { loadManifest, MANIFEST_URL } from './voice-manifest.js?v=0.2.5e';
+import { loadManifest, MANIFEST_URL, fileOf } from './voice-manifest.js?v=0.2.5f';
 
 export const MUSIC_URL = 'audio/tension.mp3';
 const FONTS = [
@@ -55,7 +55,7 @@ export function preloadAll(onProgress) {
   }
   // manifeste des voix (réseau d'abord), puis seulement les mp3 marqués prêts (aucune requête pour les autres : 0 erreur 404)
   const manP = fetch(MANIFEST_URL, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : { cues: [] })).catch(() => ({ cues: [] }));
-  jobs.push(manP.then((m) => { loadManifest(m); return Promise.all((m.cues || []).filter((c) => c.mp3Ready).map((c) => track(c.file, EST.voice))); }));
+  jobs.push(manP.then((m) => { loadManifest(m); return Promise.all((m.cues || []).filter((c) => c.mp3Ready).map((c) => track(fileOf(c.id), EST.voice))); }));
   report();
   return Promise.all(jobs).then(() => ({ failed }));
 }
