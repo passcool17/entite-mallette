@@ -1,16 +1,19 @@
 # Répliques à enregistrer — v0.2.5
 
+**État (24 nov. 2026) : les 170 répliques ci-dessous sont enregistrées et branchées** (`mp3Ready: true`, `source: piper`,
+fichiers `voix/<id>.mp3`). `intro` et `depart` restent ElevenLabs. Plus aucune réplique du manifeste n’est en synthèse
+par défaut ; la synthèse ne sert plus que de secours (fichier manquant ou en échec). Le tutoriel et la jauge batterie
+n’ont jamais eu de réplique parlée.
+
 Pour le bot Voix. Ton : froid, grave, lent, sans émotion, légèrement métallique. L’Entité tutoie le joueur.
 Elle parle comme une machine qui a déjà calculé la suite. Pas de nom de film, d’acteur ni de personnage.
 
 Fichier : `voix/<id>.mp3` (mono, 44,1 kHz, environ −16 LUFS, silence de 100 ms au début et à la fin).
-Le texte ci-dessous est **exact** : le recopier mot pour mot. Quand le fichier est en place, passer
-`mp3Ready` à `true` (et `source` à la source utilisée) dans `voix/manifest.json`. L’app joue le mp3 par
-id et se rabat sur la synthèse du navigateur si le fichier manque ou échoue.
+Le texte ci-dessous est **exact** : le recopier mot pour mot. Ces fichiers sont en place (`mp3Ready: true`, `source: piper`). L’app joue le mp3 par id et se rabat sur la synthèse du navigateur si le fichier manque ou échoue.
 
 Déjà enregistrées (ElevenLabs, ne pas refaire) : **2** — `intro`, `depart`.
 
-À enregistrer : **170** répliques (toutes celles encore en synthèse). Réparties par catégorie.
+Liste de référence (170/170 branchées). Réparties par catégorie.
 
 ## objective (11)
 

@@ -17,7 +17,8 @@ const VAGUE = 'Rebranche les câbles : nouvelle consigne.';
 
 // ================= 1. logique pure =================
 {
-  ok('manifeste v0.2.5, 172 répliques, seuls intro / depart en mp3', man.version === '0.2.5' && man.cues.length === 172 && man.cues.filter((c) => c.mp3Ready).map((c) => c.id).join() === 'intro,depart');
+  const ready = man.cues.filter((c) => c.mp3Ready); const el = ready.filter((c) => c.source === 'elevenlabs').map((c) => c.id); const piper = ready.filter((c) => c.source === 'piper');
+  ok('manifeste v0.2.5 : 172 répliques toutes prêtes, intro/depart ElevenLabs, 170 Piper', man.version === '0.2.5' && man.cues.length === 172 && ready.length === 172 && el.join() === 'intro,depart' && piper.length === 170 && piper.every((c) => c.file === `voix/${c.id}.mp3`));
   ok('coûts d’indice inchangés (0 / 15 / 30) et auto 45 s', HINT_COST[1] === 0 && HINT_COST[2] === 15 && HINT_COST[3] === 30 && AUTO_HINT_MS === 45000);
   const kinds = { double: 0, echange: 7, serie: 2 };
   const samples = {};
@@ -96,7 +97,7 @@ async function openTo(p, step) {
   await p.tap('#btnHint'); await W(p, 250);
   const h3 = await D(p, () => ({ hint: __entiteDebug.state.hint, rem: __entiteDebug.state.remaining, dis: document.querySelector('#btnHint').disabled, heard: __entiteDebug.voiceLog.map((v) => v.ids[0]), text: document.querySelector('#objText').textContent }));
   ok('étape 10 : Indice 3 coûte −30 s, dit le premier geste (voix seulement), bouton épuisé', h3.hint === 3 && rem2 - h3.rem > 29.5 && rem2 - h3.rem < 31.5 && (h3.heard.includes('hint3_geste') || h3.heard.includes('hint3_debranche')) && h3.dis, { ...h3, rem2 });
-  ok('démarrage sans erreur, aucun mp3 non prêt demandé, imports ?v=0.2.5', errs.length === 0 && !reqs.some((u) => /voix\/(?!intro|depart)\w+\.mp3/.test(u)) && reqs.filter((u) => /\/js\/\w[\w-]*\.js/.test(u)).every((u) => /\?v=0\.2\.5$/.test(u)) && reqs.some((u) => /guide\.js\?v=0\.2\.5/.test(u)), { errs: errs.slice(0, 6), js: reqs.filter((u) => /\.js/.test(u)).map((u) => u.split('/').pop()) });
+  ok('démarrage sans erreur, 0 404, imports ?v=0.2.5, mp3 Piper demandés', errs.length === 0 && !errs.some((e) => /404/.test(e)) && reqs.filter((u) => /\/js\/\w[\w-]*\.js/.test(u)).every((u) => /\?v=0\.2\.5$/.test(u)) && reqs.some((u) => /guide\.js\?v=0\.2\.5/.test(u)) && reqs.some((u) => /voix\/clue_patch_double\.mp3/.test(u)), { errs: errs.slice(0, 6), js: reqs.filter((u) => /\.js/.test(u)).map((u) => u.split('/').pop()) });
   await done();
 }
 
@@ -129,17 +130,25 @@ async function openTo(p, step) {
   const { p, reqs, errs, done } = await page({ width: 412, height: 915 }, { query: '&seed=0&voix=rapide&notuto=1' });
   await p.tap('#btnStart'); await W(p, 300); await p.tap('#coverArm'); await W(p, 120); await p.tap('#leverArm'); await W(p, 500);
   const log1 = await D(p, () => __entiteDebug.voiceLog.map((v) => ({ ids: v.ids, mode: v.mode })));
-  ok('intro et depart joués en mp3', log1.some((v) => v.ids[0] === 'intro' && v.mode === 'mp3') && log1.some((v) => v.ids[0] === 'depart' && v.mode === 'mp3'), log1.slice(0, 8));
-  await D(p, () => __entiteDebug.speak('obj_cables2'));
+  ok('intro et depart joués en mp3 (ElevenLabs)', log1.some((v) => v.ids[0] === 'intro' && v.mode === 'mp3') && log1.some((v) => v.ids[0] === 'depart' && v.mode === 'mp3'), log1.slice(0, 8));
+  const ids10 = ['obj_cables2', ...makeRun(0).cues[10]];
+  await D(p, (ids) => __entiteDebug.speak(ids), ids10);
+  await W(p, 300);
+  const chain = await D(p, (ids) => __entiteDebug.voiceLog.findLast((v) => v.ids.join() === ids.join()), ids10);
+  ok('étape 10 : consigne jouée en mp3, fragments enchaînés (tête + câble + prise)', !!chain && chain.mode === 'mp3' && chain.ids[0] === 'obj_cables2' && chain.ids.includes('cable_jaune') && chain.ids.includes('prise_1'), chain);
+  const st = await D(p, () => __entiteDebug.voiceStats);
+  ok('voix : des fichiers mp3 ont vraiment été décodés (pas seulement la synthèse)', st.fichier >= 2, st);
+  // repli : un id absent du manifeste n'est pas demandé en fichier
+  await D(p, () => __entiteDebug.speak('ligne_absente_xyz'));
   await W(p, 250);
-  const tts = await D(p, () => __entiteDebug.voiceLog.findLast((v) => v.ids[0] === 'obj_cables2' && v.ids.length === 1));
-  ok('réplique sans mp3 : mode synthèse (tts ou texte), pas de requête fichier', !!tts && (tts.mode === 'tts' || tts.mode === 'texte') && !reqs.some((u) => /voix\/obj_cables2\.mp3/.test(u)), tts);
-  // suite mixte : intro (mp3) + obj_cables2 (synthèse) → mode mix
-  await D(p, () => __entiteDebug.speak(['intro', 'obj_cables2']));
+  const tts = await D(p, () => __entiteDebug.voiceLog.findLast((v) => v.ids[0] === 'ligne_absente_xyz'));
+  ok('id inconnu : repli synthèse (tts ou texte), aucun fetch du fichier', !!tts && (tts.mode === 'tts' || tts.mode === 'texte') && !reqs.some((u) => /voix\/ligne_absente_xyz\.mp3/.test(u)), tts);
+  // suite mixte : intro (mp3 prêt) + id inconnu (synthèse)
+  await D(p, () => __entiteDebug.speak(['intro', 'ligne_absente_xyz']));
   await W(p, 250);
-  const mix = await D(p, () => __entiteDebug.voiceLog.findLast((v) => v.ids.join() === 'intro,obj_cables2'));
-  ok('suite mixte intro + obj_cables2 : mode mix (mp3 puis synthèse)', !!mix && mix.mode === 'mix', mix);
-  ok('repli voix : 0 404 / 0 erreur sur un mp3 non prêt', errs.filter((e) => /voix\/(?!intro|depart)/.test(e) || /404/.test(e)).length === 0, errs);
+  const mix = await D(p, () => __entiteDebug.voiceLog.findLast((v) => v.ids.join() === 'intro,ligne_absente_xyz'));
+  ok('suite mixte intro + id inconnu : mode mix (mp3 puis synthèse)', !!mix && mix.mode === 'mix', mix);
+  ok('repli voix : 0 erreur 404', errs.filter((e) => /404/.test(e)).length === 0, errs);
   await done();
 }
 

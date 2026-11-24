@@ -17,19 +17,20 @@ Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/ent
   exacte dictée par l’Entité (couleur du câble et prise, ou rang d’une lettre sur la plaque), et reste visible jusqu’à
   la réussite. Ce n’est pas une réponse calculée : c’est le même indice que la voix. Le bouton « Indice » fonctionne
   comme aux autres étapes (gratuit à 45 s, puis −15 s, puis −30 s). Les autres bandeaux, déjà assez clairs, sont inchangés.
-- **Voix : mp3 par réplique, synthèse en secours** : chaque id avec `mp3Ready: true` joue `voix/<id>.mp3` ; si le fichier
-  manque ou échoue, ou si l’id n’est pas encore prêt, l’app utilise la synthèse française (les morceaux prêts et non prêts
-  d’une même phrase s’enchaînent). Liste exacte des 170 répliques encore en synthèse : `voix/A-ENREGISTRER-v0.2.5.md`.
-  Les fichiers du bot Voix n’étaient pas encore arrivés au moment de cette publication : `intro` et `depart` restent les
-  seuls mp3 en ligne.
+- **Voix : 172 mp3 branchés, synthèse en secours** : les 170 nouvelles répliques (Piper `fr_FR-tom-medium`, recette v2,
+  liste et mesures dans `voix/NOUVELLES-v0.2.4.md` et `voix/verification-v0.2.4.json`) sont jouées en fichier. `intro` et
+  `depart` restent les voix ElevenLabs d’origine. Une phrase assemblée (étape 10, fragments de code, lettres…) enchaîne
+  les mp3 dans l’ordre. Si un fichier manque ou échoue, ce morceau bascule en synthèse française. Le tutoriel et la
+  jauge batterie n’ont pas de réplique parlée (inchangé). Les 170 ids restent documentés dans `voix/A-ENREGISTRER-v0.2.5.md`.
+  Les 170 mp3 ne sont pas dans le précache du service worker (comme avant : seulement `intro`, `depart` et `tension.mp3`) ;
+  le préchargement les tire depuis le manifeste.
 
 ### Toujours vrai
 Rotatifs E1–E4 = lettres seulement, chiffres au clavier 4×4, baie banane 5×5 (5 couleurs, glisser + toucher), ECG sur le
 CYD 2 (labyrinthe aux étapes 5 et 9), tout dans la valise ouverte. Les archives v0.1.5 / v0.1.6 ne sont pas touchées.
 
 ### Prochaines étapes
-- Brancher les mp3 du bot Voix dès réception (`voix/<id>.mp3` + `mp3Ready: true`).
-- Test sur le vrai S20 FE (lisibilité du bandeau étape 10, son).
+- Test sur le vrai S20 FE (lisibilité du bandeau étape 10, enchaînement des fragments, son).
 
 ## Version 0.2.4 (24 nov. 2026)
 
@@ -249,8 +250,8 @@ node tests/v025.mjs            # ou : node tests/v025.mjs <base>
 ```
 
 `tests/v025.mjs` (test léger v0.2.5) : bandeau de l’étape 10 = consigne dictée (les 3 variantes), persistant jusqu’à
-la réussite ; bouton Indice à l’étape 10 (gratuit, −15 s, −30 s) ; repli mp3 / synthèse ; imports `?v=0.2.5` ; 0 erreur 404
-sur un mp3 non prêt. Captures dans `/workspace/qa/entite-mallette/v0.2.5-live/`.
+la réussite ; bouton Indice à l’étape 10 (gratuit, −15 s, −30 s) ; 172 mp3 prêts, fragments de l’étape 10 enchaînés,
+repli synthèse si un id est absent ; imports `?v=0.2.5` ; 0 erreur 404. Captures dans `/workspace/qa/entite-mallette/v0.2.5-live/`.
 
 `tests/v024.mjs` concerne la v0.2.4 (clarté, son mixé, batterie, paliers).
 
