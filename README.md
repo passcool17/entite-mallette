@@ -11,7 +11,7 @@ Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/ent
 
 ## Version 0.2.5 (24 nov. 2026)
 
-État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.2.5g`, imports `?v=0.2.5g`).
+État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.2.5h`, imports `?v=0.2.5h`).
 
 - **Étape 10, bandeau clair** : plus de « Rebranche les câbles : nouvelle consigne. ». Le bandeau affiche la consigne
   exacte dictée par l’Entité (couleur du câble et prise, ou rang d’une lettre sur la plaque), et reste visible jusqu’à
@@ -20,8 +20,8 @@ Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/ent
 - **Voix : 172 mp3 ElevenLabs, synthèse en secours** : les 170 répliques (voix The Curator, `eleven_v4`,
   liste et mesures dans `voix/NOUVELLES-v0.2.4.md` et `voix/verification-v0.2.4.json`) remplacent les fichiers Piper
   (copie de secours dans `voix/raw/v0.2.4-piper/`, non publiée). `intro` et `depart` sont aussi des voix ElevenLabs
-  (pass de clarté v0.2.5g, même voix que le reste). Les URL des mp3 portent `?v=0.2.5g` pour que le cache ne serve plus
-  les anciens octets (Piper, puis v0.2.5f).
+  (pass de clarté v0.2.5g, même voix que le reste). Les URL des mp3 portent `?v=0.2.5h` pour que le cache ne serve plus
+  les anciens octets (Piper, puis v0.2.5f / v0.2.5g).
   Une phrase assemblée (étape 10, fragments…) enchaîne les mp3 dans l’ordre. Si un fichier manque ou échoue, ce morceau
   bascule en synthèse française. Le tutoriel et la jauge batterie n’ont pas de réplique parlée (inchangé).
   Les 170 mp3 ne sont pas dans le précache du service worker (comme avant : seulement `intro`, `depart` et `tension.mp3`) ;
@@ -38,13 +38,15 @@ Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/ent
 - **v0.2.5g, voix plus claires** : pass de clarté Voix sur les 172 fichiers (`intro` et `depart` inclus) : filtre
   d’effet plus léger, 20 répliques mal transcrites réenregistrées. Cache audio `?v=0.2.5g` / `entite-mallette-v0.2.5g`.
   Copie de la v0.2.5f dans `voix/raw/v0.2.5f-before-clarity/` (non publiée).
+- **v0.2.5h, numéros de la barre LED** : petits chiffres 1 à 8 imprimés au-dessus de chaque DEL de la barre WS2812B,
+  lisibles en 412×915 et 915×412, sans dévoiler de réponse. Cache `entite-mallette-v0.2.5h` / `?v=0.2.5h`.
 
 ### Toujours vrai
 Rotatifs E1–E4 = lettres seulement, chiffres au clavier 4×4, baie banane 5×5 (5 couleurs, glisser + toucher), ECG sur le
 CYD 2 (labyrinthe aux étapes 5 et 9), tout dans la valise ouverte. Les archives v0.1.5 / v0.1.6 ne sont pas touchées.
 
 ### Prochaines étapes
-- Test sur le vrai S20 FE (lisibilité du bandeau étape 10, enchaînement des fragments, clarté des voix ElevenLabs).
+- Test sur le vrai S20 FE (lisibilité du bandeau étape 10, numéros 1–8 de la barre LED, enchaînement des fragments, clarté des voix ElevenLabs).
 
 ## Version 0.2.4 (24 nov. 2026)
 
@@ -235,7 +237,7 @@ Si toutes les répliques d’une suite ont `mp3Ready: true`, les mp3 sont joués
 sinon la phrase est dite directement par la synthèse vocale. Aucun mp3 non prêt n’est demandé (0 erreur 404).
 
 Aujourd’hui les 172 répliques sont prêtes (voix ElevenLabs, pass de clarté v0.2.5g ; `intro` 43669 octets,
-`depart` 66656 octets). Les URL portent `?v=0.2.5g`. Pour remplacer une voix : enregistrer `voix/<id>.mp3`
+`depart` 66656 octets). Les URL portent `?v=0.2.5h`. Pour remplacer une voix : enregistrer `voix/<id>.mp3`
 avec le texte exact, garder `mp3Ready` à `true` et `source` à `elevenlabs`, puis monter la version du
 service worker. Les fichiers numérotés `dfplayerTrack` se copient tels quels sur la carte SD du DFPlayer
 (`0001.mp3`, …).
@@ -254,7 +256,7 @@ jamais publiés.
 - `js/audio.js`, `js/voice-manifest.js`, `js/sfx.js`, `js/eye.js`, `js/preload.js` : voix, sons, œil, préchargement.
 - `audio/tension.mp3` (192827 octets) : musique de tension.
 - `js/guide.js` : objectifs, modules actifs, indices (v0.2.5 : bandeau étape 10 = consigne dictée). `js/battery.js` : modèle de batterie 3S (v0.2.4).
-- `sw.js` : service worker, cache `entite-mallette-v0.2.5g` (manifeste des voix inclus). À l’activation, les anciens
+- `sw.js` : service worker, cache `entite-mallette-v0.2.5h` (manifeste des voix inclus). À l’activation, les anciens
   caches `entite-mallette-*` (dont `entite-mallette-v0.2.2`, `entite-mallette-v0.2.1`, `entite-mallette-v0.2.0-r2`, `entite-mallette-v0.2.0` et `entite-mallette-v0.1.5-base`) sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`).
 
 ## Tests
@@ -266,7 +268,7 @@ node tests/v025.mjs            # ou : node tests/v025.mjs <base>
 
 `tests/v025.mjs` (test léger v0.2.5) : bandeau de l’étape 10 = consigne dictée (les 3 variantes), persistant jusqu’à
 la réussite ; bouton Indice à l’étape 10 (gratuit, −15 s, −30 s) ; 172 mp3 prêts, fragments de l’étape 10 enchaînés,
-repli synthèse si un id est absent ; imports `?v=0.2.5g` ; overflow 0 en 412×915 à l’étape 10 (graines 0, 2, 7 et variante la plus longue) ; jauge batterie sur le CYD 2 ; voix ElevenLabs `?v=0.2.5g` ; 0 erreur 404. Captures dans `/workspace/qa/entite-mallette/v0.2.5-live/`.
+repli synthèse si un id est absent ; imports `?v=0.2.5h` ; overflow 0 en 412×915 à l’étape 10 (graines 0, 2, 7 et variante la plus longue) ; jauge batterie sur le CYD 2 ; voix ElevenLabs `?v=0.2.5h` ; numéros 1–8 au-dessus de la barre LED ; 0 erreur 404. Captures dans `/workspace/qa/entite-mallette/v0.2.5-live/`.
 
 `tests/v024.mjs` concerne la v0.2.4 (clarté, son mixé, batterie, paliers).
 
@@ -296,7 +298,7 @@ Captures dans `/workspace/qa/entite-mallette/v0.2.2-dev/` (`01-mallette-412.png`
 
 ## Historique
 
-- 0.2.5 : bandeau étape 10 = consigne de câblage dictée ; voix mp3 par id avec repli synthèse ; v0.2.5g voix ElevenLabs plus claires (172 fichiers).
+- 0.2.5 : bandeau étape 10 = consigne de câblage dictée ; voix mp3 par id avec repli synthèse ; v0.2.5g voix ElevenLabs plus claires (172 fichiers) ; v0.2.5h numéros 1–8 sur la barre LED.
 - 0.2.4 : clarté (objectif, indices, tutoriel), son mixé −8 dB, jauge batterie 3S, paliers moyen / difficile.
 - 0.2.3 : baie banane 5×5 (glisser ou toucher), 5 couleurs distinctes, rotatifs = lettres seulement, ECG sur le CYD 2, chargement à 14 % corrigé.
 - 0.2.2 : KY-040 sans + / − (on tourne le bouton), cryptex de 20 lettres, câbles banane base → couvercle.

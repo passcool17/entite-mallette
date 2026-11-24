@@ -245,6 +245,8 @@ body.boom .end-kicker { color: var(--red); }
 .spk-cone::after { content: ""; position: absolute; inset: 30%; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #34383c, #121315 70%); box-shadow: 0 0 0 1px #000, 0 0 0 calc(2px + var(--vl, 0) * 10px) rgb(98 214 255 / calc(var(--vl, 0) * .35)); }
 body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #000, 0 0 0 1px #000, 0 0 calc(var(--vl, 0) * 26px) calc(var(--vl, 0) * 4px) rgb(255 59 48 / .6); }
 .ws { display: grid; gap: 3px; width: 100%; justify-items: center; }
+.ws-nums { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; width: 100%; padding: 0 4px; pointer-events: none; }
+.ws-nums span { min-width: 0; text-align: center; font: 700 11px/1 var(--f-tech); font-variant-numeric: tabular-nums; letter-spacing: 0; color: var(--silk); text-shadow: 0 1px 0 rgb(0 0 0 / .55); user-select: none; }
 .ws-bar { width: 100%; gap: 4px; padding: 4px; }
 .ws-bar i { min-width: 0; aspect-ratio: auto; height: var(--led-h, 14px); }
 .lid-ctrls { display: grid; grid-template-columns: 1fr .8fr 1.1fr; gap: 6px; align-items: stretch; }

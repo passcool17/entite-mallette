@@ -1,5 +1,5 @@
 // sw.js : service worker versionné, écrit à la main. Changer VERSION à chaque publication.
-const VERSION = '0.2.5g';
+const VERSION = '0.2.5h';
 const CACHE = `entite-mallette-v${VERSION}`;
 const MEDIA = ['./audio/tension.mp3', `./voix/intro.mp3?v=${VERSION}`, `./voix/depart.mp3?v=${VERSION}`, './fonts/chakra-petch-latin-500-normal.woff2', './fonts/chakra-petch-latin-700-normal.woff2', './fonts/jetbrains-mono-latin-500-normal.woff2'];
 const ASSETS = [
