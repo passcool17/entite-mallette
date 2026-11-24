@@ -2,12 +2,34 @@
 
 Simulateur web (PWA, téléphone d’abord, portrait 412×915 et paysage 915×412) de la mallette de désamorçage
 ESP32 de PassCool_17, dans une valise Lykus HC-3010. Un seul joueur : l’Entité dicte tout à voix haute, ment, et
-presse pendant que tu choisis. Aucune réponse n’est écrite ; seul l’objectif de l’étape (quoi faire, quel module) l’est.
+presse pendant que tu choisis. Aucune réponse calculée n’est écrite (sauf `?debug=1`) ; l’objectif de l’étape (quoi faire, quel module) l’est, et à l’étape 10 le bandeau reprend la consigne de câblage dictée.
 
 Lien : https://passcool17.github.io/entite-mallette/
 
 Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/entite-mallette-v015/
 (dépôt passcool17/entite-mallette-v015, cache séparé `entite-mallette-v015-0.1.5`).
+
+## Version 0.2.5 (24 nov. 2026)
+
+État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.2.5`, imports `?v=0.2.5`).
+
+- **Étape 10, bandeau clair** : plus de « Rebranche les câbles : nouvelle consigne. ». Le bandeau affiche la consigne
+  exacte dictée par l’Entité (couleur du câble et prise, ou rang d’une lettre sur la plaque), et reste visible jusqu’à
+  la réussite. Ce n’est pas une réponse calculée : c’est le même indice que la voix. Le bouton « Indice » fonctionne
+  comme aux autres étapes (gratuit à 45 s, puis −15 s, puis −30 s). Les autres bandeaux, déjà assez clairs, sont inchangés.
+- **Voix : mp3 par réplique, synthèse en secours** : chaque id avec `mp3Ready: true` joue `voix/<id>.mp3` ; si le fichier
+  manque ou échoue, ou si l’id n’est pas encore prêt, l’app utilise la synthèse française (les morceaux prêts et non prêts
+  d’une même phrase s’enchaînent). Liste exacte des 170 répliques encore en synthèse : `voix/A-ENREGISTRER-v0.2.5.md`.
+  Les fichiers du bot Voix n’étaient pas encore arrivés au moment de cette publication : `intro` et `depart` restent les
+  seuls mp3 en ligne.
+
+### Toujours vrai
+Rotatifs E1–E4 = lettres seulement, chiffres au clavier 4×4, baie banane 5×5 (5 couleurs, glisser + toucher), ECG sur le
+CYD 2 (labyrinthe aux étapes 5 et 9), tout dans la valise ouverte. Les archives v0.1.5 / v0.1.6 ne sont pas touchées.
+
+### Prochaines étapes
+- Brancher les mp3 du bot Voix dès réception (`voix/<id>.mp3` + `mp3Ready: true`).
+- Test sur le vrai S20 FE (lisibilité du bandeau étape 10, son).
 
 ## Version 0.2.4 (24 nov. 2026)
 
@@ -215,16 +237,23 @@ jamais publiés.
   2 haut-parleurs `SPK-L` / `SPK-R` de part et d’autre du CYD 1 centré, aucune pièce sur la coque.
 - `js/audio.js`, `js/voice-manifest.js`, `js/sfx.js`, `js/eye.js`, `js/preload.js` : voix, sons, œil, préchargement.
 - `audio/tension.mp3` (192827 octets) : musique de tension.
-- `js/guide.js` : objectifs, modules actifs, indices (v0.2.4). `js/battery.js` : modèle de batterie 3S (v0.2.4).
-- `sw.js` : service worker, cache `entite-mallette-v0.2.4` (manifeste des voix inclus). À l’activation, les anciens
+- `js/guide.js` : objectifs, modules actifs, indices (v0.2.5 : bandeau étape 10 = consigne dictée). `js/battery.js` : modèle de batterie 3S (v0.2.4).
+- `sw.js` : service worker, cache `entite-mallette-v0.2.5` (manifeste des voix inclus). À l’activation, les anciens
   caches `entite-mallette-*` (dont `entite-mallette-v0.2.2`, `entite-mallette-v0.2.1`, `entite-mallette-v0.2.0-r2`, `entite-mallette-v0.2.0` et `entite-mallette-v0.1.5-base`) sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`).
 
 ## Tests
 
 ```
 python3 -m http.server 8794 --bind 127.0.0.1 &
-node tests/v023.mjs            # ou : node tests/v023.mjs <base> <graine>
+node tests/v025.mjs            # ou : node tests/v025.mjs <base>
 ```
+
+`tests/v025.mjs` (test léger v0.2.5) : bandeau de l’étape 10 = consigne dictée (les 3 variantes), persistant jusqu’à
+la réussite ; bouton Indice à l’étape 10 (gratuit, −15 s, −30 s) ; repli mp3 / synthèse ; imports `?v=0.2.5` ; 0 erreur 404
+sur un mp3 non prêt. Captures dans `/workspace/qa/entite-mallette/v0.2.5-live/`.
+
+`tests/v024.mjs` concerne la v0.2.4 (clarté, son mixé, batterie, paliers).
+
 
 `tests/v023.mjs` (147 vérifications) : jeu de 5 couleurs exact et distinct ; glisser-déposer vers n’importe quelle prise,
 échange et débranchement (doigt en portrait et paysage, souris sur bureau, prise survolée) ; toucher-choisir, échange et
@@ -251,6 +280,8 @@ Captures dans `/workspace/qa/entite-mallette/v0.2.2-dev/` (`01-mallette-412.png`
 
 ## Historique
 
+- 0.2.5 : bandeau étape 10 = consigne de câblage dictée ; voix mp3 par id avec repli synthèse.
+- 0.2.4 : clarté (objectif, indices, tutoriel), son mixé −8 dB, jauge batterie 3S, paliers moyen / difficile.
 - 0.2.3 : baie banane 5×5 (glisser ou toucher), 5 couleurs distinctes, rotatifs = lettres seulement, ECG sur le CYD 2, chargement à 14 % corrigé.
 - 0.2.2 : KY-040 sans + / − (on tourne le bouton), cryptex de 20 lettres, câbles banane base → couvercle.
 - 0.2.1 : une seule vue, tout dans la valise ; haut-parleurs de part et d’autre de l’œil ; leviers à capot à la place du bouton TRANSMIT.

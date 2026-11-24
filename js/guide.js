@@ -1,15 +1,21 @@
-// guide.js (v0.2.4) : clarté du jeu (retour de Pascal : « on reste bloqué sans savoir quoi faire »).
+// guide.js (v0.2.5) : clarté du jeu (retour de Pascal : « on reste bloqué sans savoir quoi faire »).
 // Pour chaque étape : un OBJECTIF court (dit par l'Entité ET écrit dans le bandeau), le ou les MODULES à utiliser
-// (contour qui pulse), et 3 niveaux d'INDICES. Règle de Pascal : le bandeau dit QUOI faire et OÙ, jamais la solution
-// (aucun chiffre, aucune lettre, aucune couleur de réponse). Seul l'indice 3 DIT (à voix haute) un morceau de la réponse.
+// (contour qui pulse), et 3 niveaux d'INDICES. Règle de Pascal : le bandeau dit QUOI faire et OÙ, jamais une réponse
+// calculée (aucun code, sauf ?debug=1). À l'étape 10 le bandeau reprend la consigne dictée (couleur / prise). Seul l'indice 3 DIT (à voix haute) un morceau de la réponse.
 // Logique pure (sans DOM) : testable avec node.
-import { RING, DIRS, canMove } from './game.js?v=0.2.4';
+import { RING, DIRS, canMove } from './game.js?v=0.2.5';
 
 // objectif : id de réplique (voix/manifest.json) ; le texte du bandeau = le texte de la réplique (même phrase)
 export const OBJECTIVE = {
   0: 'obj_armer', 1: 'obj_molettes_code', 2: 'obj_trappe', 3: 'obj_sequence', 4: 'obj_cables', 5: 'obj_verrou', 6: 'obj_code',
   7: 'obj_cles', 8: 'obj_mot', 9: 'obj_verrou', 10: 'obj_cables2', 11: 'obj_code', 12: 'obj_transmit',
 };
+// Étape 10 : le bandeau reprend la consigne dictée (couleur / prise, ou rang d'une lettre), pas le résumé vague
+// « Rebranche les câbles : nouvelle consigne. ». Ce n'est pas une réponse calculée : c'est le même indice que la voix.
+export function objectiveIds(run, step) {
+  if (step === 10 && run?.cues?.[10]) return run.cues[10];
+  return OBJECTIVE[step] ? [OBJECTIVE[step]] : [];
+}
 // modules à faire briller (sélecteurs) ; jamais un leurre
 export const MODULES = {
   0: ['#gtArm'], 1: ['#encRow', '#oled'], 2: ['#traps'], 3: ['#bar', '#keypad'], 4: ['#jacks', '#ports'], 5: ['.cyd2', '#joy'],

@@ -1,0 +1,149 @@
+// Test léger v0.2.5 : bandeau étape 10 = consigne dictée (persistante), Indice à l'étape 10,
+// repli mp3 / synthèse par id. Usage : node tests/v025.mjs [base]
+import { chromium } from '/home/box/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/index.mjs';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { makeRun } from '../js/game.js?v=0.2.5';
+import { OBJECTIVE, objectiveIds, hintCues, HINT_COST, AUTO_HINT_MS } from '../js/guide.js?v=0.2.5';
+
+const base = process.argv[2] || 'http://127.0.0.1:8794/';
+const shots = process.env.SHOTS || '/workspace/qa/entite-mallette/v0.2.5-dev/';
+mkdirSync(shots, { recursive: true });
+const R = { checks: {}, errors: [] };
+const ok = (k, v, extra) => { R.checks[k] = v ? 'PASS' : `FAIL${extra !== undefined ? ' ' + JSON.stringify(extra).slice(0, 700) : ''}`; if (!v) console.log('FAIL', k, extra !== undefined ? JSON.stringify(extra).slice(0, 400) : ''); };
+const man = JSON.parse(readFileSync(new URL('../voix/manifest.json', import.meta.url)));
+const TEXT = Object.fromEntries(man.cues.map((c) => [c.id, c.text]));
+const sentence = (ids) => ids.map((id) => TEXT[id] ?? '').filter(Boolean).join(' ').replace(/\s+([:!?])/g, '\u202f$1');
+const VAGUE = 'Rebranche les câbles : nouvelle consigne.';
+
+// ================= 1. logique pure =================
+{
+  ok('manifeste v0.2.5, 172 répliques, seuls intro / depart en mp3', man.version === '0.2.5' && man.cues.length === 172 && man.cues.filter((c) => c.mp3Ready).map((c) => c.id).join() === 'intro,depart');
+  ok('coûts d’indice inchangés (0 / 15 / 30) et auto 45 s', HINT_COST[1] === 0 && HINT_COST[2] === 15 && HINT_COST[3] === 30 && AUTO_HINT_MS === 45000);
+  const kinds = { double: 0, echange: 7, serie: 2 };
+  const samples = {};
+  for (const [kind, seed] of Object.entries(kinds)) {
+    const r = makeRun(seed);
+    const ids = objectiveIds(r, 10);
+    const text = sentence(ids);
+    samples[kind] = { seed, ids, text, cueKind: r.patch2.kind };
+    ok(`étape 10 (${kind}, graine ${seed}) : bandeau = consigne dictée, pas « ${VAGUE} »`, r.patch2.kind === kind && ids.join() === r.cues[10].join() && text === sentence(r.cues[10]) && text !== VAGUE && text !== TEXT.obj_cables2 && text.length > 40, samples[kind]);
+  }
+  ok('double : le bandeau dit quel câble débrancher et quelle prise viser', /Débranche le câble \w+/.test(samples.double.text) && /dans la prise \w+/.test(samples.double.text), samples.double.text);
+  ok('échange : le bandeau dit quels câbles intervertir', /Intervertis le câble \w+ et le câble \w+/.test(samples.echange.text), samples.echange.text);
+  ok('série : le bandeau dit le rang d’une lettre, pas un numéro de prise calculé', /prise qui porte le rang/.test(samples.serie.text) && /lettre/.test(samples.serie.text) && !/prise [1-5]/.test(samples.serie.text), samples.serie.text);
+  // autres étapes : toujours l’objectif court, pas une consigne aussi vague que l’ancienne étape 10
+  const other = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12].map((st) => ({ st, ids: objectiveIds(makeRun(0), st), text: sentence(objectiveIds(makeRun(0), st)) }));
+  ok('autres étapes : bandeau = objectif court (obj_*), pas « nouvelle consigne »', other.every((o) => o.ids.join() === OBJECTIVE[o.st] && o.text !== VAGUE && o.text.length <= 48), other);
+  const r0 = makeRun(0);
+  const h1 = hintCues(r0, 10, 1), h2 = hintCues(r0, 10, 2), h3 = hintCues(r0, 10, 3);
+  ok('indices étape 10 : niveau 1 / 2 / 3 définis', h1[0] === 'hint1_cables' && h2[0] === `hint2_patch_${r0.patch2.kind}` && (h3[0] === 'hint3_geste' || h3[0] === 'hint3_debranche'), { h1, h2, h3 });
+  R.samples = samples;
+}
+
+// ================= 2. navigateur =================
+const b = await chromium.launch({ executablePath: '/opt/google/chrome/chrome', args: ['--autoplay-policy=no-user-gesture-required'] });
+async function page(vp, { query = '' } = {}) {
+  const ctx = await b.newContext({ viewport: vp, deviceScaleFactor: vp.width < 1000 ? 2 : 1, isMobile: vp.width < 1000, hasTouch: true, serviceWorkers: 'block' });
+  await ctx.addInitScript(() => { try { localStorage.setItem('entite-tuto-vu', '1'); } catch {} });
+  const p = await ctx.newPage(); const errs = [], reqs = [];
+  p.on('console', (m) => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
+  p.on('pageerror', (e) => errs.push('page: ' + e.message));
+  p.on('requestfailed', (r) => { if (!/\.mp3/.test(r.url()) || !/ERR_ABORTED/.test(r.failure()?.errorText || '')) errs.push('failed: ' + r.url() + ' ' + r.failure()?.errorText); });
+  p.on('response', (r) => { reqs.push(r.url()); if (r.status() >= 400) errs.push(`${r.status()} ${r.url()}`); });
+  await p.goto(`${base}?debug=1${query}`);
+  await p.waitForSelector('#btnStart:not([disabled])', { timeout: 30000 });
+  await p.waitForSelector('#boot', { state: 'hidden' });
+  return { ctx, p, errs, reqs, done: async () => { R.errors.push(...errs); await ctx.close(); } };
+}
+const W = (p, ms) => p.waitForTimeout(ms);
+const D = (p, f, a) => p.evaluate(f, a);
+async function openTo(p, step) {
+  await p.tap('#btnStart'); await W(p, 300);
+  await p.tap('#coverArm'); await W(p, 120);
+  await p.tap('#leverArm'); await W(p, 300);
+  await D(p, (n) => __entiteDebug.goto(n), step);
+  await W(p, 120);
+}
+
+// ---------- étape 10, graine 0 (double) : texte, persistance, Indice, capture 412 ----------
+{
+  const want = sentence(makeRun(0).cues[10]);
+  const { p, reqs, errs, done } = await page({ width: 412, height: 915 }, { query: '&seed=0&voix=rapide&notuto=1' });
+  await openTo(p, 10);
+  const a = await D(p, () => ({ ...__entiteDebug.objective(), step: __entiteDebug.state.step, hint: __entiteDebug.state.hint, dis: document.querySelector('#btnHint').disabled, cost: document.querySelector('#hintCost').textContent, long: document.querySelector('#objective').classList.contains('long'), act: __entiteDebug.active(), fits: (() => { const t = document.querySelector('#objText'); return t.scrollHeight <= t.clientHeight + 2; })() }));
+  ok('étape 10 (412, double) : bandeau = consigne dictée, pas le résumé vague', a.step === 10 && a.text === want && a.text !== VAGUE && /câble jaune/.test(a.text) && /prise un/.test(a.text), { ...a, want });
+  ok('étape 10 : bandeau entièrement lisible (pas tronqué), module baie en surbrillance', a.fits && a.long && a.act.join() === '#jacks,#ports', a);
+  ok('étape 10 : bouton Indice disponible, prochain indice gratuit', !a.dis && a.cost === 'gratuit' && a.hint === 0, a);
+  await W(p, 3000);
+  const b2 = await D(p, () => ({ ...__entiteDebug.objective(), step: __entiteDebug.state.step }));
+  ok('étape 10 : le bandeau reste visible (même consigne) après 3 s', b2.step === 10 && b2.text === want, b2);
+  await p.screenshot({ path: shots + 'etape10-strip-412.png' });
+  // Indice 1 gratuit (auto à 45 s simulées)
+  const rem0 = await D(p, () => __entiteDebug.state.remaining);
+  await D(p, () => __entiteDebug.ageStep(46000));
+  await W(p, 400);
+  const h1 = await D(p, () => ({ hint: __entiteDebug.state.hint, rem: __entiteDebug.state.remaining, cost: document.querySelector('#hintCost').textContent, label: document.querySelector('#objLabel').textContent, text: document.querySelector('#objText').textContent, heard: __entiteDebug.voiceLog.map((v) => v.ids[0]) }));
+  ok('étape 10 : indice 1 auto à 45 s, gratuit, voix hint1_cables', h1.hint === 1 && h1.rem > rem0 - 2 && h1.heard.includes('hint1_cables') && /Indice 1/.test(h1.label), { ...h1, rem0 });
+  // après l’affichage temporaire, retour à la consigne
+  await W(p, 7200);
+  const back = await D(p, () => ({ ...__entiteDebug.objective(), hint: __entiteDebug.state.hint }));
+  ok('étape 10 : après l’indice, le bandeau reprend la consigne dictée', back.text === want && back.hint === 1, back);
+  const rem1 = await D(p, () => __entiteDebug.state.remaining);
+  await p.tap('#btnHint'); await W(p, 250);
+  const h2 = await D(p, () => ({ hint: __entiteDebug.state.hint, rem: __entiteDebug.state.remaining, cost: document.querySelector('#hintCost').textContent, heard: __entiteDebug.voiceLog.map((v) => v.ids[0]), label: document.querySelector('#objLabel').textContent }));
+  ok('étape 10 : Indice 2 coûte −15 s, explique la règle, coût suivant −30 s', h2.hint === 2 && rem1 - h2.rem > 14.5 && rem1 - h2.rem < 16.5 && h2.heard.includes('hint2_patch_double') && h2.cost === '−30 s' && /−15 s/.test(h2.label), { ...h2, rem1 });
+  const rem2 = await D(p, () => __entiteDebug.state.remaining);
+  await p.tap('#btnHint'); await W(p, 250);
+  const h3 = await D(p, () => ({ hint: __entiteDebug.state.hint, rem: __entiteDebug.state.remaining, dis: document.querySelector('#btnHint').disabled, heard: __entiteDebug.voiceLog.map((v) => v.ids[0]), text: document.querySelector('#objText').textContent }));
+  ok('étape 10 : Indice 3 coûte −30 s, dit le premier geste (voix seulement), bouton épuisé', h3.hint === 3 && rem2 - h3.rem > 29.5 && rem2 - h3.rem < 31.5 && (h3.heard.includes('hint3_geste') || h3.heard.includes('hint3_debranche')) && h3.dis, { ...h3, rem2 });
+  ok('démarrage sans erreur, aucun mp3 non prêt demandé, imports ?v=0.2.5', errs.length === 0 && !reqs.some((u) => /voix\/(?!intro|depart)\w+\.mp3/.test(u)) && reqs.filter((u) => /\/js\/\w[\w-]*\.js/.test(u)).every((u) => /\?v=0\.2\.5$/.test(u)) && reqs.some((u) => /guide\.js\?v=0\.2\.5/.test(u)), { errs: errs.slice(0, 6), js: reqs.filter((u) => /\.js/.test(u)).map((u) => u.split('/').pop()) });
+  await done();
+}
+
+// ---------- étape 10, graine 7 (échange) paysage + capture indice ; série (graine 2) ----------
+{
+  const want = sentence(makeRun(7).cues[10]);
+  const { p, errs, done } = await page({ width: 915, height: 412 }, { query: '&seed=7&voix=rapide&notuto=1' });
+  await openTo(p, 10);
+  const a = await D(p, () => ({ ...__entiteDebug.objective(), fits: (() => { const t = document.querySelector('#objText'); return t.scrollHeight <= t.clientHeight + 2; })() }));
+  ok('étape 10 (915×412, échange) : bandeau = consigne d’interversion, lisible en entier', a.text === want && /Intervertis le câble noir et le câble rouge/.test(a.text) && a.fits, a);
+  await p.tap('#btnHint'); await W(p, 300);
+  await p.screenshot({ path: shots + 'etape10-indice-915x412.png' });
+  const h = await D(p, () => ({ hint: __entiteDebug.state.hint, ...__entiteDebug.objective() }));
+  ok('étape 10 paysage : Indice fonctionne (niveau 1)', h.hint === 1 && /Indice/.test(h.label), h);
+  ok('paysage : 0 erreur console', errs.length === 0, errs);
+  await done();
+}
+{
+  const want = sentence(makeRun(2).cues[10]);
+  const { p, done } = await page({ width: 412, height: 915 }, { query: '&seed=2&voix=rapide&notuto=1' });
+  await openTo(p, 10);
+  const a = await D(p, () => ({ ...__entiteDebug.objective(), fits: (() => { const t = document.querySelector('#objText'); return t.scrollHeight <= t.clientHeight + 2; })() }));
+  ok('étape 10 (série) : consigne avec rang de lettre, lisible, pas de numéro de prise calculé', a.text === want && /câble noir/.test(a.text) && /lettre F/.test(a.text) && /porte le rang/.test(a.text) && a.fits, a);
+  await p.screenshot({ path: shots + 'etape10-serie-412.png' });
+  await done();
+}
+
+// ---------- repli mp3 / synthèse ----------
+{
+  const { p, reqs, errs, done } = await page({ width: 412, height: 915 }, { query: '&seed=0&voix=rapide&notuto=1' });
+  await p.tap('#btnStart'); await W(p, 300); await p.tap('#coverArm'); await W(p, 120); await p.tap('#leverArm'); await W(p, 500);
+  const log1 = await D(p, () => __entiteDebug.voiceLog.map((v) => ({ ids: v.ids, mode: v.mode })));
+  ok('intro et depart joués en mp3', log1.some((v) => v.ids[0] === 'intro' && v.mode === 'mp3') && log1.some((v) => v.ids[0] === 'depart' && v.mode === 'mp3'), log1.slice(0, 8));
+  await D(p, () => __entiteDebug.speak('obj_cables2'));
+  await W(p, 250);
+  const tts = await D(p, () => __entiteDebug.voiceLog.findLast((v) => v.ids[0] === 'obj_cables2' && v.ids.length === 1));
+  ok('réplique sans mp3 : mode synthèse (tts ou texte), pas de requête fichier', !!tts && (tts.mode === 'tts' || tts.mode === 'texte') && !reqs.some((u) => /voix\/obj_cables2\.mp3/.test(u)), tts);
+  // suite mixte : intro (mp3) + obj_cables2 (synthèse) → mode mix
+  await D(p, () => __entiteDebug.speak(['intro', 'obj_cables2']));
+  await W(p, 250);
+  const mix = await D(p, () => __entiteDebug.voiceLog.findLast((v) => v.ids.join() === 'intro,obj_cables2'));
+  ok('suite mixte intro + obj_cables2 : mode mix (mp3 puis synthèse)', !!mix && mix.mode === 'mix', mix);
+  ok('repli voix : 0 404 / 0 erreur sur un mp3 non prêt', errs.filter((e) => /voix\/(?!intro|depart)/.test(e) || /404/.test(e)).length === 0, errs);
+  await done();
+}
+
+await b.close();
+const fail = Object.entries(R.checks).filter(([, v]) => v !== 'PASS');
+console.log(JSON.stringify({ pass: fail.length === 0, ok: Object.keys(R.checks).length - fail.length, fail: fail.length, checks: R.checks, errors: R.errors, samples: Object.fromEntries(Object.entries(R.samples || {}).map(([k, v]) => [k, v.text])) }, null, 2));
+if (fail.length) process.exit(1);

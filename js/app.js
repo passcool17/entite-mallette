@@ -1,22 +1,23 @@
-// app.js : La mallette de l'Entité v0.2.4 : une seule vue, la mallette ouverte (couvercle intérieur + base).
+// app.js : La mallette de l'Entité v0.2.5 : une seule vue, la mallette ouverte (couvercle intérieur + base).
 // Tout est à l'intérieur de la valise. Deux leviers à capot : bleu (armement) et rouge (TRANSMIT, la fin).
 // KY-040 : on tourne le bouton lui-même (20 crans = anneau de 20 lettres A-V, JAMAIS de chiffres ; chiffres = clavier 4x4).
 // Baie banane 5x5 : n'importe quel câble dans n'importe quelle prise (glisser ou toucher). CYD 2 : moniteur cardiaque ECG.
-// Règle de Pascal : AUCUN code ni consigne écrit à l'écran. L'Entité dicte (voix), puis presse et ment (œil rouge)
-// pendant que tu choisis. Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
+// Règle de Pascal : aucun code ni réponse calculée écrit à l'écran (sauf ?debug=1). L'Entité dicte (voix), puis presse et ment (œil rouge)
+// pendant que tu choisis. À l'étape 10 le bandeau reprend la consigne de câblage dictée, visible jusqu'à la réussite.
+// Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 // v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 1, variantes d'énigmes
 // tirées par étape (deux parties de suite ne se ressemblent pas : signature de la partie précédente dans localStorage).
-import { createEye } from './eye.js?v=0.2.4';
-import { EYE, deepMerge } from './eye-config.js?v=0.2.4';
-import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.4';
-import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.2.4';
-import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.4';
-import { sfx } from './sfx.js?v=0.2.4';
-import { preloadAll } from './preload.js?v=0.2.4';
-import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip } from './guide.js?v=0.2.4';
-import { cue, loadManifest } from './voice-manifest.js?v=0.2.4';
+import { createEye } from './eye.js?v=0.2.5';
+import { EYE, deepMerge } from './eye-config.js?v=0.2.5';
+import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.5';
+import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.2.5';
+import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.5';
+import { sfx } from './sfx.js?v=0.2.5';
+import { preloadAll } from './preload.js?v=0.2.5';
+import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.2.5';
+import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.2.5';
 
-const VERSION = '0.2.4';
+const VERSION = '0.2.5';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -631,21 +632,34 @@ function input() {
   if (g.hesitating) { g.hesitating = false; g.rate = 1; document.body.classList.remove('hesitate'); }
 }
 
-// ================= clarté (v0.2.4) : objectif, module actif, indices, retours =================
-// Bandeau « Objectif » : la même phrase courte que dit l'Entité (quoi faire, quel module), JAMAIS la solution.
+// ================= clarté (v0.2.4 / v0.2.5) : objectif, module actif, indices, retours =================
+// Bandeau « Objectif » : la même phrase que dit l'Entité (quoi faire, quel module). À l'étape 10 : la consigne de
+// câblage complète (couleur / prise), pas « nouvelle consigne ». Jamais une réponse calculée (codes, sauf ?debug=1).
 const cueText = (id) => cue(id)?.text ?? '';
 let stripTimer = 0;
-function objectiveText() { return g.phase === 'idle' ? 'Ouvre la mallette.' : g.phase === 'win' ? 'Mallette désamorcée.' : g.phase === 'boom' ? 'Détonation.' : cueText(OBJECTIVE[g.phase === 'play' ? g.step : 0]); }
+function objectiveText() {
+  if (g.phase === 'idle') return 'Ouvre la mallette.';
+  if (g.phase === 'win') return 'Mallette désamorcée.';
+  if (g.phase === 'boom') return 'Détonation.';
+  const step = g.phase === 'play' ? g.step : 0;
+  return sentence(objectiveIds(run, step)) || cueText(OBJECTIVE[step]);
+}
 function showObjective() {
   clearTimeout(stripTimer);
   const o = $('#objective'); o.classList.remove('ok', 'ko', 'hint');
+  const text = objectiveText();
+  const long = g.phase === 'play' && g.step === 10;
+  o.classList.toggle('long', long);
+  document.body.classList.toggle('obj-long', long);
   $('#objLabel').textContent = g.phase === 'play' ? `Étape ${g.step}/${NSTEPS}` : 'Objectif';
-  $('#objText').textContent = objectiveText();
+  $('#objText').textContent = text;
 }
 // message temporaire dans le bandeau (retour Bien / Faux, indice), puis retour à l'objectif
 function setStrip(label, text, kind, ms = 2200) {
   clearTimeout(stripTimer);
-  const o = $('#objective'); o.classList.remove('ok', 'ko', 'hint'); if (kind) o.classList.add(kind);
+  const o = $('#objective'); o.classList.remove('ok', 'ko', 'hint', 'long');
+  document.body.classList.remove('obj-long');
+  if (kind) o.classList.add(kind);
   $('#objLabel').textContent = g.phase === 'play' && !/^Étape/.test(label) ? `Étape ${g.step}/${NSTEPS} · ${label}` : label; $('#objText').textContent = text;
   stripTimer = setTimeout(showObjective, ms);
 }

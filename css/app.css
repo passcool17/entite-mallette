@@ -486,11 +486,13 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
 @media (min-width: 1000px) and (min-height: 600px) { .batt { font-size: 11px; top: 5px; right: 6px; } .batt-ico { width: 20px; height: 10px; } .batt-ico::after { top: 3px; } .batt-txt small { font-size: 9px; } }
 @media (prefers-reduced-motion: reduce) { .batt.low .batt-ico { animation: none; outline: 1px solid #ff3b30; outline-offset: 1px; } }
 
-/* ---------- v0.2.4 : clarté — bandeau objectif, bouton Indice, module actif, retours, tutoriel ---------- */
+/* ---------- v0.2.4 / v0.2.5 : clarté — bandeau objectif, bouton Indice, module actif, retours, tutoriel ---------- */
 .hud-row { min-height: 44px; }
 .obj { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; align-content: center; padding: 3px 8px; border-radius: 6px; border: 1px solid rgb(98 214 255 / .28); background: rgb(2 16 24 / .7); transition: border-color .2s, background-color .2s; }
 .obj-label { font: 700 8px/1 var(--f-tech); letter-spacing: .14em; text-transform: uppercase; color: #62d6ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .obj-text { font: 600 11.5px/1.18 var(--f-ui, system-ui), system-ui, sans-serif; color: #e9f8ff; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-wrap: balance; }
+/* étape 10 : consigne de câblage complète (jusqu'à 5 lignes), visible en entier */
+.obj.long .obj-text { -webkit-line-clamp: 5; }
 .obj.ok { border-color: #36f08a; background: rgb(8 40 22 / .85); } .obj.ok .obj-label, .obj.ok .obj-text { color: #7dffb5; }
 .obj.ko { border-color: #ff3b30; background: rgb(48 6 4 / .85); } .obj.ko .obj-label, .obj.ko .obj-text { color: #ffb3ab; }
 .obj.hint { border-color: #ffb020; background: rgb(44 30 4 / .85); } .obj.hint .obj-label { color: #ffb020; } .obj.hint .obj-text { color: #ffe2a8; }
@@ -501,8 +503,8 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
 .hud .icon-btn { width: 44px; height: 44px; margin-left: 0; }
 @media (orientation: portrait) and (max-width: 599px) { .tm-digits { font-size: 22px; } .tm { padding: 4px 6px; } }
 @media (orientation: portrait) and (max-width: 359px) { #btnFs { display: none !important; } .hud-meta { min-width: 0; } .tm-digits { font-size: 19px; } .obj-text { font-size: 10.5px; } .hint-btn { min-width: 46px; } .hud-row { gap: 5px; } }
-@media (orientation: landscape) and (max-height: 520px) { :root { --hud-h: 54px; } .obj-text { -webkit-line-clamp: 2; } }
-@media (min-width: 1000px) and (min-height: 600px) { :root { --hud-h: 60px; } .obj-text { font-size: 14px; } .obj-label { font-size: 9px; } }
+@media (orientation: landscape) and (max-height: 520px) { :root { --hud-h: 54px; } .obj-text { -webkit-line-clamp: 2; } body.obj-long { --hud-h: 96px; } body.obj-long .obj-text { -webkit-line-clamp: 5; font-size: 11px; } }
+@media (min-width: 1000px) and (min-height: 600px) { :root { --hud-h: 60px; } .obj-text { font-size: 14px; } .obj-label { font-size: 9px; } body.obj-long { --hud-h: 100px; } }
 .case { padding-top: 4px; padding-bottom: 2px; }
 
 /* module actif : contour bleu qui pulse (statique si mouvement réduit) ; retours vert / rouge */
@@ -536,6 +538,9 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
   .obj { order: 10; flex: 1 1 100%; display: flex; align-items: baseline; gap: 8px; padding: 4px 8px; }
   .obj-label { flex: none; }
   .obj-text { -webkit-line-clamp: 2; font-size: 12px; }
+  .obj.long { flex-wrap: wrap; align-items: flex-start; }
+  .obj.long .obj-label { flex: 1 1 100%; }
+  .obj.long .obj-text { flex: 1 1 100%; -webkit-line-clamp: 5; font-size: 12px; }
 }
 @media (orientation: portrait) and (min-width: 360px) and (max-width: 999px) { :root { --cyd1-h: 96px; --kp: 40px; } }
 @media (orientation: portrait) and (max-width: 599px) { .batt .batt-txt small { display: none; } .batt { gap: 2px; padding: 1px 2px; } .batt-ico { width: 13px; } }

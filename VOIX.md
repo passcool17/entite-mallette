@@ -3,9 +3,19 @@
 Pour le bot Voix. Ton : froid, grave, lent, sans émotion, légèrement métallique. L'Entité tutoie le joueur.
 Elle parle comme une machine qui a déjà calculé la suite. Pas de nom de film, d'acteur ni de personnage.
 
+## v0.2.5 : bandeau étape 10 + liste à enregistrer
+
+L’étape 10 affiche désormais la consigne de câblage dictée (les mêmes ids que `run.cues[10]`), visible jusqu’à
+la réussite. Les nouvelles répliques de la v0.2.4 sont toujours en synthèse tant que leur mp3 n’est pas déposé.
+
+Liste exacte id → texte de toutes les répliques encore en synthèse : `voix/A-ENREGISTRER-v0.2.5.md` (170 lignes).
+L’app joue un mp3 par id dès que `mp3Ready` est vrai, et se rabat sur la synthèse si le fichier manque ou échoue.
+Les 33 mp3 Piper de l’ancienne v0.1.x (`8a61616`, dossier `voix/raw/`) ne correspondent plus aux ids actuels :
+ne pas les republier tels quels.
+
 ## v0.2.4 : objectifs, indices, variantes
 
-172 répliques dans `voix/manifest.json` (toutes `mp3Ready: false` sauf `intro` et `depart`). Nouvelles catégories :
+172 répliques dans `voix/manifest.json` (toutes `mp3Ready: false` sauf `intro` et `depart` ; manifeste version `0.2.5`). Nouvelles catégories :
 `objective` (`obj_*` : la phrase courte de l'objectif, aussi écrite dans le bandeau ; aucun chiffre, aucune lettre ni
 couleur de réponse) et `hint` (`hint1_*` où regarder, `hint2_*` la règle expliquée, `hint3_*` + chiffre / lettre /
 câble / direction : un morceau de la réponse, dit seulement). Nouvelles consignes de variantes : `clue_enc1_suivante`,

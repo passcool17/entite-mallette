@@ -1,7 +1,7 @@
-// audio.js (v0.2.4) : graphe WebAudio unique (voix / musique / effets, limiteur, L/R), musique de tension, voix de l'Entité (manifeste voix/manifest.json : mp3 si prêt, sinon synthèse française),
+// audio.js (v0.2.5) : graphe WebAudio unique (voix / musique / effets, limiteur, L/R), musique de tension, voix de l'Entité (manifeste voix/manifest.json : mp3 si prêt, sinon synthèse française),
 // routée dans un AnalyserNode pour animer l'œil.
-import { loadManifest, sentence, allReady, fileOf } from './voice-manifest.js?v=0.2.4';
-import { takePreloaded, MUSIC_URL } from './preload.js?v=0.2.4';
+import { loadManifest, sentence, fileOf, cue } from './voice-manifest.js?v=0.2.5';
+import { takePreloaded, MUSIC_URL } from './preload.js?v=0.2.5';
 
 let ac = null, master, limiter, sfxBus, voiceBus, analyser, data, muted = false, volume = 0.9;
 let musicBus, musicDuck, musicLP, music = null, musicBuf = null, musicLoad = null;
@@ -77,8 +77,9 @@ export function voiceLevel() {
 export function bus() { return ac ? { ac, out: sfxBus } : null; }
 
 // ---------- voix (manifeste voix/manifest.json) ----------
-// Règle : chaque id avec mp3Ready = true → voix/<id>.mp3 (repli synthèse française si échec).
-// Un id pas prêt dans la suite → synthèse française de la phrase entière (aucun fichier demandé : 0 erreur 404).
+// Règle (v0.2.5) : chaque id est joué tout seul. mp3Ready = true → voix/<id>.mp3 (repli synthèse si le fichier
+// manque ou échoue). mp3Ready = false → synthèse française de ce morceau, aucun fichier demandé (0 erreur 404).
+// Une suite mixte (certains mp3, d'autres pas) enchaîne les deux. Les id consécutifs en synthèse sont dits en une phrase.
 // Pas de synthèse possible (ou son coupé) → sous-titre de secours via le gestionnaire de sous-titres.
 export const ttsAvailable = () => 'speechSynthesis' in window && typeof SpeechSynthesisUtterance === 'function';
 
@@ -151,26 +152,37 @@ export function speak(ids, { lie = false } = {}) {
     };
     loadManifest().then(() => {
       if (token !== speakToken) { resolve(false); return; }
-      const mp3 = !!ac && allReady(ids) && !ids.some((id) => voiceFailed.has(id));
-      voiceLog.push({ ids: ids.slice(), mode: mp3 ? 'mp3' : ttsAvailable() && !muted ? 'tts' : 'texte', lie, t: Math.round(performance.now()) });
-      if (mp3) { duck(true); playSeq(ids, 0, token, done); }
-      else speakTTS(sentence(ids), token, done, lie);
+      const ready = (id) => !!ac && cue(id)?.mp3Ready === true && !voiceFailed.has(id);
+      const allMp3 = ids.length > 0 && ids.every(ready);
+      const anyMp3 = ids.some(ready);
+      const mode = allMp3 ? 'mp3' : anyMp3 ? 'mix' : (ttsAvailable() && !muted ? 'tts' : 'texte');
+      voiceLog.push({ ids: ids.slice(), mode, lie, t: Math.round(performance.now()) });
+      playSeq(ids, 0, token, done, lie);
     });
   });
 }
-async function playSeq(ids, i, token, done) {
+function readyMp3(id) { return !!ac && cue(id)?.mp3Ready === true && !voiceFailed.has(id); }
+async function playSeq(ids, i, token, done, lie) {
   if (token !== speakToken) return;
   if (i >= ids.length) { done(); return; }
-  try {
-    const buf = await loadVoice(ids[i]);
-    if (token !== speakToken) return;
-    voiceStats.fichier++;
-    await playBuffer(buf, token);
-    playSeq(ids, i + 1, token, done);
-  } catch {
-    voiceFailed.add(ids[i]);
-    if (token === speakToken) speakTTS(sentence(ids.slice(i)), token, done, false);
+  if (readyMp3(ids[i])) {
+    try {
+      const buf = await loadVoice(ids[i]);
+      if (token !== speakToken) return;
+      duck(true);
+      voiceStats.fichier++;
+      await playBuffer(buf, token);
+      playSeq(ids, i + 1, token, done, lie);
+    } catch {
+      voiceFailed.add(ids[i]);
+      if (token === speakToken) speakTTS(sentence([ids[i]]), token, () => playSeq(ids, i + 1, token, done, lie), lie);
+    }
+    return;
   }
+  // id consécutifs sans mp3 : une seule phrase, puis reprise (le suivant peut être un fichier)
+  let j = i + 1;
+  while (j < ids.length && !readyMp3(ids[j])) j++;
+  speakTTS(sentence(ids.slice(i, j)), token, () => playSeq(ids, j, token, done, lie), lie);
 }
 let voiceFast = false;
 // ?debug=1&voix=rapide : tests seulement — pas de synthèse, la réplique « dure » quelques ms (le journal voiceLog reste complet)
