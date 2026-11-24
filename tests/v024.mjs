@@ -224,7 +224,10 @@ async function playerSim(p, { useHints = false, label = '' } = {}) {
         const c = await waitClue('clue_trappe_');
         for (let k = 0; k < 60 && await D(p, () => document.querySelector('#cyd1').classList.contains('liar')); k++) await W(p, 80);
         const LED = { '#ff3b30': 'rouge', '#36f08a': 'vert', '#3d8bff': 'bleu' };
-        const bar = (await D(p, () => [...document.querySelectorAll('#bar i')].map((e) => e.style.getPropertyValue('--c').trim()))).map((h) => LED[h]);
+        // comme un joueur : on lit la barre quand elle est stable (pas pendant un scintillement)
+        const readBar = async () => (await D(p, () => [...document.querySelectorAll('#bar i')].map((e) => e.style.getPropertyValue('--c').trim()))).map((h) => LED[h]);
+        let bar = await readBar();
+        for (let k = 0; k < 40; k++) { await W(p, 150); const b2 = await readBar(); if (b2.every(Boolean) && b2.join() === bar.join()) break; bar = b2; }
         const rims = await D(p, () => [...document.querySelectorAll('.trap-door')].map((d) => /liseré (\w+)/.exec(d.getAttribute('aria-label'))[1]));
         const cnt = {}; bar.forEach((x) => { cnt[x] = (cnt[x] || 0) + 1; }); const by = Object.keys(cnt).sort((a, b2) => cnt[b2] - cnt[a]);
         const col = ({ frequente: by[0], moyenne: by[1], rare: by[2], gauche: bar[0] })[c[0].slice(12)];
@@ -377,7 +380,9 @@ async function playerSim(p, { useHints = false, label = '' } = {}) {
     const vp = [{ width: 412, height: 915 }, { width: 915, height: 412 }, { width: 1280, height: 800 }][i % 3];
     const { p, done } = await page(vp, { query: `&seed=${s}&voix=rapide` });
     await p.tap('#btnStart'); await W(p, 300);
-    const r = await playerSim(p, { useHints: i % 4 === 3 });
+    let r;
+    try { r = await playerSim(p, { useHints: i % 4 === 3 }); }
+    catch (e) { r = { phase: 'erreur: ' + String(e.message).split('\n')[0], tier: '?', errors: -1, rem: 0, hints: 0, sig: '', log: [] }; }
     results.push({ seed: s, vp: `${vp.width}x${vp.height}`, phase: r.phase, tier: r.tier, errors: r.errors, rem: r.rem, hints: r.hints, sig: r.sig });
     R.sims.push({ seed: s, ...r, log: r.log.filter((x) => !/^\d+:/.test(x)) });
     await done();
