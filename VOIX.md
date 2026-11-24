@@ -3,6 +3,18 @@
 Pour le bot Voix. Ton : froid, grave, lent, sans émotion, légèrement métallique. L'Entité tutoie le joueur.
 Elle parle comme une machine qui a déjà calculé la suite. Pas de nom de film, d'acteur ni de personnage.
 
+## v0.2.4 : objectifs, indices, variantes
+
+172 répliques dans `voix/manifest.json` (toutes `mp3Ready: false` sauf `intro` et `depart`). Nouvelles catégories :
+`objective` (`obj_*` : la phrase courte de l'objectif, aussi écrite dans le bandeau ; aucun chiffre, aucune lettre ni
+couleur de réponse) et `hint` (`hint1_*` où regarder, `hint2_*` la règle expliquée, `hint3_*` + chiffre / lettre /
+câble / direction : un morceau de la réponse, dit seulement). Nouvelles consignes de variantes : `clue_enc1_suivante`,
+`clue_enc1_paires`, `clue_trappe_gauche`, `clue_trappe_moyenne`, `clue_sequence_plus1`, `clue_patch_echange`,
+`clue_patch2_echange`, `clue_patch_debranche`, `clue_patch_serie`, `clue_patch2_serie` (+ `patch_et`,
+`patch_echange_fin`, `patch_laisse_deux`, `patch_rang`), `clue_code1_envers`, `clue_code1_plus1`, `clue_code2_envers`,
+`clue_code2_rotation`, `clue_code2_decale`, `clue_mot_suivante`. `clue_code2` (« le premier code, à l'envers ») n'est
+plus dite (remplacée par `clue_code2_envers`). Pistes DFPlayer 0091 à 0173.
+
 ## v0.2.3 : la source de vérité est `voix/manifest.json`
 
 Le tableau plus bas date de la v0.1.x. Depuis la v0.2.x, toutes les répliques (89) et leur texte exact sont dans

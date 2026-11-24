@@ -1,41 +1,65 @@
-// audio.js : bus WebAudio, musique de tension, voix de l'Entité (manifeste voix/manifest.json : mp3 si prêt, sinon synthèse française),
+// audio.js (v0.2.4) : graphe WebAudio unique (voix / musique / effets, limiteur, L/R), musique de tension, voix de l'Entité (manifeste voix/manifest.json : mp3 si prêt, sinon synthèse française),
 // routée dans un AnalyserNode pour animer l'œil.
-import { loadManifest, sentence, allReady, fileOf } from './voice-manifest.js?v=0.2.3';
-import { takePreloaded, MUSIC_URL } from './preload.js?v=0.2.3';
+import { loadManifest, sentence, allReady, fileOf } from './voice-manifest.js?v=0.2.4';
+import { takePreloaded, MUSIC_URL } from './preload.js?v=0.2.4';
 
-let ac = null, master, sfxBus, voiceBus, analyser, data, muted = false;
+let ac = null, master, limiter, sfxBus, voiceBus, analyser, data, muted = false, volume = 0.9;
 let musicBus, musicDuck, musicLP, music = null, musicBuf = null, musicLoad = null;
 let bed = null, speaking = false, onCaption = () => {};
 const buffers = new Map();
 export const voiceStats = { fichier: 0, synthese: 0 };
+// v0.2.4 : un seul graphe WebAudio, comme le vrai matériel (ESP32 → I2S → 2 x MAX98357A → SPK-L / SPK-R) :
+//   voix  ─► bus voix  ─► panoramique (centre : les deux HP) ─┐
+//   musique (boucle tension.mp3 + basse pulsée) ─► filtre ─► atténuation sous la voix (−8 dB) ─► bus musique ─► pano ─┤─► master (volume) ─► limiteur ─► sortie stéréo L/R
+//   effets (bips, servos, fiches) ─► bus effets ─► pano ─┘
+// La voix passe PAR-DESSUS la musique : la boucle continue, baissée de 8 dB (attaque 150 ms, relâche 400 ms) pendant que l'Entité parle.
+export const DUCK = { db: -8, gain: Math.pow(10, -8 / 20), attack: 0.15, release: 0.4 };
+const SON_KEY = 'entite-son';
+try { const s = JSON.parse(localStorage.getItem(SON_KEY) || 'null'); if (s) { muted = !!s.muted; if (typeof s.volume === 'number') volume = Math.max(0, Math.min(1, s.volume)); } } catch { /* privé */ }
+const saveSon = () => { try { localStorage.setItem(SON_KEY, JSON.stringify({ muted, volume })); } catch { /* privé */ } };
 
 export function initAudio() {
   if (ac) { if (ac.state === 'suspended') ac.resume(); return ac; }
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return null;
   ac = new AC();
-  master = ac.createGain(); master.gain.value = muted ? 0 : 0.9;
-  const comp = ac.createDynamicsCompressor();
-  comp.threshold.value = -14; comp.ratio.value = 4;
-  master.connect(comp).connect(ac.destination);
-  sfxBus = ac.createGain(); sfxBus.connect(master);
+  master = ac.createGain(); master.gain.value = muted ? 0 : volume;
+  // limiteur léger : aucun écrêtage quand voix + musique + bips s'additionnent
+  limiter = ac.createDynamicsCompressor();
+  limiter.threshold.value = -10; limiter.knee.value = 6; limiter.ratio.value = 12; limiter.attack.value = 0.003; limiter.release.value = 0.15;
+  master.connect(limiter).connect(ac.destination);
+  const pan = (v) => { if (!ac.createStereoPanner) return master; const p = ac.createStereoPanner(); p.pan.value = v; p.connect(master); return p; };
+  sfxBus = ac.createGain(); sfxBus.connect(pan(0));
   voiceBus = ac.createGain(); voiceBus.gain.value = 1;
   analyser = ac.createAnalyser(); analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.6;
   data = new Uint8Array(analyser.fftSize);
-  voiceBus.connect(analyser); voiceBus.connect(master);
+  voiceBus.connect(analyser); voiceBus.connect(pan(0));
   // musique : boucle → filtre → atténuation sous la voix → bus musique → master (donc coupée par le bouton son)
-  musicBus = ac.createGain(); musicBus.gain.value = 0.0001; musicBus.connect(master);
+  musicBus = ac.createGain(); musicBus.gain.value = 0.0001; musicBus.connect(pan(0));
   musicDuck = ac.createGain(); musicDuck.connect(musicBus);
   musicLP = ac.createBiquadFilter(); musicLP.type = 'lowpass'; musicLP.frequency.value = 1400; musicLP.Q.value = 0.8; musicLP.connect(musicDuck);
   loadManifest();
+  // mobile : le contexte peut naître suspendu ; on le relance au premier geste
+  const unlock = () => { if (ac.state === 'suspended') ac.resume(); };
+  for (const ev of ['pointerdown', 'keydown', 'touchend']) addEventListener(ev, unlock, { passive: true });
   return ac;
 }
 
 export function setMuted(m) {
-  muted = m;
-  if (master) master.gain.setTargetAtTime(m ? 0 : 0.9, ac.currentTime, 0.03);
+  muted = m; saveSon();
+  if (master) master.gain.setTargetAtTime(m ? 0 : volume, ac.currentTime, 0.03);
   if (m && 'speechSynthesis' in window) speechSynthesis.cancel();
   if (m) stopBed();
+}
+// volume général 0..1 (bus master), gardé avec l'état du bouton son
+export function setVolume(v) {
+  volume = Math.max(0, Math.min(1, v)); saveSon();
+  if (master && !muted) master.gain.setTargetAtTime(volume, ac.currentTime, 0.03);
+}
+export const getVolume = () => volume;
+// état du graphe (tests, ?debug=1)
+export function audioGraph() {
+  return ac ? { state: ac.state, master: +master.gain.value.toFixed(3), duck: +musicDuck.gain.value.toFixed(3), music: +musicBus.gain.value.toFixed(5), ducked: musicStats.sousVoix, speaking, muted, volume, limiter: limiter.threshold.value, panners: !!ac.createStereoPanner } : { state: 'none', muted, volume };
 }
 export const isMuted = () => muted;
 export function setCaptionHandler(fn) { onCaption = fn; }
@@ -102,6 +126,7 @@ function pickVoice() {
 if (ttsAvailable()) speechSynthesis.addEventListener?.('voiceschanged', pickVoice);
 
 let speakToken = 0;
+let settlePrev = () => {};
 const voiceFailed = new Set();
 export const voiceLog = []; // [{ ids, mode, lie, t }] pour ?debug=1 et les tests
 
@@ -111,8 +136,13 @@ export function speak(ids, { lie = false } = {}) {
   const token = ++speakToken;
   if (ttsAvailable()) speechSynthesis.cancel();
   stopBed();
-  speaking = true; duck(true);
-  return new Promise((resolve) => {
+  speaking = true;
+  settlePrev(false);
+  return new Promise((resolve0) => {
+    // une réplique interrompue se résout toujours (false) : la file d'attente d'app.js ne reste jamais bloquée
+    let settled = false;
+    const resolve = (v) => { if (settled) return; settled = true; if (settlePrev === settleMe) settlePrev = () => {}; resolve0(v); };
+    const settleMe = (v) => resolve(v); settlePrev = settleMe;
     const done = () => {
       if (token !== speakToken) { resolve(false); return; }
       speaking = false; stopBed(); duck(false);
@@ -123,7 +153,7 @@ export function speak(ids, { lie = false } = {}) {
       if (token !== speakToken) { resolve(false); return; }
       const mp3 = !!ac && allReady(ids) && !ids.some((id) => voiceFailed.has(id));
       voiceLog.push({ ids: ids.slice(), mode: mp3 ? 'mp3' : ttsAvailable() && !muted ? 'tts' : 'texte', lie, t: Math.round(performance.now()) });
-      if (mp3) playSeq(ids, 0, token, done);
+      if (mp3) { duck(true); playSeq(ids, 0, token, done); }
       else speakTTS(sentence(ids), token, done, lie);
     });
   });
@@ -142,19 +172,26 @@ async function playSeq(ids, i, token, done) {
     if (token === speakToken) speakTTS(sentence(ids.slice(i)), token, done, false);
   }
 }
+let voiceFast = false;
+// ?debug=1&voix=rapide : tests seulement — pas de synthèse, la réplique « dure » quelques ms (le journal voiceLog reste complet)
+export function setVoiceFast(on) { voiceFast = !!on; }
 function speakTTS(text, token, done, lie) {
   voiceStats.synthese++;
+  if (voiceFast) { setTimeout(done, 30 + text.length * 2); return; }
   const est = 1200 + text.length * 75;
   let fallback = setTimeout(done, est);
   // secours silencieux : pas de synthèse sur l'appareil, ou son coupé → sous-titre court
   if (!ttsAvailable() || muted) { onCaption(text, lie); return; }
   startBed();
+  // synthèse : la musique baisse au début réel de l'énoncé (onstart) ; secours si onstart ne vient jamais (certains Android)
+  const safety = setTimeout(() => token === speakToken && duck(true), 700);
   try {
     const u = new SpeechSynthesisUtterance(text);
+    u.onstart = () => { clearTimeout(safety); if (token === speakToken) duck(true); };
     u.lang = 'fr-CA'; u.voice = frVoice || pickVoice();
     u.pitch = lie ? 0.35 : 0.2; u.rate = lie ? 1.02 : 0.86; u.volume = 1; // grave et calme ; plus pressée quand elle ment
-    u.onend = () => { clearTimeout(fallback); done(); };
-    u.onerror = () => { clearTimeout(fallback); fallback = setTimeout(done, 300); };
+    u.onend = () => { clearTimeout(fallback); clearTimeout(safety); done(); };
+    u.onerror = () => { clearTimeout(fallback); clearTimeout(safety); fallback = setTimeout(done, 300); };
     speechSynthesis.speak(u);
   } catch { onCaption(text, lie); }
 }
@@ -180,7 +217,7 @@ function playBuffer(buf, token) {
 
 export const isSpeaking = () => speaking;
 export function stopVoice() {
-  speakToken++; speaking = false; stopBed(); duck(false);
+  speakToken++; speaking = false; stopBed(); duck(false); settlePrev(false);
   try { curSrc?.stop(); } catch { /* déjà fini */ }
   if (ttsAvailable()) speechSynthesis.cancel();
   onCaption('', false);
@@ -201,7 +238,10 @@ function loadMusic() {
 }
 function duck(on) {
   if (!musicDuck) return;
-  musicDuck.gain.setTargetAtTime(on ? 0.32 : 1, ac.currentTime, on ? 0.08 : 0.45);
+  const t = ac.currentTime, p = musicDuck.gain;
+  // rampes explicites : −8 dB en 150 ms quand la voix démarre, retour à 0 dB en 400 ms quand elle se tait
+  if (p.cancelAndHoldAtTime) p.cancelAndHoldAtTime(t); else { const v = p.value; p.cancelScheduledValues(t); p.setValueAtTime(v, t); }
+  p.linearRampToValueAtTime(on ? DUCK.gain : 1, t + (on ? DUCK.attack : DUCK.release));
   musicStats.sousVoix = on;
 }
 export function startMusic() {

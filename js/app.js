@@ -1,17 +1,22 @@
-// app.js : La mallette de l'Entité v0.2.3 : une seule vue, la mallette ouverte (couvercle intérieur + base).
+// app.js : La mallette de l'Entité v0.2.4 : une seule vue, la mallette ouverte (couvercle intérieur + base).
 // Tout est à l'intérieur de la valise. Deux leviers à capot : bleu (armement) et rouge (TRANSMIT, la fin).
 // KY-040 : on tourne le bouton lui-même (20 crans = anneau de 20 lettres A-V, JAMAIS de chiffres ; chiffres = clavier 4x4).
 // Baie banane 5x5 : n'importe quel câble dans n'importe quelle prise (glisser ou toucher). CYD 2 : moniteur cardiaque ECG.
 // Règle de Pascal : AUCUN code ni consigne écrit à l'écran. L'Entité dicte (voix), puis presse et ment (œil rouge)
-// pendant que tu choisis. Paliers cachés ~50/50, ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
-import { createEye } from './eye.js?v=0.2.3';
-import { EYE, deepMerge } from './eye-config.js?v=0.2.3';
-import { makeRun, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.3';
-import { initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.3';
-import { sfx } from './sfx.js?v=0.2.3';
-import { preloadAll } from './preload.js?v=0.2.3';
+// pendant que tu choisis. Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
+// v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 1, variantes d'énigmes
+// tirées par étape (deux parties de suite ne se ressemblent pas : signature de la partie précédente dans localStorage).
+import { createEye } from './eye.js?v=0.2.4';
+import { EYE, deepMerge } from './eye-config.js?v=0.2.4';
+import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.4';
+import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.2.4';
+import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.4';
+import { sfx } from './sfx.js?v=0.2.4';
+import { preloadAll } from './preload.js?v=0.2.4';
+import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip } from './guide.js?v=0.2.4';
+import { cue, loadManifest } from './voice-manifest.js?v=0.2.4';
 
-const VERSION = '0.2.3';
+const VERSION = '0.2.4';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -29,8 +34,18 @@ const ORD = ['1er', '2e', '3e', '4e', '5e'];
 // ================= état =================
 let run = null;
 const g = {};
-function resetState() {
-  run = makeRun(newSeed());
+// deux parties de suite : au moins 3 étapes à règle différente (sauf ?seed=N, toujours reproductible)
+const SIG_KEY = 'entite-derniere-partie', MIN_DIFF = 3;
+const lastSig = () => { try { return localStorage.getItem(SIG_KEY) || ''; } catch { return ''; } };
+function drawRun() {
+  if (SEED_Q != null) return makeRun(SEED_Q);
+  const prev = lastSig(); let r = makeRun(newSeed());
+  for (let k = 0; k < 40 && sigDiff(r.sig, prev) < MIN_DIFF; k++) r = makeRun(newSeed());
+  return r;
+}
+function resetState(remember = false) {
+  run = drawRun();
+  if (remember) { try { localStorage.setItem(SIG_KEY, run.sig); } catch { /* privé */ } }
   Object.assign(g, {
     phase: 'idle',               // idle → arm-toggle (capot bleu) → play → win | boom
     step: 0, running: false, ended: false, result: null,
@@ -42,24 +57,43 @@ function resetState() {
     pos: null, code: '', keysTurned: [], hesitating: false, lastInput: 0,
     sabotage: false, sabT: 0, said30: false, said10: false,
     lastClue: null, pressure: [], decoy: null, startT: 0,
+    hint: 0, progressT: 0, hintsUsed: 0,
   });
 }
 
 // ================= voix : file d'attente, mensonges (œil rouge) =================
-let vq = Promise.resolve(), vqGen = 0;
+// v0.2.4 : vraie file d'attente. Une réplique « now » (mensonge, erreur, indice) coupe la voix en cours, mais une
+// CONSIGNE (clue) n'est jamais perdue : coupée ou en attente, elle est redite juste après. (Avant, un mensonge arrivé
+// pendant depart.mp3 pouvait effacer la consigne de l'étape 1 : on restait bloqué sans savoir quoi faire.)
+const vqItems = []; let vqBusy = false, vqCur = null;
 // ids : un id ou une suite d'ids du manifeste. lie : œil rouge pendant la réplique.
 function voice(ids, { lie = false, now = false, clue = false } = {}) {
   ids = Array.isArray(ids) ? ids : [ids];
   if (clue) { g.lastClue = ids; $('#btnReplay').disabled = false; }
-  const gen = now ? ++vqGen : vqGen;
-  const play = () => {
-    if (gen !== vqGen && !now) return Promise.resolve();
-    if (lie) flagLie(true);
-    return speak(ids, { lie }).then(() => { if (lie) flagLie(false); });
-  };
-  if (now) { stopVoice(); vq = play(); } else vq = vq.then(play);
-  return vq;
+  return new Promise((resolve) => {
+    const it = { ids, lie, clue, resolve, requeued: false };
+    if (now) {
+      for (let i = vqItems.length - 1; i >= 0; i--) if (!vqItems[i].clue) { vqItems[i].resolve(false); vqItems.splice(i, 1); }
+      vqItems.unshift(it);
+      const c = vqCur;
+      if (c) { if (c.clue && c.ids.join() !== ids.join()) { c.requeued = true; vqItems.splice(1, 0, c); } stopVoice(); }
+    } else vqItems.push(it);
+    pumpVoice();
+  });
 }
+async function pumpVoice() {
+  if (vqBusy) return; vqBusy = true;
+  while (vqItems.length) {
+    const it = vqItems.shift(); vqCur = it; it.requeued = false;
+    if (it.lie) flagLie(true);
+    await speak(it.ids, { lie: it.lie });
+    if (it.lie) flagLie(false);
+    vqCur = null;
+    if (!it.requeued) it.resolve(true);
+  }
+  vqBusy = false;
+}
+function clearVoice() { while (vqItems.length) vqItems.shift().resolve(false); if (vqCur) vqCur.requeued = false; stopVoice(); }
 function flagLie(on) {
   if (on) { g.lies++; g.lieUntil = performance.now() + 2600; }
   const apply = () => {
@@ -272,23 +306,25 @@ function tapSocket(s) {
   const c = g.sel;
   if (g.cables[c].socket === s) unplugCable(c); else plugCable(c, s);
 }
-// règle : on peut débrancher et déplacer librement pendant les étapes 4 et 10 ; seule une fiche branchée dans la
-// mauvaise prise est fautive. Hors de ces étapes, toucher aux câbles coûte du temps et l'Entité les remet en place.
+// règle : on peut débrancher et déplacer librement pendant les étapes 4 et 10 ; seule une fiche branchée en violation
+// de la consigne (câble visé dans une autre prise, câble à laisser débranché rebranché, ou autre câble dans la prise
+// visée) est fautive. Hors de ces étapes, toucher aux câbles coûte du temps et l'Entité les remet en place.
+// v0.2.4 : consigne générique run.patchN.req = { câble: prise | null } (route, échange, débranche, rang de lettre, double).
+const patchDone = (req) => Object.entries(req).every(([c, s]) => g.cables[+c].socket === s);
+function patchWrong(req, ev) {
+  if (ev.type !== 'plug') return false;
+  if (ev.c in req && req[ev.c] !== ev.s) return true;
+  return Object.entries(req).some(([c, s]) => +c !== ev.c && s === ev.s);
+}
 function afterPatch(ev, before) {
   syncPatchDom(); drawCables();
   const tok = ++g.patchTok;
-  const revert = (ms) => setTimeout(() => { if (g.patchTok !== tok) return; g.cables.forEach((k, i) => { k.socket = before[i]; }); g.sel = null; sfx.servo(); syncPatchDom(); drawCables(); }, ms);
+  const revert = (ms) => setTimeout(() => { if (g.patchTok !== tok) return; g.cables.forEach((k, i) => { k.socket = before[i]; }); g.sel = null; sfx.servo(); batt?.dip('servo'); syncPatchDom(); drawCables(); }, ms);
   if (g.phase !== 'play') { revert(700); return; }
-  if (g.step === 4) {
-    const { cable: A, socket: N } = run.patch1;
-    if (g.cables[A].socket === N) { good(5, 2); return; }
-    if (ev.type === 'plug' && ((ev.c === A && ev.s !== N) || (ev.c !== A && ev.s === N))) { bad(8); revert(900); }
-    return;
-  }
-  if (g.step === 10) {
-    const { off: B, cable: C, socket: M } = run.patch2;
-    if (g.cables[B].socket == null && g.cables[C].socket === M) { good(11); return; }
-    if (ev.type === 'plug' && (ev.c === B || (ev.c === C && ev.s !== M) || (ev.c !== C && ev.s === M))) { bad(8); revert(900); }
+  if (g.step === 4 || g.step === 10) {
+    const p = g.step === 4 ? run.patch1 : run.patch2;
+    if (patchDone(p.req)) { g.step === 4 ? good(5, 2) : good(11); return; }
+    if (patchWrong(p.req, ev)) { bad(8); revert(900); }
     return;
   }
   bad(5); revert(900);
@@ -488,7 +524,8 @@ function drawCyd2() {
   if (!maze) { drawEcg(c, W, H, now);
     return;
   }
-  if (ecg.aria) { ecg.aria = ''; ecg.ariaL = ''; cv.setAttribute('aria-label', 'Écran 2 : verrou de signal'); }
+  if (ecg.aria) { ecg.aria = ''; ecg.ariaL = ''; }
+  { const [ax, ay] = g.pos || maze.start, al = `Écran 2 : verrou de signal, point en colonne ${ax + 1}, ligne ${ay + 1}${sab ? ', commandes inversées' : ''}`; if (cv.getAttribute('aria-label') !== al) cv.setAttribute('aria-label', al); }
   const n = maze.n, cs = Math.floor(Math.min((W - 20) / n, (H - 20) / n)), ox = Math.floor((W - cs * n) / 2), oy = Math.floor((H - cs * n) / 2);
   const ink = sab ? '#ff4b3e' : '#62d6ff';
   c.strokeStyle = sab ? 'rgba(255,75,62,.16)' : 'rgba(98,214,255,.14)'; c.lineWidth = 1;
@@ -516,34 +553,34 @@ function drawCyd2() {
 // ================= déroulé =================
 function nextStep(n) {
   g.step = n; g.pressure.forEach(clearTimeout); g.pressure = []; g.decoy = null; clearDecoys();
-  showStep();
-  const hard = run.tier === 'difficile';
+  g.hint = 0; progress(); showStep(); showObjective(); highlight(); hintUi();
+  const O = OBJECTIVE[n], C = Object.fromEntries(Object.entries(run.cues).map(([k, v]) => [k, [O, ...v]]));
   switch (n) {
     case 1: setEncMode('alpha');
-      voice(hard ? 'clue_enc1_envers' : 'clue_enc1_ordre', { clue: true }); pressureEnc(); break;
-    case 2: voice(hard ? 'clue_trappe_rare' : 'clue_trappe_frequente', { clue: true });
+      voice(C[1], { clue: true }); pressureEnc(); break;
+    case 2: voice(C[2], { clue: true });
       pressure(5500, () => { const w = (run.trap + 1) % 3; decoy('trap', w); voice(['taunt_trappe', color(run.trapColors[w])], { lie: true, now: true }); }); break;
-    case 3: g.code = ''; voice(hard ? 'clue_sequence_envers' : 'clue_sequence_ordre', { clue: true }).then(() => g.step === 3 && flashSeq(run.seq));
+    case 3: g.code = ''; voice(C[3], { clue: true }).then(() => g.step === 3 && flashSeq(run.seq));
       pressure(9000, () => { voice('taunt_regarde', { lie: true, now: true }); flashSeq(run.seq.map((d) => (d % 8) + 1), true); }); break;
-    case 4: voice(['clue_patch_route', cableCue(run.patch1.cable), prise(run.patch1.socket)], { clue: true });
+    case 4: voice(C[4], { clue: true });
       pressure(6000, () => { const w = run.decoys.wire1; decoy('wire', w); voice(['taunt_branche', cableCue(w.cable), prise(w.socket)], { lie: true, now: true }); }); break;
-    case 5: g.pos = run.maze1.start.slice(); voice('clue_verrou', { clue: true });
+    case 5: g.pos = run.maze1.start.slice(); voice([O, 'clue_verrou'], { clue: true });
       pressure(9000, () => voice('taunt_lent', { now: true })); break;
-    case 6: g.code = ''; voice('clue_code1', { clue: true });
+    case 6: g.code = ''; voice(C[6], { clue: true });
       pressure(6000, () => { const i = Math.floor(Math.random() * 4); voice(['taunt_cetait', digit(run.decoys.frags[i]), 'taunt_depeche'], { lie: true, now: true }); }); break;
     case 7: $$('.lock.key .lock-btn').forEach((b) => { b.disabled = false; b.closest('.lock').classList.add('ready'); });
-      voice(hard ? 'clue_cles_lourde' : 'clue_cles_legere', { clue: true });
+      voice(C[7], { clue: true });
       pressure(5000, () => voice(['taunt_cles', ...run.decoys.keys.map((k) => digit(k + 1))], { lie: true, now: true }));
       if (run.lies.keysTwice) pressure(14000, () => voice(['taunt_cles', ...run.decoys.keys.map((k) => digit(k + 1))], { lie: true, now: true })); break;
     case 8: setEncMode('alpha');
-      voice([hard ? 'clue_mot_envers' : 'clue_mot_ordre', ...run.spell.split('').map(letter)], { clue: true }); pressureEnc(); break;
-    case 9: g.pos = run.maze2.start.slice(); voice('clue_verrou', { clue: true }); g.sabT = performance.now() + 5000; break;
-    case 10: straightCables(); sfx.servo();
-      voice(['clue_patch_double', cableCue(run.patch2.off), 'patch_laisse', cableCue(run.patch2.cable), prise(run.patch2.socket)], { clue: true });
+      voice(C[8], { clue: true }); pressureEnc(); break;
+    case 9: g.pos = run.maze2.start.slice(); voice([O, 'clue_verrou'], { clue: true }); g.sabT = performance.now() + 5000; break;
+    case 10: straightCables(); sfx.servo(); batt?.dip('servo');
+      voice(C[10], { clue: true });
       if (run.lies.wire2False) pressure(6000, () => { const w = run.decoys.wire2; decoy('wire', w); voice(['taunt_branche', cableCue(w.cable), prise(w.socket)], { lie: true, now: true }); }); break;
-    case 11: g.code = ''; voice('clue_code2', { clue: true });
+    case 11: g.code = ''; voice(C[11], { clue: true });
       pressure(7000, () => { decoy('tx'); voice('taunt_rouge', { lie: true, now: true }); }); break;
-    case 12: $('#gtTx').classList.add('armed'); voice('clue_transmit', { clue: true }); voice('taunt_sceller', { lie: true }); break;
+    case 12: $('#gtTx').classList.add('armed'); voice([O, 'clue_transmit'], { clue: true }); voice('taunt_sceller', { lie: true }); break;
   }
   drawOled(); drawCyd2();
 }
@@ -572,7 +609,8 @@ function decoy(kind, i) {
 function clearDecoys() { $$('.decoy').forEach((e) => e.classList.remove('decoy')); }
 
 function good(nextN, fragIdx) {
-  sfx.confirm(); buzz(30);
+  sfx.confirm(); buzz(30); progress();
+  flashModules('ok'); setStrip(`Étape ${g.step}/${NSTEPS} franchie`, 'Bien.', 'ok', 1800);
   g.prob = Math.max(0.3, g.prob - 7.9); showProb();
   if (fragIdx != null) {
     if (run.lies.fragLies.includes(fragIdx)) voice(['clue_fragment', digit(run.decoys.frags[fragIdx])], { lie: true, now: true });
@@ -582,6 +620,7 @@ function good(nextN, fragIdx) {
 }
 function bad(sec = 5, line = 'outcome_faux') {
   sfx.strike(); buzz(70);
+  flashModules('ko'); setStrip('Faux', `−${sec} s`, 'ko', 2000);
   g.errors++; ecgSpike(20 + Math.random() * 5); g.remaining -= sec; g.prob = Math.min(99.9, g.prob + 3.2); showProb();
   document.body.classList.remove('hit'); void document.body.offsetWidth; document.body.classList.add('hit');
   eye?.setMood('angry'); setTimeout(() => !g.lieUntil && g.running && eye?.setMood('watching'), 900);
@@ -590,6 +629,83 @@ function bad(sec = 5, line = 'outcome_faux') {
 function input() {
   g.lastInput = performance.now();
   if (g.hesitating) { g.hesitating = false; g.rate = 1; document.body.classList.remove('hesitate'); }
+}
+
+// ================= clarté (v0.2.4) : objectif, module actif, indices, retours =================
+// Bandeau « Objectif » : la même phrase courte que dit l'Entité (quoi faire, quel module), JAMAIS la solution.
+const cueText = (id) => cue(id)?.text ?? '';
+let stripTimer = 0;
+function objectiveText() { return g.phase === 'idle' ? 'Ouvre la mallette.' : g.phase === 'win' ? 'Mallette désamorcée.' : g.phase === 'boom' ? 'Détonation.' : cueText(OBJECTIVE[g.phase === 'play' ? g.step : 0]); }
+function showObjective() {
+  clearTimeout(stripTimer);
+  const o = $('#objective'); o.classList.remove('ok', 'ko', 'hint');
+  $('#objLabel').textContent = g.phase === 'play' ? `Étape ${g.step}/${NSTEPS}` : 'Objectif';
+  $('#objText').textContent = objectiveText();
+}
+// message temporaire dans le bandeau (retour Bien / Faux, indice), puis retour à l'objectif
+function setStrip(label, text, kind, ms = 2200) {
+  clearTimeout(stripTimer);
+  const o = $('#objective'); o.classList.remove('ok', 'ko', 'hint'); if (kind) o.classList.add(kind);
+  $('#objLabel').textContent = g.phase === 'play' && !/^Étape/.test(label) ? `Étape ${g.step}/${NSTEPS} · ${label}` : label; $('#objText').textContent = text;
+  stripTimer = setTimeout(showObjective, ms);
+}
+// module(s) de l'étape : contour qui pulse (statique si mouvement réduit) ; un leurre ne brille jamais
+function highlight() {
+  $$('.active-mod').forEach((e) => e.classList.remove('active-mod'));
+  const k = g.phase === 'play' ? g.step : g.phase === 'arm-toggle' ? 0 : null;
+  if (k == null) return;
+  for (const sel of MODULES[k] || []) $(sel)?.classList.add('active-mod');
+}
+function flashModules(kind) {
+  const els = $$('.active-mod'); const cls = kind === 'ok' ? 'fx-ok' : 'fx-ko';
+  els.forEach((e) => { e.classList.remove('fx-ok', 'fx-ko'); void e.offsetWidth; e.classList.add(cls); });
+  setTimeout(() => els.forEach((e) => e.classList.remove(cls)), 650);
+}
+function progress() { g.progressT = performance.now(); }
+// indices : 1 = où regarder (gratuit, automatique après 45 s sans progrès) ; 2 = la règle (−15 s) ; 3 = un morceau de la réponse dit à voix haute (−30 s)
+function hintStep() { return g.phase === 'play' ? g.step : g.phase === 'arm-toggle' ? 0 : null; }
+function hintUi() {
+  const b = $('#btnHint'), k = hintStep(), next = g.hint + 1;
+  const can = k != null && next <= 3;
+  b.disabled = !can;
+  const cost = !can ? '—' : (k === 0 || HINT_COST[next] === 0) ? 'gratuit' : `−${HINT_COST[next]} s`;
+  $('#hintCost').textContent = cost;
+  b.setAttribute('aria-label', can ? `Indice niveau ${next}, ${cost === 'gratuit' ? 'gratuit' : `coûte ${HINT_COST[next]} secondes`}` : 'Plus d’indice pour cette étape');
+}
+function giveHint(level, auto = false) {
+  const k = hintStep(); if (k == null || level > 3 || level <= g.hint) return;
+  g.hint = level; g.hintsUsed++;
+  const cost = k === 0 ? 0 : HINT_COST[level];
+  if (cost) { g.remaining -= cost; showTime(g.remaining); }
+  const ids = hintCues(run, k, level, { pos: g.pos, sabotage: g.sabotage });
+  sfx.push();
+  voice(ids, { now: true });
+  setStrip(cost ? `Indice ${level} · −${cost} s` : `Indice ${level}${auto ? ' · automatique' : ''}`, hintStrip(k, level).replace(/^Indice : /, ''), 'hint', 7000);
+  hintUi();
+}
+// tutoriel (première partie, ou bouton « Comment jouer ») : 5 écrans, « Passer » à tout moment
+const TUTO = [
+  ['Écoute l’Entité', 'Elle dicte chaque consigne à voix haute : monte le son. « Réécouter » répète l’objectif et la consigne.'],
+  ['Le module qui brille', 'Le bandeau en haut dit quoi faire. Le module à utiliser pulse en bleu : c’est lui qu’il faut toucher.'],
+  ['Œil rouge = mensonge', 'Quand son œil vire au rouge, ce qu’elle dit est faux. Ignore-le et garde la consigne de l’œil bleu.'],
+  ['Bloqué ?', 'Un indice arrive tout seul après 45 secondes sans progrès. Le bouton « Indice » en donne plus, contre du temps sur le chrono.'],
+  ['Armer, puis TRANSMIT', 'Pour commencer : lève le capot bleu et bascule le levier. À la fin : capot rouge, puis levier TRANSMIT. Chaque erreur coûte du temps.'],
+];
+const TUTO_KEY = 'entite-tuto-vu';
+const tutoSeen = () => { try { return localStorage.getItem(TUTO_KEY) === '1'; } catch { return true; } };
+let tutoI = 0, tutoDone = null;
+function showTuto(then) {
+  tutoI = 0; tutoDone = then || null; $('#tuto').hidden = false; tutoPaint(); $('#tutoNext').focus({ preventScroll: true });
+}
+function tutoPaint() {
+  const [t, body] = TUTO[tutoI];
+  $('#tutoNo').textContent = tutoI + 1; $('#tutoTitle').textContent = t; $('#tutoBody').textContent = body;
+  $$('.tuto-dots i').forEach((d, i) => d.classList.toggle('on', i === tutoI));
+  $('#tutoNext').textContent = tutoI === TUTO.length - 1 ? 'Jouer' : 'Suivant';
+}
+function closeTuto() {
+  try { localStorage.setItem(TUTO_KEY, '1'); } catch { /* privé */ }
+  $('#tuto').hidden = true; const f = tutoDone; tutoDone = null; f?.();
 }
 
 // ---------- armement ----------
@@ -601,17 +717,19 @@ function resetHardware() {
   }
 }
 function startGame() {
-  resetState(); buildParts(); setEncVisual(); resetHardware();
+  if (!tutoSeen() && !q.has('notuto')) { showTuto(startGame); return; }
+  clearVoice(); resetState(true); buildParts(); setEncVisual(); resetHardware();
   $('#intro').hidden = true; $('#app').hidden = false; $('#end').hidden = true;
   initAudio();
   // la mallette s'ouvre tout de suite : tout est à l'intérieur ; on arme avec le levier à capot bleu
-  g.phase = 'arm-toggle'; showStep(); refreshView();
+  g.phase = 'arm-toggle'; showStep(); refreshView(); showObjective(); highlight(); hintUi(); progress();
   $('#face-mallette').classList.remove('opening'); void $('#face-mallette').offsetWidth; $('#face-mallette').classList.add('opening'); sfx.lidOpen();
   $('#gtArm').classList.add('armed');
   setTimeout(() => drawCables(true), 760);
   voice('intro'); voice('arm_cache', { clue: true });
   showTime(TIME_S); showProb();
   if (DEBUG) $('#seedTag').textContent = ` · graine ${run.seed} · ${run.tier}`;
+  if (DEBUG) console.info('[entite] partie', run.seed, run.sig);
 }
 // levier à capot : 1er geste lève le capot, 2e bascule le levier (le capot se rabat si on le touche encore)
 function coverTap(k) {
@@ -626,6 +744,7 @@ function armToggle() {
   if (g.phase !== 'arm-toggle' || !g.coverArm) return;
   g.armed = true; $('#leverArm').setAttribute('aria-checked', 'true'); $('#gtArm').classList.remove('armed'); $('#gtArm').classList.add('on');
   sfx.toggleSnap(); sfx.arm(); buzz([40, 60, 40]);
+  flashModules('ok');
   g.phase = 'play'; g.running = true; g.startT = performance.now(); g.lastTick = performance.now(); g.lastInput = performance.now();
   voice('depart', { now: true });
   startMusic();
@@ -646,11 +765,12 @@ function txFlip() {
 function endGame(win) {
   if (g.ended) return;
   g.ended = true; g.running = false; g.result = win ? 'win' : 'boom'; g.phase = win ? 'win' : 'boom'; g.endT = performance.now();
-  g.pressure.forEach(clearTimeout); clearDecoys(); g.sabotage = false;
+  g.pressure.forEach(clearTimeout); clearDecoys(); g.sabotage = false; clearVoice();
+  showObjective(); highlight(); hintUi();
   document.body.classList.remove('hesitate', 'lying');
   $('#cyd1').classList.remove('liar');
   if (win) { stopMusic('fade'); sfx.win(); eye?.setMood('defused'); buzz([90, 90, 90]); voice('outcome_victoire', { now: true }); }
-  else { stopMusic('cut'); sfx.boom(); eye?.setMood('boom'); buzz([500, 120, 300, 120, 700]); voice('outcome_boom', { now: true }); document.body.classList.add('boom'); }
+  else { stopMusic('cut'); sfx.boom(); batt?.dip('boom'); eye?.setMood('boom'); buzz([500, 120, 300, 120, 700]); voice('outcome_boom', { now: true }); document.body.classList.add('boom'); }
   const used = TIME_S - Math.max(0, g.remaining), mm = Math.floor(used / 60), ss = Math.floor(used % 60);
   setTimeout(() => {
     $('#endKicker').textContent = win ? 'Entité confinée' : 'Détonation';
@@ -665,8 +785,14 @@ function wire() {
   $('#btnStart').addEventListener('click', startGame);
   $('#btnAgain').addEventListener('click', () => { document.body.classList.remove('boom'); stopVoice(); startGame(); });
   $('#btnReplay').addEventListener('click', () => { if (!g.lastClue) return; voice(g.lastClue, { now: true }).then(() => { if (g.running && g.step === 3 && g.code === '') flashSeq(run.seq); }); });
+  $('#btnHint').addEventListener('click', () => { input(); giveHint(g.hint + 1); });
+  $('#btnHelp').addEventListener('click', () => showTuto(null));
+  $('#tutoSkip').addEventListener('click', closeTuto);
+  $('#tutoNext').addEventListener('click', () => { if (tutoI < TUTO.length - 1) { tutoI++; tutoPaint(); } else closeTuto(); });
   $('#btnPocket').addEventListener('click', () => { sfx.push(); $('#pocketDlg').showModal(); });
-  $('#btnSon').addEventListener('click', () => { const m = !isMuted(); setMuted(m); $('#btnSon').setAttribute('aria-pressed', String(m)); $('#btnSon').setAttribute('aria-label', m ? 'Rétablir le son' : 'Couper le son'); });
+  const sonUi = () => { const m = isMuted(); $('#btnSon').setAttribute('aria-pressed', String(m)); $('#btnSon').setAttribute('aria-label', m ? 'Rétablir le son' : 'Couper le son'); };
+  $('#btnSon').addEventListener('click', () => { setMuted(!isMuted()); sonUi(); });
+  sonUi(); // état du bouton son gardé d'une session à l'autre (localStorage entite-son)
 
   // serrures Gebildet I, II, III (couvercle intérieur)
   $$('.lock.key').forEach((l) => $('.lock-btn', l).addEventListener('click', (e) => {
@@ -677,7 +803,7 @@ function wire() {
     if (k !== expect) {
       bad(5); g.keysTurned = []; $$('.lock.key').forEach((x) => { x.classList.remove('on'); $('.lock-btn', x).setAttribute('aria-pressed', 'false'); }); return;
     }
-    g.keysTurned.push(k); l.classList.add('on'); e.currentTarget.setAttribute('aria-pressed', 'true');
+    g.keysTurned.push(k); l.classList.add('on'); e.currentTarget.setAttribute('aria-pressed', 'true'); progress();
     if (g.keysTurned.length === 3) good(8);
   }));
 
@@ -746,7 +872,7 @@ function wire() {
     const shake = () => { t.classList.add('wiggle'); setTimeout(() => t.classList.remove('wiggle'), 400); };
     if (g.step !== 2 || g.trapOpen[i]) { sfx.wall(); shake(); return; }
     if (i === run.trap) { openTrap(i, 'ok'); good(3); }
-    else { shake(); sfx.servo(); bad(5); }
+    else { shake(); sfx.servo(); batt?.dip('servo'); bad(5); }
   });
 
   // clavier 4x4 (clavier pur)
@@ -799,7 +925,7 @@ function pushEnc(i) {
   else bad(5);
 }
 function openTrap(i, what) {
-  g.trapOpen[i] = true; sfx.servo();
+  g.trapOpen[i] = true; sfx.servo(); batt?.dip('trap');
   const t = $(`.trap[data-i="${i}"]`); t.classList.add('open');
   const well = $('.trap-well', t);
   well.innerHTML = what === 'keys' ? '<span class="keyset" role="img" aria-label="Clés I, II, III"><i></i><i></i><i></i></span>' : '<span class="trap-led" role="img" aria-label="Trappe ouverte"></span>';
@@ -823,7 +949,7 @@ function press(k) {
     g.code = ''; drawOled();
     if (step === 3) good(4, 1);
     else if (step === 6) {
-      sfx.confirm(); g.prob = Math.max(0.3, g.prob - 7.9); showProb();
+      sfx.confirm(); g.prob = Math.max(0.3, g.prob - 7.9); showProb(); flashModules('ok'); setStrip(`Étape 6/${NSTEPS} franchie`, 'Bien.', 'ok', 1800);
       voice('taunt_fini', { lie: true, now: true }); voice('taunt_couche2');
       openTrap((run.trap + 1) % 3, 'keys');
       setTimeout(() => g.running && nextStep(7), 400);
@@ -838,19 +964,47 @@ function stick(dir) {
   const maze = g.step === 5 ? run.maze1 : run.maze2;
   if (!canMove(maze, g.pos, d)) { sfx.wall(); $('.cyd2').classList.remove('bump'); void $('.cyd2').offsetWidth; $('.cyd2').classList.add('bump'); drawCyd2(); return; }
   g.pos = [g.pos[0] + DIRS[d][0], g.pos[1] + DIRS[d][1]];
+  { const key = g.pos.join(','); g.seen = g.seen || new Set(); if (!g.seen.has(g.step + ':' + key)) { g.seen.add(g.step + ':' + key); progress(); } }
   drawCyd2();
   if (g.pos[0] === maze.goal[0] && g.pos[1] === maze.goal[1]) {
     if (g.sabotage) endSabotage();
     good(g.step === 5 ? 6 : 10, g.step === 5 ? 3 : null);
   }
 }
-function startSabotage() { g.sabotage = true; g.sabEnd = performance.now() + 5500; $('.cyd2').classList.add('sab'); voice('sabotage_joystick', { lie: true, now: true }); sfx.glitch(); }
+function startSabotage() { g.sabotage = true; g.sabEnd = performance.now() + 5500; $('.cyd2').classList.add('sab'); voice('sabotage_joystick', { lie: true, now: true }); sfx.glitch(); batt?.dip('sabotage'); }
 function endSabotage() { g.sabotage = false; $('.cyd2').classList.remove('sab'); g.sabT = performance.now() + 7000; if (g.running && g.step === 9) voice('sabotage_fin', { now: true }); }
+// ================= batterie 3S (CYD 1, coin haut droit) =================
+// Mspalocell 12 V 5600 mAh Li-ion 3S : % + tension (courbe de décharge réelle), vidange lente, alerte < 15 %.
+let batt = null;
+function battInit() {
+  const f = DEBUG && q.has('batt') ? Number(q.get('batt')) : null;
+  batt = openBattery({ force: Number.isFinite(f) ? f : null });
+  battShow(true);
+}
+function battShow(force) {
+  const el = $('#batt'); if (!el || !batt) return;
+  const pct = Math.round(batt.pct), v = batt.volts.toFixed(1).replace('.', ',');
+  if (!force && el.dataset.pct === String(pct) && el.dataset.v === v) return;
+  el.dataset.pct = pct; el.dataset.v = v; el.dataset.level = batt.level;
+  el.style.setProperty('--fill', `${Math.max(4, batt.pct)}%`);
+  $('#battPct').textContent = `${pct} %`; $('#battV').textContent = `${v} V`;
+  el.setAttribute('aria-label', `Batterie ${pct} %, ${v} volts${batt.low ? ', faible' : ''}`);
+  el.classList.toggle('low', batt.low);
+}
+function battTick(now) {
+  if (!batt) return;
+  const dt = Math.min(1, (now - (battTick.t || now)) / 1000); battTick.t = now;
+  if (!$('#app').hidden) batt.tick(dt, g.running);
+  if (!$('#app').hidden && batt.takeWarning()) { sfx.lowBatt(); battTick.warnings = (battTick.warnings || 0) + 1; }
+  if (now - (battTick.s || 0) > 500) { battTick.s = now; battShow(); }
+}
+
 // ================= boucle =================
 let eye = null;
 const spkEl = document.getElementById('face-mallette');
 function loop(now) {
   requestAnimationFrame(loop);
+  battTick(now);
   // CYD 2 : ECG animé (~30 i/s) tant qu'il n'est pas en labyrinthe (étapes 5 et 9 inchangées)
   if (now - (loop.ecgT || 0) > 32 && !(g.phase === 'play' && (g.step === 5 || g.step === 9)) && !$('#app').hidden) { loop.ecgT = now; drawCyd2(); }
   const vl = voiceLevel(); if (vl !== loop.vl) { loop.vl = vl; spkEl.style.setProperty('--vl', vl.toFixed(3)); } // haut-parleurs du couvercle
@@ -868,6 +1022,8 @@ function loop(now) {
       if (sec <= 10 && !g.said10) { g.said10 = true; voice('outcome_dix', { now: true }); }
     }
     if (g.remaining <= 0) { showTime(0); endGame(false); return; }
+    // indice 1 automatique après 45 s sans progrès sur l'étape (gratuit)
+    if (g.hint === 0 && now - g.progressT > AUTO_HINT_MS) giveHint(1, true);
     // hésitation : 15 s sans geste → le temps accélère jusqu'au prochain geste
     if (!g.hesitating && now - g.lastInput > 15000) { g.hesitating = true; g.rate = 1.6; document.body.classList.add('hesitate'); voice('taunt_hesite', { now: true }); }
     // sabotage du joystick (étape 9) : fenêtres de 5,5 s, axes inversés, œil rouge
@@ -968,6 +1124,9 @@ function init() {
   $('#ver').textContent = VERSION;
   if (DEBUG && SEED_Q != null) { $('#seedTag').hidden = false; $('#seedTag').textContent = ` · graine ${SEED_Q}`; }
   resetState();
+  battInit();
+  if (DEBUG && q.get('voix') === 'rapide') setVoiceFast(true);
+  loadManifest().then(showObjective);
   // secours silencieux : sous-titre seulement si la synthèse vocale manque (ou son coupé)
   setCaptionHandler((text, lie) => { const c = $('#caption'); c.textContent = text; c.classList.toggle('show', !!text); c.classList.toggle('lie', !!lie); });
   eye = createEye($('#eye'), { config: deepMerge(EYE, { radiusOfMin: 0.3, center: { x: 0.5, y: 0.5 } }), reducedMotion: reduced });
@@ -985,7 +1144,12 @@ function init() {
       voiceLog, voiceStats, musicStats, ttsAvailable,
       forceSabotage(on) { if (on) startSabotage(); else endSabotage(); },
       idle(ms) { g.lastInput = performance.now() - ms; },
-      turn(i, s) { turn(i, s); }, pushEnc(i) { pushEnc(i); }, cables: () => cableGeom.map((c) => ({ ...c })), ecg: () => ({ bpm: Math.round(ecg.bpm), target: Math.round(ecg.target), label: ecg.label, adren: +ecg.adren.toFixed(1) }), ecgSpike, oled: () => drawOled(), get drag() { return drag; }, RING, DETENTS,
+      turn(i, s) { turn(i, s); }, pushEnc(i) { pushEnc(i); }, press(k) { press(k); }, stick(d) { stick(d); },
+      audio: () => audioGraph(), DUCK, setVolume, getVolume, speak: (ids) => voice(ids, { now: true }),
+      battery: () => ({ warnings: battTick.warnings || 0, pct: +batt.pct.toFixed(2), volts: +batt.volts.toFixed(2), level: batt.level, low: batt.low, why: batt.why, pack: PACK.name }), setBattery(p) { batt.set(p); battShow(true); }, battDip(k) { batt.dip(k); battShow(true); },
+      sigDiff, lastSig, hint(l) { giveHint(l ?? g.hint + 1); }, ageStep(ms) { g.progressT -= ms; }, objective: () => ({ label: $('#objLabel').textContent, text: $('#objText').textContent, kind: $('#objective').className }),
+      active: () => { const k = hintStep(); return k == null ? [] : MODULES[k].filter((sel) => $(sel)?.classList.contains('active-mod')); }, showTuto() { showTuto(null); },
+      goto(n) { if (g.phase === 'play') nextStep(n); }, cables: () => cableGeom.map((c) => ({ ...c })), ecg: () => ({ bpm: Math.round(ecg.bpm), target: Math.round(ecg.target), label: ecg.label, adren: +ecg.adren.toFixed(1) }), ecgSpike, oled: () => drawOled(), get drag() { return drag; }, RING, DETENTS,
     };
   }
 }

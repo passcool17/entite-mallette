@@ -1,5 +1,5 @@
 // sfx.js : effets procéduraux WebAudio (aucun fichier). Branchés sur le bus d'effets d'audio.js (donc coupés par le bouton son).
-import { bus } from './audio.js?v=0.2.3';
+import { bus } from './audio.js?v=0.2.4';
 
 let noiseBuf = null;
 function ctx() { return bus(); }
@@ -51,6 +51,7 @@ export const sfx = {
   strike() { tone(160, 0.24, { type: 'sawtooth', vol: 0.16 }); tone(152, 0.24, { type: 'square', vol: 0.08, at: 0.02 }); },
   confirm() { tone(880, 0.08, { type: 'triangle', vol: 0.12 }); tone(1320, 0.16, { type: 'triangle', vol: 0.11, at: 0.07 }); tone(1760, 0.2, { type: 'sine', vol: 0.05, at: 0.14 }); },
   glitch() { for (let i = 0; i < 5; i++) noise(0.03 + Math.random() * 0.04, { vol: 0.14, lp: 3000 + Math.random() * 5000, hp: 300, at: i * 0.05 }); tone(60, 0.25, { type: 'sawtooth', vol: 0.05 }); },
+  lowBatt() { tone(1568, 0.06, { type: 'sine', vol: 0.035 }); tone(1175, 0.09, { type: 'sine', vol: 0.03, at: 0.11 }); },   // batterie < 15 % : deux notes douces descendantes, une fois
   alarm() { for (let i = 0; i < 3; i++) tone(980, 0.12, { type: 'square', vol: 0.08, at: i * 0.18 }); },
   arm() { tone(220, 0.6, { type: 'sawtooth', vol: 0.06, slide: 4, attack: 0.05 }); tone(880, 0.12, { type: 'square', vol: 0.05, at: 0.62 }); },
   lidOpen() { noise(0.35, { vol: 0.12, lp: 900 }); tone(70, 0.4, { vol: 0.14, slide: 1.4 }); },

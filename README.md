@@ -1,13 +1,72 @@
 # La mallette de l’Entité
 
 Simulateur web (PWA, téléphone d’abord, portrait 412×915 et paysage 915×412) de la mallette de désamorçage
-ESP32 de PassCool_17, dans une valise Lykus HC-3010. Un seul joueur, aucune aide écrite : l’Entité dicte tout
-à voix haute, ment, et presse pendant que tu choisis.
+ESP32 de PassCool_17, dans une valise Lykus HC-3010. Un seul joueur : l’Entité dicte tout à voix haute, ment, et
+presse pendant que tu choisis. Aucune réponse n’est écrite ; seul l’objectif de l’étape (quoi faire, quel module) l’est.
 
 Lien : https://passcool17.github.io/entite-mallette/
 
 Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/entite-mallette-v015/
 (dépôt passcool17/entite-mallette-v015, cache séparé `entite-mallette-v015-0.1.5`).
+
+## Version 0.2.4 (24 nov. 2026)
+
+État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.2.4`, imports `?v=0.2.4`).
+
+### Clarté (priorité, retour de Pascal : « on reste bloqué sans savoir quoi faire »)
+- **Bandeau objectif** sous le chrono (portrait) ou dans la barre du haut (paysage / bureau) : « Étape N/12 » + une phrase
+  courte qui dit QUOI faire et OÙ (ex. « Branche les câbles dans les bonnes prises. », « Tape le code sur le clavier. »).
+  L’Entité dit la même phrase avant chaque consigne ; « Réécouter » rejoue objectif + consigne. Jamais de solution écrite
+  (aucun chiffre, lettre ou couleur de réponse ; testé sur les 12 étapes).
+- **Module actif** : le ou les modules de l’étape pulsent en bleu (contour statique si « mouvement réduit »). Un leurre
+  de l’Entité ne brille jamais ; quand l’œil est rouge, le contour reste sur le vrai module.
+- **Indices** : niveau 1 automatique et gratuit après 45 s sans progrès (où regarder : « Regarde la plaque de série »…) ;
+  bouton « Indice » (44 px, coût affiché) : niveau 2 = la règle expliquée pas à pas (−15 s ; aux étapes de code, rappel
+  des vrais fragments), niveau 3 = un morceau de la réponse DIT à voix haute, jamais écrit (première lettre, premier
+  chiffre, premier geste, première direction, bonne trappe…) (−30 s). Le bandeau ne montre que la source de l’indice.
+- **Tutoriel** au premier lancement (5 écrans, « Passer » 44 px, retenu dans `localStorage`), rejouable via « Comment jouer ».
+- **Retours** : bonne action = module flashé en vert + bip + DEL de progression + « Étape N/12 franchie · Bien. » ; erreur =
+  flash rouge + vibration + « Faux · −8 s » + réplique de l’Entité.
+- **Correctif voix** : une réplique « tout de suite » (mensonge, erreur, indice) ne peut plus effacer une consigne : la
+  consigne coupée est redite juste après (avant, un mensonge pendant `depart.mp3` pouvait faire disparaître la consigne
+  de l’étape 1).
+
+### Son mixé comme le vrai matériel (ESP32 → I2S → 2 × MAX98357A → SPK-L / SPK-R)
+- Un seul graphe WebAudio : bus voix, bus musique (boucle `audio/tension.mp3` + basse pulsée), bus effets, chacun dans
+  un panoramique stéréo (L/R), puis volume général → limiteur (DynamicsCompressor −10 dB, ratio 12) → sortie.
+- La voix passe PAR-DESSUS la musique : la boucle continue, baissée de **−8 dB (×0,398)**, attaque **150 ms**, relâche
+  **400 ms** (mp3 : au début de la lecture ; synthèse française : sur `onstart` / `onend`, secours à 700 ms). Les bips
+  passent au-dessus. Contexte audio relancé au premier geste (mobile).
+- Bouton son conservé ; muet + volume gardés dans `localStorage` (`entite-son`).
+
+### Jauge batterie (CYD 1, coin haut droit)
+- Batterie réelle : Mspalocell 12 V 5600 mAh Li-ion 3S (12,6 V pleine, ~9,0 V vide, 67,2 Wh). Icône + % (+ tension en
+  paysage / bureau), tension tirée d’une courbe OCV Li-ion réaliste ×3 (100 % 12,6 V · 50 % 11,4 V · 15 % 10,7 V · 0 % 9,0 V).
+- Simulation accélérée : −0,5 %/min en partie (≈ −4 % sur 8 min), −0,1 %/min hors partie ; −0,3 % par servo / trappe,
+  −0,5 % par sabotage, −1 % à l’explosion. Vert ≥ 40 %, ambre, rouge < 15 % : icône qui clignote + un bip discret, une fois,
+  aucune pénalité.
+- `localStorage` `entite-batterie` : continue de baisser d’une session à l’autre ; ≤ 5 % → rechargée à 100 % à l’ouverture ;
+  nouveau jour (ou première visite) → 62-100 % au hasard. `?debug=1&batt=12` force un niveau.
+
+### Paliers et variantes
+- Chaque partie tire **moyen** ou **difficile** (~50/50, caché ; `?debug=1` l’affiche ; `?seed=N` reproductible).
+- 9 étapes ont plusieurs règles (bassin par palier) : encodeurs (ordre, envers, lettre suivante sur l’anneau, échangées
+  par paires) ; trappe (couleur la plus présente, la plus rare, ni l’une ni l’autre, première DEL à gauche) ; séquence
+  (ordre, envers, position + 1) ; baie banane étape 4 (brancher couleur → prise, intervertir deux câbles, débrancher deux
+  câbles, prise = rang d’une lettre du n° de série) ; code 1 (ordre, envers, + 1) ; clés (légère → lourde ou l’inverse) ;
+  mot (ordre, envers, lettre suivante) ; baie étape 10 (double, intervertir, débrancher + rang de lettre) ; code 2
+  (envers, en commençant par le 3e, + dernier chiffre de la plaque).
+- Deux parties de suite diffèrent sur au moins 3 règles (signature de la partie précédente dans `localStorage`
+  `entite-derniere-partie`). Toutes les nouvelles répliques sont dans `voix/manifest.json` (`mp3Ready: false` → synthèse).
+
+### Toujours vrai
+Rotatifs E1–E4 = lettres seulement, chiffres au clavier 4×4, baie banane 5×5 (5 couleurs, glisser + toucher), ECG sur le
+CYD 2 (labyrinthe aux étapes 5 et 9), brouillage OLED sur le cadre seulement, tout dans la valise ouverte.
+
+### Prochaines étapes
+- Faire enregistrer les nouvelles répliques (objectifs, indices, variantes) par le bot Voix (`mp3Ready: true`).
+- Test sur le vrai S20 FE (son mixé, vibration, lisibilité du bandeau en plein soleil).
+- Porter la file de voix, le ducking et la jauge (lecture ADC du pont diviseur 3S) sur l’ESP32.
 
 ## Version 0.2.3 (23 nov. 2026)
 
@@ -156,7 +215,8 @@ jamais publiés.
   2 haut-parleurs `SPK-L` / `SPK-R` de part et d’autre du CYD 1 centré, aucune pièce sur la coque.
 - `js/audio.js`, `js/voice-manifest.js`, `js/sfx.js`, `js/eye.js`, `js/preload.js` : voix, sons, œil, préchargement.
 - `audio/tension.mp3` (192827 octets) : musique de tension.
-- `sw.js` : service worker, cache `entite-mallette-v0.2.3` (manifeste des voix inclus). À l’activation, les anciens
+- `js/guide.js` : objectifs, modules actifs, indices (v0.2.4). `js/battery.js` : modèle de batterie 3S (v0.2.4).
+- `sw.js` : service worker, cache `entite-mallette-v0.2.4` (manifeste des voix inclus). À l’activation, les anciens
   caches `entite-mallette-*` (dont `entite-mallette-v0.2.2`, `entite-mallette-v0.2.1`, `entite-mallette-v0.2.0-r2`, `entite-mallette-v0.2.0` et `entite-mallette-v0.1.5-base`) sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`).
 
 ## Tests

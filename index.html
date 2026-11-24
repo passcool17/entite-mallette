@@ -40,17 +40,19 @@
     @keyframes b-scan { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
     @media (prefers-reduced-motion: reduce) { .b-eye i { animation-duration: 30s; } .b-scan { animation-duration: 3s; } .b-eye b { animation: none; } }
   </style>
-  <link rel="stylesheet" href="css/app.css?v=0.2.3" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="css/app.css?v=0.2.3"></noscript>
-  <link rel="modulepreload" href="js/eye.js?v=0.2.3">
-  <link rel="modulepreload" href="js/eye-config.js?v=0.2.3">
-  <link rel="modulepreload" href="js/game.js?v=0.2.3">
-  <link rel="modulepreload" href="js/audio.js?v=0.2.3">
-  <link rel="modulepreload" href="js/sfx.js?v=0.2.3">
-  <link rel="modulepreload" href="js/voice-manifest.js?v=0.2.3">
-  <link rel="modulepreload" href="js/preload.js?v=0.2.3">
-  <link rel="modulepreload" href="js/panel-config.js?v=0.2.3">
-  <script type="module" src="js/app.js?v=0.2.3"></script>
+  <link rel="stylesheet" href="css/app.css?v=0.2.4" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="css/app.css?v=0.2.4"></noscript>
+  <link rel="modulepreload" href="js/eye.js?v=0.2.4">
+  <link rel="modulepreload" href="js/eye-config.js?v=0.2.4">
+  <link rel="modulepreload" href="js/game.js?v=0.2.4">
+  <link rel="modulepreload" href="js/audio.js?v=0.2.4">
+  <link rel="modulepreload" href="js/sfx.js?v=0.2.4">
+  <link rel="modulepreload" href="js/voice-manifest.js?v=0.2.4">
+  <link rel="modulepreload" href="js/preload.js?v=0.2.4">
+  <link rel="modulepreload" href="js/panel-config.js?v=0.2.4">
+  <link rel="modulepreload" href="js/battery.js?v=0.2.4">
+  <link rel="modulepreload" href="js/guide.js?v=0.2.4">
+  <script type="module" src="js/app.js?v=0.2.4"></script>
 </head>
 <body>
   <div id="boot" aria-live="polite">
@@ -120,6 +122,7 @@
     <h1 class="intro-title">La mallette<br>de l’Entité</h1>
     <p class="intro-lead">Elle dicte. Elle ment. Elle presse.<br>Écoute, retiens, désamorce.</p>
     <button class="btn-primary" id="btnStart" type="button" disabled>Ouvrir la mallette</button>
+    <button class="btn-ghost help-btn" id="btnHelp" type="button" aria-label="Comment jouer"><span aria-hidden="true">?</span> Comment jouer</button>
     <p class="intro-note">Monte le son : tout est dicté à voix haute.<br>Œil rouge : ce qu’elle dit est faux.</p>
     <p class="intro-meta"><span>PassCool_17</span> · v<span id="ver"></span><span id="seedTag" hidden></span> · Lykus HC-3010</p>
   </div>
@@ -128,12 +131,14 @@
     <header class="hud" id="hud">
       <div class="hud-row">
         <div class="tm" role="timer" aria-label="Temps restant"><span class="tm-digits" id="timer">8:00</span></div>
-        <div class="hud-meta">
+        <div class="hud-meta hud-prob">
           <span class="hud-label">prob. échec</span><output class="hud-val" id="prob">99,7 %</output>
         </div>
         <div class="hud-meta">
           <span class="hud-label">étape</span><output class="hud-val" id="stepNo">—</output>
         </div>
+        <div class="obj" id="objective" aria-live="polite"><span class="obj-label" id="objLabel">Objectif</span><span class="obj-text" id="objText">Ouvre la mallette.</span></div>
+        <button class="hint-btn" id="btnHint" type="button" disabled aria-label="Indice"><span class="hint-name">Indice</span><span class="hint-cost" id="hintCost">gratuit</span></button>
         <button class="icon-btn" id="btnSon" type="button" aria-pressed="false" aria-label="Couper le son">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-spk" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="i-on" d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11"/><path class="i-off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
         </button>
@@ -155,7 +160,7 @@
               <div class="spk spk-l" aria-hidden="true"><span class="spk-cone"></span><span class="silk">SPK-L · 3 W</span></div>
               <div class="cyd cyd1" id="cyd1">
                 <span class="pcb-tag" aria-hidden="true">CYD 1</span>
-                <div class="screen"><canvas id="eye" aria-hidden="true"></canvas><p class="caption" id="caption" aria-live="polite"></p></div>
+                <div class="screen"><canvas id="eye" aria-hidden="true"></canvas><div class="batt" id="batt" role="img" aria-label="Batterie"><span class="batt-ico" aria-hidden="true"><i></i></span><span class="batt-txt" aria-hidden="true"><b id="battPct">— %</b><small id="battV">— V</small></span></div><p class="caption" id="caption" aria-live="polite"></p></div>
               </div>
               <div class="spk spk-r" aria-hidden="true"><span class="spk-cone"></span><span class="silk">SPK-R · 3 W</span></div>
             </div>
@@ -255,6 +260,15 @@
     </form>
   </dialog>
 
+  <div class="tuto" id="tuto" hidden role="dialog" aria-modal="true" aria-labelledby="tutoTitle">
+    <div class="tuto-card">
+      <p class="tuto-kicker"><span id="tutoNo">1</span> / 5 · Comment jouer</p>
+      <h2 class="tuto-title" id="tutoTitle"></h2>
+      <p class="tuto-body" id="tutoBody"></p>
+      <div class="tuto-dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="tuto-actions"><button class="btn-ghost" id="tutoSkip" type="button">Passer</button><button class="btn-primary" id="tutoNext" type="button">Suivant</button></div>
+    </div>
+  </div>
   <div class="end" id="end" hidden role="dialog" aria-modal="true" aria-labelledby="endTitle">
     <div class="end-card">
       <p class="end-kicker" id="endKicker"></p>

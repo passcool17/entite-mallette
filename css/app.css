@@ -472,3 +472,70 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
   .keypad { padding: 4px; gap: 3px; }
   .mod-keys .lock-btn { width: 36px; height: 36px; }
 }
+
+/* ---------- v0.2.4 : jauge batterie 3S (CYD 1, coin haut droit, ne cache pas l'œil) ---------- */
+.batt { position: absolute; top: 3px; right: 4px; z-index: 2; display: flex; align-items: center; gap: 3px; padding: 1px 3px; border-radius: 3px; background: rgb(0 0 0 / .55); color: #36f08a; font: 700 8px/1 var(--f-mono); pointer-events: none; --fill: 80%; }
+.batt[data-level="mid"] { color: #ffb020; } .batt[data-level="low"] { color: #ff3b30; }
+.batt-ico { position: relative; width: 15px; height: 8px; border: 1px solid currentColor; border-radius: 2px; }
+.batt-ico::after { content: ""; position: absolute; right: -3px; top: 2px; width: 2px; height: 3px; border-radius: 0 1px 1px 0; background: currentColor; }
+.batt-ico i { position: absolute; left: 1px; top: 1px; bottom: 1px; width: calc((100% - 2px) * var(--fill) / 100%); max-width: calc(100% - 2px); background: currentColor; border-radius: 1px; }
+.batt-txt { display: flex; gap: 3px; align-items: baseline; white-space: nowrap; }
+.batt-txt small { font-size: 7px; opacity: .8; }
+.batt.low .batt-ico { animation: batt-blink 1s steps(2, jump-none) infinite; }
+@keyframes batt-blink { 50% { opacity: .15; } }
+@media (min-width: 1000px) and (min-height: 600px) { .batt { font-size: 11px; top: 5px; right: 6px; } .batt-ico { width: 20px; height: 10px; } .batt-ico::after { top: 3px; } .batt-txt small { font-size: 9px; } }
+@media (prefers-reduced-motion: reduce) { .batt.low .batt-ico { animation: none; outline: 1px solid #ff3b30; outline-offset: 1px; } }
+
+/* ---------- v0.2.4 : clarté — bandeau objectif, bouton Indice, module actif, retours, tutoriel ---------- */
+.hud-row { min-height: 44px; }
+.obj { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; align-content: center; padding: 3px 8px; border-radius: 6px; border: 1px solid rgb(98 214 255 / .28); background: rgb(2 16 24 / .7); transition: border-color .2s, background-color .2s; }
+.obj-label { font: 700 8px/1 var(--f-tech); letter-spacing: .14em; text-transform: uppercase; color: #62d6ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.obj-text { font: 600 11.5px/1.18 var(--f-ui, system-ui), system-ui, sans-serif; color: #e9f8ff; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-wrap: balance; }
+.obj.ok { border-color: #36f08a; background: rgb(8 40 22 / .85); } .obj.ok .obj-label, .obj.ok .obj-text { color: #7dffb5; }
+.obj.ko { border-color: #ff3b30; background: rgb(48 6 4 / .85); } .obj.ko .obj-label, .obj.ko .obj-text { color: #ffb3ab; }
+.obj.hint { border-color: #ffb020; background: rgb(44 30 4 / .85); } .obj.hint .obj-label { color: #ffb020; } .obj.hint .obj-text { color: #ffe2a8; }
+.hint-btn { flex: none; min-width: 52px; height: 44px; padding: 0 6px; display: grid; align-content: center; justify-items: center; gap: 2px; border-radius: 12px; border: 1px solid rgb(255 176 32 / .6); background: rgb(44 30 4 / .6); color: #ffd27a; }
+.hint-btn .hint-name { font: 700 10px/1 var(--f-tech); letter-spacing: .06em; text-transform: uppercase; }
+.hint-btn .hint-cost { font: 500 10px/1 var(--f-mono); color: #ffe2a8; white-space: nowrap; }
+.hint-btn:disabled { opacity: .35; }
+.hud .icon-btn { width: 44px; height: 44px; margin-left: 0; }
+@media (orientation: portrait) and (max-width: 599px) { .tm-digits { font-size: 22px; } .tm { padding: 4px 6px; } }
+@media (orientation: portrait) and (max-width: 359px) { #btnFs { display: none !important; } .hud-meta { min-width: 0; } .tm-digits { font-size: 19px; } .obj-text { font-size: 10.5px; } .hint-btn { min-width: 46px; } .hud-row { gap: 5px; } }
+@media (orientation: landscape) and (max-height: 520px) { :root { --hud-h: 54px; } .obj-text { -webkit-line-clamp: 2; } }
+@media (min-width: 1000px) and (min-height: 600px) { :root { --hud-h: 60px; } .obj-text { font-size: 14px; } .obj-label { font-size: 9px; } }
+.case { padding-top: 4px; padding-bottom: 2px; }
+
+/* module actif : contour bleu qui pulse (statique si mouvement réduit) ; retours vert / rouge */
+.active-mod { outline: 2px solid rgb(98 214 255 / .95); outline-offset: 3px; border-radius: 8px; animation: mod-pulse 1.3s ease-in-out infinite; }
+@keyframes mod-pulse { 0%, 100% { outline-color: rgb(98 214 255 / .95); box-shadow: 0 0 0 0 rgb(98 214 255 / 0); } 50% { outline-color: rgb(98 214 255 / .4); box-shadow: 0 0 16px 2px rgb(98 214 255 / .35); } }
+.active-mod.fx-ok { animation: none; outline-color: #36f08a; box-shadow: 0 0 18px 4px rgb(54 240 138 / .55); }
+.active-mod.fx-ko, .fx-ko { animation: none; outline: 2px solid #ff3b30; outline-offset: 3px; box-shadow: 0 0 18px 4px rgb(255 59 48 / .55); }
+.decoy.active-mod { outline-color: rgb(98 214 255 / .95); }
+@media (prefers-reduced-motion: reduce) { .active-mod { animation: none; } }
+
+/* bouton « Comment jouer » (accueil) */
+.help-btn { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; color: var(--silk); }
+.help-btn span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid currentColor; font: 700 13px/1 var(--f-tech); }
+
+/* tutoriel */
+.tuto { position: fixed; inset: 0; z-index: 900; display: grid; place-items: center; padding: 20px; background: rgb(3 5 7 / .86); backdrop-filter: blur(4px); }
+.tuto[hidden] { display: none; }
+.tuto-card { width: min(420px, 100%); display: grid; gap: 12px; padding: 22px 20px 18px; border-radius: 16px; border: 1px solid rgb(98 214 255 / .35); background: linear-gradient(#0d1a22, #071017); box-shadow: 0 20px 60px rgb(0 0 0 / .6); }
+.tuto-kicker { margin: 0; font: 700 10px/1 var(--f-tech); letter-spacing: .16em; text-transform: uppercase; color: #62d6ff; }
+.tuto-title { margin: 0; font: 700 24px/1.1 var(--f-tech); color: #e9f8ff; }
+.tuto-body { margin: 0; font-size: 16px; line-height: 1.45; color: #cfe3ee; min-height: 4.4em; }
+.tuto-dots { display: flex; gap: 6px; } .tuto-dots i { width: 8px; height: 8px; border-radius: 50%; background: rgb(98 214 255 / .25); } .tuto-dots i.on { background: #62d6ff; }
+.tuto-actions { display: flex; justify-content: space-between; gap: 10px; }
+.tuto-actions button { min-height: 44px; min-width: 110px; }
+/* portrait : le bandeau objectif passe sur sa propre ligne, pleine largeur, sous le chrono */
+@media (orientation: portrait) and (max-width: 999px) {
+  .hud-row { flex-wrap: wrap; row-gap: 4px; }
+  .hud-row .hud-meta:not(.hud-prob) { display: none; }
+  .hud-prob { display: grid !important; }
+  .hint-btn { margin-left: auto; }
+  .obj { order: 10; flex: 1 1 100%; display: flex; align-items: baseline; gap: 8px; padding: 4px 8px; }
+  .obj-label { flex: none; }
+  .obj-text { -webkit-line-clamp: 2; font-size: 12px; }
+}
+@media (orientation: portrait) and (min-width: 360px) and (max-width: 999px) { :root { --cyd1-h: 96px; --kp: 40px; } }
+@media (orientation: portrait) and (max-width: 599px) { .batt .batt-txt small { display: none; } .batt { gap: 2px; padding: 1px 2px; } .batt-ico { width: 13px; } }
