@@ -10,23 +10,198 @@
 //   - un indice (étape 3, niveaux 1–2) rejoue aussi les DEL (une fois par variante de séquence)
 //   - un indice sur une autre étape n'empêche pas d'avancer
 //   - à chaque étape code (3, 6, 11) : un faux code puis le bon, et l'étape n'avance qu'après le bon
+//   - à chaque réussite : l'index d'étape avance et l'id de voix passe à la réussite + l'objectif suivant
 //
 // Usage :
 //   node tests/fullrun.mjs
 //   node tests/fullrun.mjs http://127.0.0.1:8794/
 //   node tests/fullrun.mjs https://passcool17.github.io/entite-mallette/
+//   node tests/fullrun.mjs --base-url URL
+//   node tests/fullrun.mjs --seeds 0,26,28
+//   node tests/fullrun.mjs --seeds 3,42,77,501,1234          # ad hoc : couverture = WARN, pas FAIL
+//   node tests/fullrun.mjs --seeds 3,42,77 --require-coverage
+//   npm run qa
+//   node tests/fullrun.mjs --qa
+//   node tests/fullrun.mjs --qa --base-url https://passcool17.github.io/entite-mallette/
 //   FULLRUN_BASE=... node tests/fullrun.mjs
-// Graines optionnelles (débogage seulement ; le push exige la couverture complète) :
+// Graines optionnelles (débogage seulement ; la couverture complète n'est exigée
+// que pour le jeu par défaut et pour --qa / npm run qa) :
 //   node tests/fullrun.mjs http://127.0.0.1:8794/ 0 26 28 142 9
 // Viewport : 412×915 (Galaxy S20 FE, portrait).
+// --qa / CI : 20 graines fixes par palier + quelques aléatoires journalisées ;
+//   audio court-circuité (voiceLog + --mute-audio), serveur local auto si pas de --base-url.
 
-import { chromium } from '/home/box/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/index.mjs';
-import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS } from '../js/game.js?v=0.2.5i';
-import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.2.5i';
+import { createRequire } from 'node:module';
+import { existsSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import net from 'node:net';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS } from '../js/game.js?v=0.2.6';
+import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.2.6';
 
-const base = (process.env.FULLRUN_BASE || process.argv[2] || 'http://127.0.0.1:8794/').replace(/\/?$/, '/');
-const CHROME = process.env.CHROME || '/opt/google/chrome/chrome';
+const require = createRequire(import.meta.url);
+function loadChromium() {
+  const candidates = [
+    'playwright',
+    'playwright-core',
+    '/home/box/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/index.js',
+    '/home/box/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/index.mjs',
+  ];
+  for (const id of candidates) {
+    try { return require(id).chromium; } catch { /* next */ }
+  }
+  throw new Error('playwright introuvable : lancer npm ci (devDependency playwright)');
+}
+const chromium = loadChromium();
+
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const VIEW = { width: 412, height: 915 };
+
+// 20 moyen + 20 difficile, jeu couvrant inclus (0, 9, 28 / 26, 142). Liste fixe pour CI reproductible.
+const QA_FIXED = {
+  moyen:     [0, 7, 8, 9, 12, 14, 15, 18, 19, 21, 23, 24, 27, 28, 29, 32, 35, 39, 45, 46],
+  difficile: [1, 2, 3, 4, 5, 6, 10, 11, 13, 16, 17, 20, 22, 25, 26, 30, 31, 33, 34, 142],
+};
+const QA_RANDOM_PER_TIER = 2;
+
+function parseArgv(argv) {
+  const envCi = process.env.CI === 'true' || process.env.CI === '1';
+  const out = {
+    base: process.env.FULLRUN_BASE || '',
+    seeds: null,
+    qa: envCi || process.env.FULLRUN_QA === '1',
+    stubAudio: null,
+    autoServe: false,
+    explicitSeeds: false,
+    requireCoverage: process.env.FULLRUN_REQUIRE_COVERAGE === '1',
+  };
+  const rest = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--qa') out.qa = true;
+    else if (a === '--base-url' || a === '--base') out.base = argv[++i] || '';
+    else if (a.startsWith('--base-url=')) out.base = a.slice('--base-url='.length);
+    else if (a === '--seeds') {
+      out.seeds = String(argv[++i] || '').split(/[,\s]+/).filter(Boolean).map(Number);
+      out.explicitSeeds = true;
+    } else if (a.startsWith('--seeds=')) {
+      out.seeds = a.slice('--seeds='.length).split(/[,\s]+/).filter(Boolean).map(Number);
+      out.explicitSeeds = true;
+    } else if (a === '--stub-audio') out.stubAudio = true;
+    else if (a === '--no-stub-audio') out.stubAudio = false;
+    else if (a === '--serve') out.autoServe = true;
+    else if (a === '--require-coverage') out.requireCoverage = true;
+    else if (a === '--no-require-coverage') out.requireCoverage = false;
+    else if (a.startsWith('-')) {
+      console.error('option inconnue :', a);
+      process.exit(2);
+    } else rest.push(a);
+  }
+  for (const r of rest) {
+    if (/^https?:\/\//i.test(r)) {
+      if (!out.base) out.base = r;
+    } else if (/^\d+$/.test(r)) {
+      if (!out.seeds) out.seeds = [];
+      out.seeds.push(Number(r));
+      out.explicitSeeds = true;
+    } else if (!out.base) out.base = r;
+  }
+  if (out.stubAudio == null) out.stubAudio = !!out.qa;
+  if (out.qa && !out.base) out.autoServe = true;
+  if (!out.base && !out.autoServe) out.base = 'http://127.0.0.1:8794/';
+  if (out.base) out.base = out.base.replace(/\/?$/, '/');
+  return out;
+}
+
+const ARGS = parseArgv(process.argv.slice(2));
+
+function chromePath() {
+  if (process.env.CHROME) return process.env.CHROME;
+  if (process.env.CI === 'true' || process.env.CI === '1') return undefined;
+  if (existsSync('/opt/google/chrome/chrome')) return '/opt/google/chrome/chrome';
+  return undefined;
+}
+
+function launchOptions() {
+  const opts = {
+    args: [
+      '--autoplay-policy=no-user-gesture-required',
+      '--mute-audio',
+      '--disable-dev-shm-usage',
+    ],
+  };
+  const exe = chromePath();
+  if (exe) opts.executablePath = exe;
+  return opts;
+}
+
+function portOpen(port) {
+  return new Promise((resolve) => {
+    const s = net.connect({ host: '127.0.0.1', port }, () => { s.end(); resolve(true); });
+    s.on('error', () => resolve(false));
+  });
+}
+
+async function startStaticServer() {
+  const preferred = Number(process.env.FULLRUN_PORT) || 8794;
+  if (await portOpen(preferred)) {
+    const base = `http://127.0.0.1:${preferred}/`;
+    console.log(`serveur déjà ouvert  ${base}`);
+    return { base, stop: async () => {} };
+  }
+  const port = preferred;
+  const child = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], {
+    cwd: REPO_ROOT,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let err = '';
+  child.stderr.on('data', (d) => { err += d.toString(); });
+  const t0 = Date.now();
+  while (Date.now() - t0 < 8000) {
+    if (child.exitCode != null) throw new Error(`serveur http arrêté (code ${child.exitCode}) ${err}`);
+    if (await portOpen(port)) {
+      const base = `http://127.0.0.1:${port}/`;
+      console.log(`serveur local        ${base}`);
+      return {
+        base,
+        stop: () => new Promise((resolve) => {
+          child.once('exit', () => resolve());
+          child.kill('SIGTERM');
+          setTimeout(() => { try { child.kill('SIGKILL'); } catch {} resolve(); }, 1500);
+        }),
+      };
+    }
+    await new Promise((r) => setTimeout(r, 80));
+  }
+  try { child.kill('SIGTERM'); } catch {}
+  throw new Error('serveur http : délai dépassé');
+}
+
+function qaSeeds() {
+  const moyen = QA_FIXED.moyen.slice();
+  const difficile = QA_FIXED.difficile.slice();
+  if (moyen.length < 20 || difficile.length < 20) {
+    throw new Error(`QA_FIXED incomplet : moyen ${moyen.length}, difficile ${difficile.length}`);
+  }
+  const used = new Set([...moyen, ...difficile]);
+  const random = [];
+  for (const tier of TIERS) {
+    let n = 0, guard = 0;
+    while (n < QA_RANDOM_PER_TIER && guard++ < 200000) {
+      const s = Math.floor(Math.random() * 100000);
+      if (used.has(s)) continue;
+      if (makeRun(s).tier !== tier) continue;
+      used.add(s);
+      random.push(s);
+      n++;
+    }
+  }
+  console.log(`graines fixes         moyen ${moyen.length} [${moyen.join(', ')}]`);
+  console.log(`graines fixes         difficile ${difficile.length} [${difficile.join(', ')}]`);
+  console.log(`graines aléatoires    ${random.map((s) => `${s}(${makeRun(s).tier})`).join(', ') || '—'}`);
+  return { seeds: [...moyen, ...difficile, ...random], random };
+}
 
 const neededVariants = () => {
   const need = new Set();
@@ -35,6 +210,37 @@ const neededVariants = () => {
 };
 
 // Ensemble minimal de graines qui couvre chaque variante et les deux paliers (glouton déterministe).
+function plannedCoverage(seedList) {
+  const by = new Map();
+  for (const s of seedList) {
+    const r = makeRun(s);
+    for (const k of SLOTS) {
+      const key = `${k}:${r.v[k]}`;
+      if (!by.has(key)) by.set(key, []);
+      by.get(key).push(s);
+    }
+  }
+  return by;
+}
+
+// Échec immédiat si la liste fixe --qa / CI ne garantit pas les 29 variantes (union).
+function assertFixedListCovers() {
+  const fixed = [...QA_FIXED.moyen, ...QA_FIXED.difficile];
+  const need = neededVariants();
+  const by = plannedCoverage(fixed);
+  const missing = [...need].filter((k) => !by.has(k));
+  console.log('=== couverture prévue (liste fixe, union sur tout le run) ===');
+  for (const key of [...need].sort()) {
+    const ss = by.get(key) || [];
+    console.log(`  ${key.padEnd(20)}${ss.length ? 'graines ' + ss.join(', ') : 'MANQUE'}`);
+  }
+  if (missing.length) {
+    console.error(`FULLRUN FAIL  QA_FIXED ne couvre pas 29/29 : ${missing.join(', ')}`);
+    process.exit(1);
+  }
+  console.log(`liste fixe          ${need.size}/${need.size} variantes garanties`);
+}
+
 function coveringSeeds() {
   const need = neededVariants();
   const seeds = [];
@@ -61,9 +267,9 @@ function coveringSeeds() {
   return seeds;
 }
 
-function pickSeeds() {
-  const extra = process.argv.slice(3).filter((x) => /^\d+$/.test(x)).map(Number);
-  if (extra.length) return extra;
+function pickSeeds(args) {
+  if (args.explicitSeeds && args.seeds?.length) return args.seeds;
+  if (args.qa) return qaSeeds().seeds;
   return coveringSeeds();
 }
 
@@ -236,23 +442,42 @@ async function doMaze(p, { waitSab = false } = {}) {
   return false;
 }
 
-async function recordCyanSeq(p, ms = 22000) {
+async function recordCyanSeq(p, msOrOpts = 22000) {
+  const opts = typeof msOrOpts === 'number' ? { ms: msOrOpts } : (msOrOpts || {});
+  const ms = opts.ms ?? 22000;
+  const since = opts.since ?? 0;
   const tWait = Date.now();
+  let show = null;
   while (Date.now() - tWait < ms) {
-    const s = await D(p, () => __entiteDebug.seqShow);
-    if (s && !s.fake) break;
-    await W(p, 50);
+    show = await D(p, (since) => {
+      const pack = (s, live) => s && !s.fake && s.t0 > since
+        ? { seq: s.seq.slice(), t0: s.t0, on: s.on, gap: s.gap, now: performance.now(), live } : null;
+      const live = pack(typeof __entiteDebug !== 'undefined' ? __entiteDebug.seqShow : null, true);
+      if (live) return live;
+      return pack(window.__lastRealSeq, false);
+    }, since);
+    if (show) break;
+    await W(p, 30);
   }
-  const ev = [];
-  const t0 = Date.now();
-  let last = -1;
-  while (Date.now() - t0 < Math.max(4000, ms - (Date.now() - tWait)) && ev.length < 4) {
-    const on = await D(p, () => [...document.querySelectorAll('#bar i')].findIndex((e) => e.classList.contains('on') && e.style.getPropertyValue('--c').trim() === '#62d6ff'));
-    if (on >= 0 && on !== last) ev.push({ t: Date.now() - t0, led: on + 1 });
-    last = on;
-    await W(p, 40);
+  if (!show) return [];
+  const endAt = show.t0 + show.seq.length * (show.on + show.gap) + 40;
+  const tEnd = Date.now();
+  while (Date.now() - tEnd < 8000) {
+    const now = await D(p, () => performance.now());
+    if (now >= endAt) break;
+    await W(p, Math.min(50, Math.max(10, endAt - now)));
   }
-  return ev;
+  // Journal rempli dans la page (rAF). On compacte les doublons consécutifs
+  // (un frame « off » pendant l'allumage ne doit pas recréer la même DEL).
+  const ev = await D(p, ({ t0, endAt }) => (window.__cyanSeqLog || [])
+    .filter((e) => e.t >= t0 - 16 && e.t < endAt)
+    .map((e) => ({ t: Math.round(e.t - t0), led: e.led, leds: e.leds, groupOk: e.groupOk !== false })), { t0: show.t0, endAt });
+  const compact = [];
+  for (const e of ev) {
+    if (!compact.length || compact[compact.length - 1].led !== e.led) compact.push(e);
+    else if (!e.groupOk) compact[compact.length - 1].groupOk = false;
+  }
+  return compact;
 }
 
 async function waitSeqIdle(p, ms = 8000) {
@@ -263,6 +488,51 @@ async function waitSeqIdle(p, ms = 8000) {
     await W(p, 60);
   }
   return false;
+}
+
+async function readCyd2Hud(p) {
+  return D(p, () => {
+    const plate = document.querySelector('#serialPlate');
+    const serialEl = document.querySelector('#serial');
+    const readout = document.querySelector('#serialReadout');
+    const btn = document.querySelector('#btnReplay');
+    const cyd = document.querySelector('.cyd2');
+    const screen = cyd?.querySelector('.screen');
+    const batt = document.querySelector('#batt');
+    const want = window.__entiteDebug?.run?.serial;
+    const r = (el) => el ? el.getBoundingClientRect() : null;
+    const overlap = (a, b) => !!(a && b && !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom));
+    const visibleIn = (el, box) => {
+      const q = r(el);
+      if (!q || q.width < 1 || q.height < 1) return false;
+      const st = getComputedStyle(el);
+      if (st.visibility === 'hidden' || st.display === 'none' || Number(st.opacity) === 0) return false;
+      if (!box) return true;
+      const interW = Math.max(0, Math.min(q.right, box.right) - Math.max(q.left, box.left));
+      const interH = Math.max(0, Math.min(q.bottom, box.bottom) - Math.max(q.top, box.top));
+      return interW * interH > 0.6 * q.width * q.height;
+    };
+    const br = r(btn), sr = r(serialEl), scr = r(screen), btr = r(batt), rr = r(readout);
+    const zoom = parseFloat(document.getElementById('face-mallette')?.style.zoom || '1') || 1;
+    return {
+      plate: !!plate,
+      lidReplay: !!document.querySelector('.lid #btnReplay, .lid-ctrls #btnReplay'),
+      serialText: (serialEl?.textContent || '').trim(),
+      want,
+      inCyd: !!(cyd && serialEl && btn && cyd.contains(serialEl) && cyd.contains(btn)),
+      mazeClass: !!cyd?.classList.contains('maze'),
+      zoom: Math.round(zoom * 1000) / 1000,
+      btnW: br ? Math.round((br.width / zoom) * 10) / 10 : 0,
+      btnH: br ? Math.round((br.height / zoom) * 10) / 10 : 0,
+      btnLabel: (btn?.textContent || '').replace(/\s+/g, ' ').trim(),
+      serialVisible: visibleIn(serialEl, scr),
+      btnVisible: visibleIn(btn, scr),
+      battVisible: visibleIn(batt, scr),
+      battPct: (document.querySelector('#battPct')?.textContent || '').trim(),
+      overlapBattSerial: overlap(btr, sr),
+      overlapBattBtn: overlap(btr, br),
+    };
+  });
 }
 
 async function playOne(b, seed, opts) {
@@ -279,6 +549,64 @@ async function playOne(b, seed, opts) {
     viewport: VIEW, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block',
   });
   await ctx.addInitScript(() => { try { localStorage.setItem('entite-tuto-vu', '1'); } catch {} });
+  // Journal des DEL cyan côté page : résiste à un evaluate occupé pendant une fenêtre d'allumage.
+  await ctx.addInitScript(() => {
+    window.__cyanSeqLog = [];
+    window.__lastRealSeq = null;
+    const tick = () => {
+      try {
+        const s = window.__entiteDebug?.seqShow;
+        if (s && !s.fake && (!window.__lastRealSeq || window.__lastRealSeq.t0 !== s.t0)) {
+          window.__lastRealSeq = { seq: s.seq.slice(), t0: s.t0, on: s.on, gap: s.gap };
+        }
+        const bar = document.querySelector('#bar');
+        if (bar) {
+          const all = [...bar.querySelectorAll('i')];
+          const lit = all.map((e, i) => (e.classList.contains('on') && e.style.getPropertyValue('--c').trim() === '#62d6ff' ? i : -1)).filter((i) => i >= 0);
+          const positions = [...new Set(lit.map((i) => Math.floor(i / 4) + 1))];
+          const log = window.__cyanSeqLog;
+          const last = log[log.length - 1];
+          if (positions.length === 1) {
+            const pos = positions[0], a = (pos - 1) * 4;
+            const want = [a, a + 1, a + 2, a + 3];
+            const groupOk = want.every((i) => lit.includes(i)) && lit.length === 4;
+            const leds = want.map((i) => i + 1);
+            if (!last || last.led !== pos || last.off) log.push({ t: performance.now(), led: pos, leds, groupOk, off: false });
+            else if (!groupOk) last.groupOk = false;
+          } else if (lit.length === 0 && last && !last.off) last.off = true;
+          else if (positions.length > 1 && last && !last.off) last.groupOk = false;
+        }
+      } catch { /* debug pas encore prêt */ }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  // CI / --qa : pas de périphérique audio. On décode chaque mp3 en tampon silencieux très court
+  // pour que playBuffer se termine tout de suite. voiceLog reste complet (mode mp3).
+  if (ARGS.stubAudio) {
+    await ctx.addInitScript(() => {
+      const Orig = window.AudioContext || window.webkitAudioContext;
+      if (!Orig) return;
+      const Wrapped = function (...args) {
+        const ac = new Orig(...args);
+        ac.decodeAudioData = (data, success, error) => {
+          try {
+            const n = Math.max(8, Math.floor(ac.sampleRate * 0.04));
+            const buf = ac.createBuffer(1, n, ac.sampleRate);
+            if (typeof success === 'function') success(buf);
+            return Promise.resolve(buf);
+          } catch (e) {
+            if (typeof error === 'function') error(e);
+            return Promise.reject(e);
+          }
+        };
+        return ac;
+      };
+      Wrapped.prototype = Orig.prototype;
+      window.AudioContext = Wrapped;
+      window.webkitAudioContext = Wrapped;
+    });
+  }
   const p = await ctx.newPage();
   const errs = [];
   p.on('console', (m) => { if (m.type() === 'error') errs.push('console:' + m.text()); });
@@ -298,7 +626,24 @@ async function playOne(b, seed, opts) {
     return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs };
   }
 
-  const extras = { replay: null, hintSeq: null, hintOther: null, wrong: [], voice: 0 };
+  const extras = { replay: null, hintSeq: null, hintOther: null, wrong: [], voice: 0, hud: 0 };
+
+  const hud = async (step, maze = false) => {
+    const info = await readCyd2Hud(p);
+    const ok = !info.plate && !info.lidReplay && info.inCyd
+      && info.serialText === info.want && /^[A-Z][0-9][A-Z][0-9]-[A-Z][0-9][A-Z][0-9]$/.test(info.serialText)
+      && info.serialVisible && info.btnVisible && info.battVisible
+      && info.btnW >= 44 && info.btnH >= 44
+      && /RÉÉCOUTER|RÉECOUTER/i.test(info.btnLabel)
+      && info.mazeClass === maze
+      && !info.overlapBattSerial && !info.overlapBattBtn
+      && /%/.test(info.battPct);
+    rec(ok, step, step, ok
+      ? `CYD 2 n° ${info.serialText} + RÉÉCOUTER ${info.btnW}×${info.btnH}${maze ? ' (labyrinthe, coin)' : ''}, batterie ${info.battPct}`
+      : `CYD 2 HUD ${JSON.stringify(info)}`);
+    if (ok) extras.hud = (extras.hud || 0) + 1;
+    return ok;
+  };
 
   const fail = async (from, to, why) => {
     const now = await snap(p);
@@ -328,10 +673,12 @@ async function playOne(b, seed, opts) {
     await ctx.close();
     return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, s };
   }
+  if (!(await hud(0, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   await p.tap('#coverArm'); await W(p, 120);
   const tArm = await tNow();
   await p.tap('#leverArm');
   if (!(await expectAdvance(0, 1, 'armement', tArm))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs }; }
+  if (!(await hud(1, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
   const answers = await D(p, () => {
     const r = __entiteDebug.run, RING = __entiteDebug.RING;
@@ -363,25 +710,33 @@ async function playOne(b, seed, opts) {
   const t1 = await tNow();
   await rotateTo(p, answers.enc1);
   if (!(await expectAdvance(1, 2, `lettres ${answers.enc1.join('')}`, t1))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  if (!(await hud(2, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
   // ---- 2 trappe
+  // Journal rAF dans la page : on ne lit la 1re séquence qu'après l'assertion de voix,
+  // pour ne pas concurrencer les evaluate (sinon la 1re DEL peut être lue à 0).
   const t2 = await tNow();
+  const tBeforeSeq = await D(p, () => performance.now());
   await p.tap(`.trap[data-i="${answers.trap}"] .trap-door`);
   if (!(await expectAdvance(2, 3, `trappe ${answers.trap + 1}`, t2))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  if (!(await hud(3, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
   // ---- 3 barre + clavier : 1re séquence, Réécouter, éventuellement indice, faux code puis bon
   const wantSeq = answers.seq;
-  const first = await recordCyanSeq(p, 22000);
+  const first = await recordCyanSeq(p, { since: tBeforeSeq, ms: 22000 });
   const firstLeds = first.map((e) => e.led);
-  const firstOk = firstLeds.join() === wantSeq.join();
-  rec(firstOk, 3, 3, firstOk ? `1re séquence ${firstLeds.join('-')}` : `1re séquence ${firstLeds.join('-') || '∅'} ≠ ${wantSeq.join('-')}`);
+  const firstGroups = first.length > 0 && first.every((e) => e.groupOk && Array.isArray(e.leds) && e.leds.length === 4 && e.leds[0] === 4 * e.led - 3 && e.leds[3] === 4 * e.led);
+  const firstOk = firstLeds.join() === wantSeq.join() && firstGroups;
+  rec(firstOk, 3, 3, firstOk ? `1re séquence ${firstLeds.join('-')} (groupes 32 LED)` : `1re séquence ${firstLeds.join('-') || '∅'} ≠ ${wantSeq.join('-')}  groupes=${JSON.stringify(first.map((e) => ({ pos: e.led, leds: e.leds, ok: e.groupOk })))}`);
   if (!firstOk) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   await waitSeqIdle(p, 4000);
 
+  const tBeforeReplay = await D(p, () => performance.now());
   await p.locator('#btnReplay').click({ force: true });
-  const replay = await recordCyanSeq(p, 22000);
+  const replay = await recordCyanSeq(p, { since: tBeforeReplay, ms: 22000 });
   const replayLeds = replay.map((e) => e.led);
-  const replayOk = replayLeds.join() === wantSeq.join();
+  const replayGroups = replay.length > 0 && replay.every((e) => e.groupOk && Array.isArray(e.leds) && e.leds.length === 4 && e.leds[0] === 4 * e.led - 3 && e.leds[3] === 4 * e.led);
+  const replayOk = replayLeds.join() === wantSeq.join() && replayGroups;
   const replayInfo = replayOk ? `Réécouter ${replayLeds.join('-')}` : `Réécouter ${replayLeds.join('-') || '∅'} ≠ ${wantSeq.join('-')}  ${JSON.stringify(await D(p, () => ({ lastClue: __entiteDebug.state.lastClue, seqShow: __entiteDebug.seqShow, log: __entiteDebug.voiceLog.slice(-5).map((v) => v.ids[0]), replayDis: document.querySelector('#btnReplay')?.disabled })))}`;
   rec(replayOk, 3, 3, replayInfo);
   extras.replay = { ok: replayOk, first: firstLeds, replay: replayLeds, want: wantSeq };
@@ -404,16 +759,30 @@ async function playOne(b, seed, opts) {
   if (!w3.ok) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   const t3 = w3.tRight ?? await tNow();
   if (!(await expectAdvance(3, 4, `code ${answers.seqCode}`, t3))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  if (!(await hud(4, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
   // ---- 4 baie
   const t4 = await tNow();
   await doPatch(p, answers.patch1);
   if (!(await expectAdvance(4, 5, `patch ${JSON.stringify(answers.patch1)}`, t4))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
-  // ---- 5 labyrinthe
+  // ---- 5 labyrinthe : n° + RÉÉCOUTER restent dans le coin, bouton utilisable
+  if (!(await hud(5, true))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  await p.waitForFunction(() => !document.querySelector('#btnReplay')?.disabled, { timeout: 8000 }).catch(() => {});
+  const nVoix5 = await D(p, () => (__entiteDebug.voiceLog || []).length);
+  await p.locator('#btnReplay').click({ force: true });
+  await W(p, 250);
+  const mazeReplay5 = await D(p, (n) => {
+    const log = (__entiteDebug.voiceLog || []).slice(n);
+    return log.some((v) => (v.ids || []).some((id) => /verrou|clue_|obj_/.test(id)));
+  }, nVoix5);
+  rec(!!mazeReplay5, 5, 5, mazeReplay5 ? 'Réécouter pendant le labyrinthe' : `Réécouter labyrinthe muet  log=${JSON.stringify(await D(p, (n) => (__entiteDebug.voiceLog || []).slice(n).map((v) => v.ids), nVoix5))}`);
+  if (!mazeReplay5) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  if (!(await hud(5, true))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   const t5 = await tNow();
   if (!(await doMaze(p))) { await fail(5, 6, 'labyrinthe bloqué'); await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   if (!(await expectAdvance(5, 6, 'labyrinthe', t5))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  if (!(await hud(6, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
   // ---- 6 code 1
   const w6 = await wrongThenRight(p, answers.code1, 6);
@@ -422,6 +791,7 @@ async function playOne(b, seed, opts) {
   if (!w6.ok) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   const t6 = w6.tRight ?? await tNow();
   if (!(await expectAdvance(6, 7, `code ${answers.code1}`, t6))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  if (!(await hud(7, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
   // ---- 7 clés
   const t7 = await tNow();
@@ -430,6 +800,7 @@ async function playOne(b, seed, opts) {
     await W(p, 70);
   }
   if (!(await expectAdvance(7, 8, `ordre ${answers.keyOrder.join(',')}`, t7))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  if (!(await hud(8, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
   // ---- 8 encodeurs (mot)
   const t8 = await tNow();
@@ -437,14 +808,17 @@ async function playOne(b, seed, opts) {
   if (!(await expectAdvance(8, 9, `lettres ${answers.enc2.join('')}`, t8))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
   // ---- 9 labyrinthe (éventuellement attendre le sabotage)
+  if (!(await hud(9, true))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   const t9 = await tNow();
   if (!(await doMaze(p, { waitSab: opts.waitSab }))) { await fail(9, 10, 'labyrinthe 2 bloqué'); await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   if (!(await expectAdvance(9, 10, 'labyrinthe 2', t9))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  if (!(await hud(10, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
   // ---- 10 baie 2
   const t10 = await tNow();
   await doPatch(p, answers.patch2);
   if (!(await expectAdvance(10, 11, `patch ${JSON.stringify(answers.patch2)}`, t10))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  if (!(await hud(11, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
   // ---- 11 code 2
   const w11 = await wrongThenRight(p, answers.code2, 11);
@@ -453,6 +827,7 @@ async function playOne(b, seed, opts) {
   if (!w11.ok) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   const t11 = w11.tRight ?? await tNow();
   if (!(await expectAdvance(11, 12, `code ${answers.code2}`, t11))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  if (!(await hud(12, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
   // ---- 12 levier rouge
   await p.tap('#coverTx'); await W(p, 120);
@@ -496,13 +871,28 @@ async function wrongThenRight(p, want, step) {
   return { ok: true, bad, want, tRight };
 }
 
-const seeds = pickSeeds();
+const seeds = pickSeeds(ARGS);
 const need = neededVariants();
-console.log(`fullrun  base=${base}`);
+let base = ARGS.base;
+let stopServer = async () => {};
+if (ARGS.autoServe) {
+  const srv = await startStaticServer();
+  base = srv.base;
+  stopServer = srv.stop;
+}
+console.log(`fullrun  base=${base}  qa=${ARGS.qa ? 'oui' : 'non'}  audio=${ARGS.stubAudio ? 'court-circuité (voiceLog)' : 'réel'}  graines=${ARGS.explicitSeeds ? 'explicites' : (ARGS.qa ? 'qa 20+20+aléatoires' : 'couverture minimale')}`);
 console.log(`graines (${seeds.length}) : ${seeds.map((s) => `${s}(${makeRun(s).tier})`).join(', ')}`);
+const seedTiers = { moyen: seeds.filter((s) => makeRun(s).tier === 'moyen').length, difficile: seeds.filter((s) => makeRun(s).tier === 'difficile').length };
+console.log(`par palier           moyen ${seedTiers.moyen}  difficile ${seedTiers.difficile}`);
+if (ARGS.qa && !ARGS.explicitSeeds) assertFixedListCovers();
+if (ARGS.qa && !ARGS.explicitSeeds && (seedTiers.moyen < 20 || seedTiers.difficile < 20)) {
+  console.error(`FULLRUN FAIL  --qa exige ≥ 20 graines par palier (moyen ${seedTiers.moyen}, difficile ${seedTiers.difficile})`);
+  await stopServer();
+  process.exit(1);
+}
 console.log(`variantes à couvrir : ${need.size}  paliers : ${TIERS.join(', ')}`);
 
-const b = await chromium.launch({ executablePath: CHROME, args: ['--autoplay-policy=no-user-gesture-required'] });
+const b = await chromium.launch(launchOptions());
 const results = [];
 const cover = new Map(); // variant -> [seeds]
 const tierHits = { moyen: 0, difficile: 0 };
@@ -529,6 +919,7 @@ try {
   }
 } finally {
   await b.close();
+  await stopServer();
 }
 
 const missing = [...need].filter((k) => !cover.has(k));
@@ -563,14 +954,25 @@ for (const r of results) {
 }
 console.log(`parties              ${nPass}/${results.length} réussies`);
 console.log(`Réécouter (DEL)      ${nReplay}/${results.length}`);
+const nHud = results.reduce((n, r) => n + (r.extras?.hud || 0), 0);
+console.log(`CYD 2 n° + RÉÉCOUTER ${nHud} vérifs (plaque absente, ≥ 44 px, visible y compris labyrinthe)`);
 console.log(`indices étape 3      ${nHintSeq} (cible : une fois par variante de séquence)`);
 console.log(`indices autre étape  ${nHintOther}`);
 console.log(`faux puis bon code   ${nWrong}/${nWrongWant} (étapes 3, 6, 11)`);
 console.log(`voix après réussite  ${results.reduce((n, r) => n + (r.extras?.voice || 0), 0)} (étape + id de voix en ≤ 1,5 s, sans voix de l'étape d'avant)`);
 console.log(`couverture           ${coverOk ? 'COMPLETE' : 'INCOMPLETE'}  (${cover.size}/${need.size} variantes, paliers moyen=${tierHits.moyen} difficile=${tierHits.difficile})`);
 
-if (!allOk || !coverOk) {
-  console.log('FULLRUN FAIL');
+// Couverture = union de toutes les parties du run, pas de chaque graine isolée.
+// --qa / jeu couvrant par défaut / --require-coverage : 29/29 exigé (FAIL sinon).
+// Run ad hoc (--seeds …) : WARN seulement, sauf si --require-coverage.
+const requireCover = ARGS.requireCoverage || !ARGS.explicitSeeds;
+if (!allOk || (requireCover && !coverOk)) {
+  if (!allOk) console.log('FULLRUN FAIL  au moins une partie a échoué');
+  if (requireCover && !coverOk) console.log('FULLRUN FAIL  couverture incomplète (union du run)');
   process.exit(1);
+}
+if (!requireCover && !coverOk) {
+  console.log(`WARN  couverture ${cover.size}/${need.size} (union du run) — incomplet, pas un échec. Exiger 29/29 avec --require-coverage.`);
+  if (missing.length) console.log(`WARN  manquent : ${missing.join(', ')}`);
 }
 console.log('FULLRUN PASS');

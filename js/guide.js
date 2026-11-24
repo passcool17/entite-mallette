@@ -3,7 +3,7 @@
 // (contour qui pulse), et 3 niveaux d'INDICES. Règle de Pascal : le bandeau dit QUOI faire et OÙ, jamais une réponse
 // calculée (aucun code, sauf ?debug=1). À l'étape 10 le bandeau reprend la consigne dictée (couleur / prise). Seul l'indice 3 DIT (à voix haute) un morceau de la réponse.
 // Logique pure (sans DOM) : testable avec node.
-import { RING, DIRS, canMove } from './game.js?v=0.2.5i';
+import { RING, DIRS, canMove } from './game.js?v=0.2.6';
 
 // objectif : id de réplique (voix/manifest.json) ; le texte du bandeau = le texte de la réplique (même phrase)
 export const OBJECTIVE = {
@@ -29,14 +29,14 @@ const H1 = { 1: 'hint1_plaque', 2: 'hint1_barre', 3: 'hint1_sequence', 4: 'hint1
 const RULE = 'Indice : écoute la règle, pas à pas';
 const STRIP = {
   0: ['Indice : capot bleu, puis levier', 'Indice : deux gestes, capot puis levier', 'Indice : deux gestes, capot puis levier'],
-  1: ['Indice : regarde la plaque de série', RULE, 'Indice : la première molette est dite'],
+  1: ['Indice : regarde le n° de série, sur l’écran du bas', RULE, 'Indice : la première molette est dite'],
   2: ['Indice : compte les couleurs de la barre', RULE, 'Indice : la bonne trappe est dite'],
-  3: ['Indice : Réécouter, puis observe la barre', RULE, 'Indice : le premier chiffre est dit'],
+  3: ['Indice : Réécouter, sur l’écran du bas, puis la barre', RULE, 'Indice : le premier chiffre est dit'],
   4: ['Indice : écoute la couleur et la prise', RULE, 'Indice : le premier geste est dit'],
   5: ['Indice : contourne les murs', 'Indice : essaie vers la droite et le haut', 'Indice : la première direction est dite'],
   6: ['Indice : reprends les fragments dictés (œil bleu)', 'Indice : écoute la règle et les fragments', 'Indice : le premier chiffre est dit'],
-  7: ['Indice : regarde les chiffres de la plaque', RULE, 'Indice : la première serrure est dite'],
-  8: ['Indice : Réécouter, puis lis l’OLED', RULE, 'Indice : la première molette est dite'],
+  7: ['Indice : regarde les chiffres du n° de série, sur l’écran du bas', RULE, 'Indice : la première serrure est dite'],
+  8: ['Indice : Réécouter, sur l’écran du bas, puis lis l’OLED', RULE, 'Indice : la première molette est dite'],
   12: ['Indice : capot rouge, puis levier', 'Indice : deux gestes, capot puis levier', 'Indice : deux gestes, capot puis levier'],
 };
 STRIP[9] = STRIP[5]; STRIP[10] = STRIP[4]; STRIP[11] = STRIP[6];

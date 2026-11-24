@@ -1,0 +1,44 @@
+# Contrôle qualité automatique : partie complète, étapes 0 à 12.
+# Tout échec (exit ≠ 0) rend la coche rouge.
+name: QA
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  fullrun:
+    name: full-run 0–12
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Full-run QA
+        env:
+          CI: 'true'
+        run: |
+          set -o pipefail
+          mkdir -p qa-out
+          npm run qa 2>&1 | tee qa-out/fullrun.log
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fullrun-log
+          path: qa-out/fullrun.log
+          if-no-files-found: warn

@@ -1,23 +1,23 @@
 // app.js : La mallette de l'Entité v0.2.5 : une seule vue, la mallette ouverte (couvercle intérieur + base).
 // Tout est à l'intérieur de la valise. Deux leviers à capot : bleu (armement) et rouge (TRANSMIT, la fin).
 // KY-040 : on tourne le bouton lui-même (20 crans = anneau de 20 lettres A-V, JAMAIS de chiffres ; chiffres = clavier 4x4).
-// Baie banane 5x5 : n'importe quel câble dans n'importe quelle prise (glisser ou toucher). CYD 2 : moniteur cardiaque ECG.
+// Baie banane 5x5 : n'importe quel câble dans n'importe quelle prise (glisser ou toucher). CYD 2 : n° de série + bouton RÉÉCOUTER (labyrinthe aux étapes 5 et 9).
 // Règle de Pascal : aucun code ni réponse calculée écrit à l'écran (sauf ?debug=1). L'Entité dicte (voix), puis presse et ment (œil rouge)
 // pendant que tu choisis. À l'étape 10 le bandeau reprend la consigne de câblage dictée, visible jusqu'à la réussite.
 // Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 // v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 2, variantes d'énigmes
 // tirées par étape (deux parties de suite ne se ressemblent pas : signature de la partie précédente dans localStorage).
-import { createEye } from './eye.js?v=0.2.5i';
-import { EYE, deepMerge } from './eye-config.js?v=0.2.5i';
-import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.5i';
-import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.2.5i';
-import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.5i';
-import { sfx } from './sfx.js?v=0.2.5i';
-import { preloadAll } from './preload.js?v=0.2.5i';
-import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.2.5i';
-import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.2.5i';
+import { createEye } from './eye.js?v=0.2.6';
+import { EYE, deepMerge } from './eye-config.js?v=0.2.6';
+import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.6';
+import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.2.6';
+import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.6';
+import { sfx } from './sfx.js?v=0.2.6';
+import { preloadAll } from './preload.js?v=0.2.6';
+import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.2.6';
+import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.2.6';
 
-const VERSION = '0.2.5i';
+const VERSION = '0.2.6';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -390,10 +390,30 @@ function wirePatchbay() {
 }
 
 // ================= affichages =================
+// 32 LED physiques (4 barrettes de 8 en chaîne), 8 positions de jeu : la position p
+// allume le groupe LED 4p−3 à 4p. `cols` reste un tableau de 8 couleurs (une par position).
 function setBar(cols) {
   const b = $('#bar');
-  if (b.children.length !== 8) { b.textContent = ''; for (let i = 0; i < 8; i++) b.append(document.createElement('i')); }
-  [...b.children].forEach((el, i) => { const c = cols[i]; el.style.setProperty('--c', c || 'transparent'); el.classList.toggle('on', !!c); });
+  let leds = b.querySelectorAll('i');
+  if (leds.length !== 32) {
+    b.textContent = '';
+    for (let p = 0; p < 8; p++) {
+      const group = document.createElement('span');
+      group.className = 'ws-group';
+      group.dataset.p = String(p + 1);
+      for (let k = 0; k < 4; k++) group.append(document.createElement('i'));
+      b.append(group);
+    }
+    leds = b.querySelectorAll('i');
+  }
+  for (let p = 0; p < 8; p++) {
+    const c = cols[p];
+    for (let k = 0; k < 4; k++) {
+      const el = leds[4 * p + k];
+      el.style.setProperty('--c', c || 'transparent');
+      el.classList.toggle('on', !!c);
+    }
+  }
 }
 function showTime(s) {
   s = Math.max(0, s);
@@ -445,104 +465,37 @@ function setEncVisual() {
   });
 }
 
-// CYD 2 : verrou de signal (labyrinthe visible), sinon oscilloscope en veille
-// ================= CYD 2 hors labyrinthe : moniteur cardiaque (ECG) du démineur =================
-// Purement visuel (aucun bip) : le pouls monte avec le chrono, les erreurs (adrénaline) et les répliques de l'Entité.
-const ecg = { bpm: 70, target: 70, adren: 0, jit: 0, ph: 0, head: 0, lastT: 0, buf: null, label: 'VEILLE', aria: '' };
-function ecgWave(p) {                       // un battement P-QRS-T, p ∈ [0,1)
-  const gs = (m, w, a) => a * Math.exp(-((p - m) * (p - m)) / (2 * w * w));
-  return gs(0.1, 0.022, 0.12) + gs(0.205, 0.007, -0.12) + gs(0.23, 0.009, 1) + gs(0.255, 0.008, -0.28) + gs(0.44, 0.04, 0.3);
+// CYD 2 : n° de série + RÉÉCOUTER en permanence (plus d'ECG / oscilloscope). Aux étapes 5 et 9, le labyrinthe
+// prend l'écran ; le n° reste visible en petit dans un coin, avec le bouton, sous la grille. La jauge batterie (HTML, haut droit) ne doit pas les chevaucher.
+function setCyd2Mode() {
+  const mazeOn = !!(run && g.phase === 'play' && (g.step === 5 || g.step === 9));
+  $('.cyd2')?.classList.toggle('maze', mazeOn);
+  const cv = $('#cyd2'), sn = ($('#serial')?.textContent || '').trim();
+  if (!cv) return;
+  const al = mazeOn
+    ? `Écran 2 : verrou de signal, numéro de série ${sn}`
+    : `Écran 2 : numéro de série ${sn}`;
+  if (cv.getAttribute('aria-label') !== al) cv.setAttribute('aria-label', al);
 }
-function ecgSpike(n = 22) { ecg.adren = Math.min(60, ecg.adren + n); ecg.jit = 1; }
-function ecgTarget(now) {
-  if (g.phase === 'boom') return 0;
-  if (g.phase === 'win') return 72;
-  if (g.phase !== 'play') return 70;
-  const t = Math.min(1, Math.max(0, 1 - g.remaining / TIME_S)), r = g.remaining;
-  let b = 76 + 30 * Math.pow(t, 1.3);
-  if (r < 180) b += (180 - r) / 180 * 16;   // < 3 min : ça grimpe plus vite
-  if (r < 60) b += (60 - r) / 60 * 22;      // < 60 s : panique
-  b += Math.min(20, g.errors * 4) + ecg.adren;
-  if (now < g.lieUntil) b += 13;            // l'Entité ment / provoque
-  else if (voiceLevel() > 0.04) b += 6;     // l'Entité parle
-  if (g.hesitating) b += 8;
-  return Math.max(74, Math.min(176, b));
-}
-function ecgStyle(bpm) {
-  if (g.phase === 'boom') return { ink: '#ff3b30', hud: '#ff3b30', label: 'ARRÊT' };
-  if (g.phase !== 'play' && g.phase !== 'win') return { ink: '#38bdf8', hud: '#38bdf8', label: 'VEILLE' };
-  if (bpm < 95) return { ink: '#36f08a', hud: '#52d6ff', label: 'STABLE' };
-  if (bpm < 125) return { ink: '#ffb020', hud: '#ffb020', label: 'STRESS' };
-  return { ink: '#ff3b30', hud: '#ff3b30', label: bpm < 150 ? 'STRESS ÉLEVÉ' : 'CRITIQUE' };
-}
-function drawEcg(c, W, H, now) {
-  const dt = Math.min(0.1, ecg.lastT ? (now - ecg.lastT) / 1000 : 0); ecg.lastT = now;
-  ecg.target = ecgTarget(now);
-  ecg.adren *= Math.exp(-dt / 9); ecg.jit *= Math.exp(-dt / 0.8);
-  ecg.bpm += (ecg.target - ecg.bpm) * (1 - Math.exp(-dt / (g.phase === 'boom' ? 0.5 : 1.6)));
-  const st = ecgStyle(ecg.bpm), top = 32, bot = H - 14, mid = top + (bot - top) * 0.62, amp = (bot - top) * 0.55;
-  if (!ecg.buf || ecg.buf.length !== W) { ecg.buf = new Float32Array(W).fill(NaN); ecg.head = 0; }
-  // balayage gauche → droite (≈ 2,6 s par écran) ; la phase cardiaque avance au rythme du pouls
-  const flat = g.phase === 'boom' && ecg.bpm < 8;
-  ecg.acc = (ecg.acc || 0) + dt * W / 2.6; const steps = Math.floor(ecg.acc); ecg.acc -= steps;
-  for (let k = 0; k < steps; k++) {
-    ecg.ph = (ecg.ph + (ecg.bpm / 60) * (2.6 / W)) % 1;
-    const tremor = (st.ink === '#ff3b30' ? 1.2 : 0) + ecg.jit * 2.5;
-    const v = flat ? 0 : ecgWave(ecg.ph) * (g.phase === 'boom' ? ecg.bpm / 90 : 1);
-    ecg.head = (ecg.head + 1) % W;
-    ecg.buf[ecg.head] = mid - v * amp + (Math.random() - 0.5) * (0.8 + tremor);
-  }
-  // grille
-  c.strokeStyle = 'rgba(82,214,255,.12)'; c.lineWidth = 1;
-  for (let x = 0.5; x <= W; x += 20) { c.beginPath(); c.moveTo(x, top - 4); c.lineTo(x, bot); c.stroke(); }
-  for (let y = top - 3.5; y <= bot; y += 20) { c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
-  // trace phosphore : plus vive près du spot, effacée juste devant lui
-  c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = st.ink;
-  for (let seg = 0; seg < 6; seg++) {
-    c.globalAlpha = 0.18 + seg * 0.16; c.lineWidth = seg === 5 ? 2.2 : 1.8; c.beginPath();
-    let started = false;
-    for (let d = W - 12 - Math.round((W - 12) * (seg + 1) / 6); d <= W - 12 - Math.round((W - 12) * seg / 6); d++) {
-      const x = (ecg.head - (W - 12 - d) + W * 2) % W, y = ecg.buf[x];
-      if (Number.isNaN(y) || (started && x === 0)) { started = false; continue; }
-      started ? c.lineTo(x, y) : c.moveTo(x, y); started = true;
-    }
-    c.stroke();
-  }
-  c.globalAlpha = 1;
-  const hy = ecg.buf[ecg.head];
-  if (!Number.isNaN(hy)) { c.fillStyle = '#fff'; c.shadowColor = st.ink; c.shadowBlur = 12; c.beginPath(); c.arc(ecg.head, hy, 2.6, 0, 7); c.fill(); c.shadowBlur = 0; }
-  // HUD : cœur qui bat + BPM + état ; barre de stress en bas
-  const beat = flat ? 0 : Math.max(0, 1 - Math.abs(ecg.ph - 0.24) * 9);
-  const hx = 14, hy0 = 13, s = 5 + beat * 1.6;
-  c.fillStyle = st.ink; c.shadowColor = st.ink; c.shadowBlur = 4 + beat * 10; c.beginPath();
-  c.moveTo(hx, hy0 + s * 0.9); c.bezierCurveTo(hx - s * 1.6, hy0 - s * 0.1, hx - s * 0.7, hy0 - s * 1.3, hx, hy0 - s * 0.35);
-  c.bezierCurveTo(hx + s * 0.7, hy0 - s * 1.3, hx + s * 1.6, hy0 - s * 0.1, hx, hy0 + s * 0.9); c.fill(); c.shadowBlur = 0;
-  const shown = Math.round(flat ? 0 : ecg.bpm);
-  c.textBaseline = 'middle'; c.fillStyle = st.hud; c.font = 'bold 16px ui-monospace, Menlo, Consolas, monospace'; c.textAlign = 'left';
-  c.fillText(String(shown), 26, 13); const tw = c.measureText(String(shown)).width;
-  c.font = 'bold 9px ui-monospace, Menlo, Consolas, monospace'; c.fillText('BPM', 30 + tw, 14);
-  // état à gauche, sous le BPM : le coin droit est réservé à la jauge batterie (HTML)
-  c.font = 'bold 8px ui-monospace, Menlo, Consolas, monospace'; c.fillText(st.label, 26, 25);
-  const f = Math.max(0, Math.min(1, (ecg.bpm - 60) / 116));
-  c.fillStyle = 'rgba(255,255,255,.08)'; c.fillRect(8, H - 8, W - 16, 4);
-  c.fillStyle = st.ink; c.fillRect(8, H - 8, (W - 16) * f, 4);
-  ecg.label = st.label;
-  const aria = `Moniteur cardiaque : ${shown} BPM, ${st.label.toLowerCase()}`;
-  if (aria !== ecg.aria && (now - (ecg.ariaT || 0) > 2000 || st.label !== ecg.ariaL)) { ecg.aria = aria; ecg.ariaT = now; ecg.ariaL = st.label; c.canvas.setAttribute('aria-label', aria); }
+function drawCyd2Idle(c, W, H) {
+  c.fillStyle = '#020a10'; c.fillRect(0, 0, W, H);
+  c.strokeStyle = 'rgba(82,214,255,.10)'; c.lineWidth = 1;
+  for (let x = 0.5; x <= W; x += 20) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke(); }
+  for (let y = 0.5; y <= H; y += 20) { c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
 }
 
 function drawCyd2() {
   const cv = $('#cyd2'); if (!cv) return;
+  setCyd2Mode();
   const c = cv.getContext('2d'), W = cv.width, H = cv.height, now = performance.now();
   c.fillStyle = '#020a10'; c.fillRect(0, 0, W, H);
   const maze = g.phase === 'play' && (g.step === 5 ? run.maze1 : g.step === 9 ? run.maze2 : null);
   const sab = g.sabotage;
-  if (!maze) { drawEcg(c, W, H, now);
-    return;
-  }
-  if (ecg.aria) { ecg.aria = ''; ecg.ariaL = ''; }
-  { const [ax, ay] = g.pos || maze.start, al = `Écran 2 : verrou de signal, point en colonne ${ax + 1}, ligne ${ay + 1}${sab ? ', commandes inversées' : ''}`; if (cv.getAttribute('aria-label') !== al) cv.setAttribute('aria-label', al); }
-  const n = maze.n, hud = 32, cs = Math.floor(Math.min((W - 16) / n, (H - 16 - hud) / n)), ox = Math.floor((W - cs * n) / 2), oy = hud + Math.floor((H - hud - cs * n) / 2);
+  if (!maze) { drawCyd2Idle(c, W, H); return; }
+  { const [ax, ay] = g.pos || maze.start, al = `Écran 2 : verrou de signal, point en colonne ${ax + 1}, ligne ${ay + 1}, numéro de série ${run.serial}${sab ? ', commandes inversées' : ''}`; if (cv.getAttribute('aria-label') !== al) cv.setAttribute('aria-label', al); }
+  // réserve haut (jauge) et bas (n° compact + RÉÉCOUTER, 46 px CSS ≈ proportionnel au canvas)
+  const topPad = Math.round(H * 0.12), botPad = Math.round(H * 0.30);
+  const n = maze.n, cs = Math.floor(Math.min((W - 16) / n, (H - topPad - botPad) / n)), ox = Math.floor((W - cs * n) / 2), oy = topPad + Math.floor((H - topPad - botPad - cs * n) / 2);
   const ink = sab ? '#ff4b3e' : '#62d6ff';
   c.strokeStyle = sab ? 'rgba(255,75,62,.16)' : 'rgba(98,214,255,.14)'; c.lineWidth = 1;
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) c.strokeRect(ox + x * cs + 0.5, oy + y * cs + 0.5, cs, cs);
@@ -552,14 +505,12 @@ function drawCyd2() {
     if (w & 1) { c.moveTo(X, Y); c.lineTo(X + cs, Y); }
     if (w & 8) { c.moveTo(X, Y); c.lineTo(X, Y + cs); }
     if (y === n - 1 && (w & 4)) { c.moveTo(X, Y + cs); c.lineTo(X + cs, Y + cs); }
-    if (x === n - 1 && (w & 2)) { c.moveTo(X + cs, Y); c.lineTo(X + cs, Y + cs); }
+    if (x === n - 1 && (w & 2)) { c.moveTo(X, Y); c.lineTo(X + cs, Y + cs); }
   }
   c.stroke();
-  // cible : anneau pulsé
   const [gx, gy] = maze.goal, pr = cs * 0.28 + Math.sin(now / 200) * 2;
   c.strokeStyle = '#36f08a'; c.lineWidth = 2; c.beginPath(); c.arc(ox + gx * cs + cs / 2, oy + gy * cs + cs / 2, pr, 0, 7); c.stroke();
   c.beginPath(); c.arc(ox + gx * cs + cs / 2, oy + gy * cs + cs / 2, 3, 0, 7); c.fillStyle = '#36f08a'; c.fill();
-  // curseur
   const [px, py] = g.pos || maze.start;
   c.fillStyle = sab ? '#ff4b3e' : '#e9f8ff'; c.shadowColor = ink; c.shadowBlur = 10;
   c.fillRect(ox + px * cs + cs * 0.3, oy + py * cs + cs * 0.3, cs * 0.4, cs * 0.4); c.shadowBlur = 0;
@@ -644,7 +595,7 @@ function good(nextN, fragIdx) {
 function bad(sec = 5, line = 'outcome_faux') {
   sfx.strike(); buzz(70);
   flashModules('ko'); setStrip('Faux', `−${sec} s`, 'ko', 2000);
-  g.errors++; ecgSpike(20 + Math.random() * 5); g.remaining -= sec; g.prob = Math.min(99.9, g.prob + 3.2); showProb();
+  g.errors++; g.remaining -= sec; g.prob = Math.min(99.9, g.prob + 3.2); showProb();
   document.body.classList.remove('hit'); void document.body.offsetWidth; document.body.classList.add('hit');
   eye?.setMood('angry'); setTimeout(() => !g.lieUntil && g.running && eye?.setMood('watching'), 900);
   if (line) voice(line, { now: true });
@@ -1106,8 +1057,8 @@ const spkEl = document.getElementById('face-mallette');
 function loop(now) {
   requestAnimationFrame(loop);
   battTick(now);
-  // CYD 2 : ECG animé (~30 i/s) tant qu'il n'est pas en labyrinthe (étapes 5 et 9 inchangées)
-  if (now - (loop.ecgT || 0) > 32 && !(g.phase === 'play' && (g.step === 5 || g.step === 9)) && !$('#app').hidden) { loop.ecgT = now; drawCyd2(); }
+  // CYD 2 : le labyrinthe (étapes 5 et 9) pulse à ~30 i/s ; hors labyrinthe le n° est en HTML, pas d'animation ECG
+  if (now - (loop.cydT || 0) > 32 && g.phase === 'play' && (g.step === 5 || g.step === 9) && !$('#app').hidden) { loop.cydT = now; drawCyd2(); }
   const vl = voiceLevel(); if (vl !== loop.vl) { loop.vl = vl; spkEl.style.setProperty('--vl', vl.toFixed(3)); } // haut-parleurs du couvercle
   if (eye) { eye.setVoice(vl); eye.lookAt(Math.sin(now / 2300) * 0.5, Math.sin(now / 3100) * 0.35); }
   if (g.running) {
@@ -1135,7 +1086,7 @@ function loop(now) {
     if (!g.lieUntil && eye && !g.ended) eye.setMood(g.remaining <= 30 ? 'angry' : 'watching');
     setMusicIntensity(Math.pow(Math.min(1, Math.max(0, 1 - g.remaining / TIME_S)), 1.8));
   }
-  // barre WS2812B : avant l'étape 2 progression ; à partir de l'étape 2 la barre montre ses 8 couleurs (indice de la trappe)
+  // barre WS2812B : 32 LED / 8 groupes de 4. Avant l'étape 2, progression ; à partir de l'étape 2, 8 couleurs (indice de la trappe)
   if (now - (loop.t || 0) > 80) {
     loop.t = now;
     let cols;
@@ -1253,7 +1204,7 @@ function init() {
       active: () => { const k = hintStep(); return k == null ? [] : MODULES[k].filter((sel) => $(sel)?.classList.contains('active-mod')); }, showTuto() { showTuto(null); },
       goto(n) { if (g.phase === 'play') nextStep(n); },
       get seqShow() { return g.seqShow; }, cancelSeq, clearVoice,
-      cables: () => cableGeom.map((c) => ({ ...c })), ecg: () => ({ bpm: Math.round(ecg.bpm), target: Math.round(ecg.target), label: ecg.label, adren: +ecg.adren.toFixed(1) }), ecgSpike, oled: () => drawOled(), get drag() { return drag; }, RING, DETENTS,
+      cables: () => cableGeom.map((c) => ({ ...c })), oled: () => drawOled(), get drag() { return drag; }, RING, DETENTS,
     };
   }
 }

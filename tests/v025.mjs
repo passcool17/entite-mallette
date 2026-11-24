@@ -1,9 +1,9 @@
-// Test léger v0.2.5i : voix ElevenLabs, jauge CYD 2 (y compris 915×412), overflow 0.
+// Test léger v0.2.6 : voix ElevenLabs, jauge CYD 2 (y compris 915×412), overflow 0.
 // Usage : node tests/v025.mjs [base]
 import { chromium } from '/home/box/.npm/_npx/9833c18b2d85bc59/node_modules/playwright-core/index.mjs';
 import { mkdirSync, readFileSync } from 'node:fs';
-import { makeRun } from '../js/game.js?v=0.2.5i';
-import { OBJECTIVE, objectiveIds, hintCues, HINT_COST, AUTO_HINT_MS } from '../js/guide.js?v=0.2.5i';
+import { makeRun } from '../js/game.js?v=0.2.6';
+import { OBJECTIVE, objectiveIds, hintCues, HINT_COST, AUTO_HINT_MS } from '../js/guide.js?v=0.2.6';
 
 const base = process.argv[2] || 'http://127.0.0.1:8794/';
 const shots = process.env.SHOTS || '/workspace/qa/entite-mallette/v0.2.5-dev/';
@@ -18,7 +18,7 @@ const VAGUE = 'Rebranche les câbles : nouvelle consigne.';
 // ================= 1. logique pure =================
 {
   const ready = man.cues.filter((c) => c.mp3Ready); const el = ready.filter((c) => c.source === 'elevenlabs');
-  ok('manifeste v0.2.5i : 172 répliques toutes prêtes, toutes ElevenLabs (intro/depart inclus)', man.version === '0.2.5i' && man.cues.length === 172 && ready.length === 172 && el.length === 172 && el.every((c) => c.mp3Ready && c.file === `voix/${c.id}.mp3`) && el.filter((c) => c.id === 'intro' || c.id === 'depart').length === 2);
+  ok('manifeste v0.2.6 : 172 répliques toutes prêtes, toutes ElevenLabs (intro/depart inclus)', man.version === '0.2.6' && man.cues.length === 172 && ready.length === 172 && el.length === 172 && el.every((c) => c.mp3Ready && c.file === `voix/${c.id}.mp3`) && el.filter((c) => c.id === 'intro' || c.id === 'depart').length === 2);
   ok('coûts d’indice inchangés (0 / 15 / 30) et auto 45 s', HINT_COST[1] === 0 && HINT_COST[2] === 15 && HINT_COST[3] === 30 && AUTO_HINT_MS === 45000);
   const kinds = { double: 0, echange: 7, serie: 2 };
   const samples = {};
@@ -97,7 +97,7 @@ async function openTo(p, step) {
   await p.tap('#btnHint'); await W(p, 250);
   const h3 = await D(p, () => ({ hint: __entiteDebug.state.hint, rem: __entiteDebug.state.remaining, dis: document.querySelector('#btnHint').disabled, heard: __entiteDebug.voiceLog.map((v) => v.ids[0]), text: document.querySelector('#objText').textContent }));
   ok('étape 10 : Indice 3 coûte −30 s, dit le premier geste (voix seulement), bouton épuisé', h3.hint === 3 && rem2 - h3.rem > 29.5 && rem2 - h3.rem < 31.5 && (h3.heard.includes('hint3_geste') || h3.heard.includes('hint3_debranche')) && h3.dis, { ...h3, rem2 });
-  ok('démarrage sans erreur, 0 404, imports ?v=0.2.5i, mp3 ElevenLabs demandés', errs.length === 0 && !errs.some((e) => /404/.test(e)) && reqs.filter((u) => /\/js\/\w[\w-]*\.js/.test(u)).every((u) => /\?v=0\.2\.5i$/.test(u)) && reqs.some((u) => /guide\.js\?v=0\.2\.5i/.test(u)) && reqs.some((u) => /voix\/clue_patch_double\.mp3/.test(u)), { errs: errs.slice(0, 6), js: reqs.filter((u) => /\.js/.test(u)).map((u) => u.split('/').pop()) });
+  ok('démarrage sans erreur, 0 404, imports ?v=0.2.6, mp3 ElevenLabs demandés', errs.length === 0 && !errs.some((e) => /404/.test(e)) && reqs.filter((u) => /\/js\/\w[\w-]*\.js/.test(u)).every((u) => /\?v=0\.2\.5i$/.test(u)) && reqs.some((u) => /guide\.js\?v=0\.2\.5i/.test(u)) && reqs.some((u) => /voix\/clue_patch_double\.mp3/.test(u)), { errs: errs.slice(0, 6), js: reqs.filter((u) => /\.js/.test(u)).map((u) => u.split('/').pop()) });
   await done();
 }
 
@@ -313,7 +313,10 @@ const measureBatt = () => {
   await D(p, () => __entiteDebug.goto(3));
   await W(p, 120);
   const want = await D(p, () => __entiteDebug.run.seq.slice());
-  const readLit = () => D(p, () => [...document.querySelectorAll('#bar i')].map((e, i) => (e.classList.contains('on') && e.style.getPropertyValue('--c').trim() === '#62d6ff' ? i + 1 : 0)).filter(Boolean));
+  const readLit = () => D(p, () => {
+    const lit = [...document.querySelectorAll('#bar i')].map((e, i) => (e.classList.contains('on') && e.style.getPropertyValue('--c').trim() === '#62d6ff' ? i : -1)).filter((i) => i >= 0);
+    return [...new Set(lit.map((i) => Math.floor(i / 4) + 1))];
+  });
   const overflow = () => D(p, () => { const se = document.scrollingElement || document.documentElement; return { dx: se.scrollWidth - se.clientWidth, dy: se.scrollHeight - se.clientHeight }; });
   async function recordSeq(ms = 18000) {
     const ev = [];

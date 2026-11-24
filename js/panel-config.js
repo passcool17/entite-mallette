@@ -17,15 +17,14 @@ export const CASE = {
 // v0.2.1 : TOUT est à l'intérieur de la valise ouverte. Coque (dessus, flancs) : aucun composant, aucun perçage.
 // v0.2.2 : 5 câbles banane qui partent de la base et montent se brancher dans les douilles du couvercle ; KY-040 sans boutons + / −.
 // v0.2.3 : vraie baie banane 5x5 (n'importe quel câble dans n'importe quelle prise, matrice GPIO), 5 couleurs Keadic
-//          distinctes (rouge, noir, jaune, vert, bleu : une de chaque), KY-040 = lettres seulement, CYD 2 = moniteur ECG.
+//          distinctes (rouge, noir, jaune, vert, bleu : une de chaque), KY-040 = lettres seulement, CYD 2 = n° de série + bouton tactile RÉÉCOUTER (labyrinthe aux étapes 5 et 9).
 //          Toujours 0 pièce à l'extérieur de la valise.
 export const PARTS = {
   // Couvercle intérieur (32 mm)
   cyd1:      { w: 86, h: 50, screen: { w: 57.6, h: 43.2 }, note: 'CYD 1 ESP32-2432S028 2,8 po ILI9341 240x320 : œil de l’Entité, au centre du couvercle' },
   speaker:   { d: 40, count: 2, power: '3 W', impedance: '8 Ω', note: 'deux haut-parleurs 3 W 8 Ω (SPK-L, SPK-R) de chaque côté de l’œil (DFPlayer SPK1/SPK2)' },
-  ledBar:    { w: 53, h: 10, leds: 8, note: 'barrette WS2812B 8 DEL' },
-  pocket:    { w: 90, h: 60, depth: 6, note: 'pochette à fiche (note tactique)' },
-  serial:    { w: 70, h: 22, note: 'plaque de n° de série rivetée' },
+  ledBar:    { w: 220, h: 10, leds: 32, positions: 8, sticks: 4, stick: 'CANADUINO WS2812B 8 LED ~55×10 mm (5050)', note: 'quatre barrettes en chaîne DIN→DOUT, ~220 mm, allumées par groupes de 4' },
+  pocket:    { w: 90, h: 60, depth: 6, note: 'pochette à fiche (note tactique), sous la barre LED' },
   jacks:     { count: 5, hole: 8, pitch: 18, note: 'prises femelles banane Keadic 4 mm (1..5) au bas du couvercle ; n\'importe quel câble dans n\'importe quelle prise' },
   cables:    { count: 5, length: 300, from: 'base.cablePorts', to: 'lid.jacks', colors: ['rouge', 'noir', 'jaune', 'vert', 'bleu'], hex: { rouge: '#e53935', noir: '#1b1d22', jaune: '#f5c518', vert: '#22c55e', bleu: '#2b7cff' }, note: 'câbles silicone souples Keadic, 5 couleurs distinctes (une de chaque, jamais deux bleus), fiche banane 4 mm mâle côté couvercle, ancrés à demeure sur la base ; assez longs pour aller dans n\'importe quelle prise ; débranché, le câble repose sur la base' },
   cablePort: { hole: 6, count: 5, note: 'passe-câble encastré (ancrage) en haut de la base, un par couleur' },
@@ -34,7 +33,7 @@ export const PARTS = {
   tm1637:    { w: 42, h: 24, note: 'afficheur 4 chiffres 0,56 po' },
   oled:      { w: 27, h: 27, screen: { w: 22, h: 11 }, note: 'OLED 0,96 po I2C 128x64' },
   encoder:   { w: 26, h: 19, shaft: 6, count: 4, detents: 20, modes: { cryptex: 'ABCDEFGHIJLMNOPRSTUV' }, note: 'KY-040 encodeur rotatif 20 crans/tour + poussoir ; aucun bouton + / − : on tourne le bouton ; LETTRES SEULEMENT (anneau de 20 lettres, sans K Q W X Y Z), affichées sur l’OLED ; les chiffres se tapent au clavier 4x4' },
-  cyd2:      { w: 86, h: 50, screen: { w: 57.6, h: 43.2 }, note: 'CYD 2 ESP32-2432S028 2,8 po : écran interactif : verrou de signal (labyrinthe, étapes 5 et 9), sinon moniteur cardiaque ECG (pouls qui monte avec le stress)' },
+  cyd2:      { w: 86, h: 50, screen: { w: 57.6, h: 43.2 }, touch: true, note: 'CYD 2 ESP32-2432S028 2,8 po, écran tactile : affiche le n° de série (LCLC-LCLC, par graine) et le bouton RÉÉCOUTER (≥ 44 px) ; aux étapes 5 et 9 le labyrinthe prend l’écran, n° + bouton restent visibles en petit dans un coin ; jauge batterie en haut à droite. Plus de moniteur ECG. Pas de bouton Réécouter physique supplémentaire.' },
   joystick:  { w: 35, h: 35, note: 'joystick compact 2 axes + poussoir' },
   keySwitch: { hole: 12, w: 20.6, h: 26, count: 3, note: 'serrures Gebildet 12 mm métal, clés I, II, III, points rouge/vert' },
   keypad:    { w: 69, h: 77, note: 'clavier membrane 4x4 (clavier seul : pas de RFID, pas d’empreinte)' },
@@ -50,9 +49,8 @@ export const LAYOUT = {
     spkL:   { x: 12,  y: 22,  w: 44, h: 44 },
     cyd1:   { x: 93.5, y: 18, w: 86, h: 50 },   // centré
     spkR:   { x: 217, y: 22,  w: 44, h: 44 },
-    ledBar: { x: 110, y: 78,  w: 53, h: 10 },
-    pocket: { x: 12,  y: 96,  w: 90, h: 60 },
-    serial: { x: 110, y: 96,  w: 70, h: 22 },
+    ledBar: { x: 26, y: 78,  w: 220, h: 10 },
+    pocket: { x: 12,  y: 96,  w: 90, h: 44 },
     jacks:  { x: 110, y: 140, w: 90, h: 22 },   // 5 douilles femelles, pas de 18 mm, au bas du couvercle (côté charnière)
   },
   base: {

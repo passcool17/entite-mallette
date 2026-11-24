@@ -114,8 +114,9 @@ svg { display: block; }
 .replay:disabled { opacity: .35; }
 .lid-side { display: grid; grid-template-columns: 1fr auto; gap: var(--s-3); align-items: end; }
 .ws { display: grid; gap: 6px; }
-.ws-leds { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; padding: 6px; border-radius: 4px; background: #0b0c0d; box-shadow: inset 0 0 0 1px #000, inset 0 2px 4px #000; }
-.ws-leds i { aspect-ratio: 1; border-radius: 2px; background: radial-gradient(circle at 50% 45%, #2a2d30, #141618); box-shadow: inset 0 0 0 1px #000; }
+.ws-leds { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; padding: 6px; border-radius: 4px; background: #0b0c0d; box-shadow: inset 0 0 0 1px #000, inset 0 2px 4px #000; }
+.ws-group { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; min-width: 0; }
+.ws-leds i { aspect-ratio: 1; border-radius: 2px; background: radial-gradient(circle at 50% 45%, #2a2d30, #141618); box-shadow: inset 0 0 0 1px #000; min-width: 0; }
 .ws-leds i.on { background: radial-gradient(circle at 50% 45%, #fff 0 12%, var(--c) 45%, color-mix(in srgb, var(--c) 40%, #000)); box-shadow: 0 0 10px var(--c), inset 0 0 0 1px rgb(0 0 0 / .4); }
 .pocket { position: relative; width: 104px; min-height: 64px; padding: 6px 8px; border: 0; border-radius: 6px; background: linear-gradient(#1d2024, #121417); box-shadow: inset 0 0 0 1px #2b2f34, inset 0 10px 12px rgb(0 0 0 / .5); display: grid; align-content: end; justify-items: center; gap: 6px; }
 .pocket-card { width: 70px; height: 22px; border-radius: 2px 2px 0 0; background: linear-gradient(#e9e2cf, #cfc5ab); transform: translateY(2px); box-shadow: 0 -1px 0 rgb(255 255 255 / .4); }
@@ -212,7 +213,8 @@ body.boom .end-kicker { color: var(--red); }
 }
 
 /* ================= v0.2.1 : une seule vue, tout dans la valise ouverte =================
-   Couvercle intérieur : [SPK-L | CYD 1 | SPK-R], barre WS2812B, Réécouter / Pochette / plaque de série, baie de 5 fiches.
+   Couvercle intérieur : [SPK-L | CYD 1 | SPK-R], barre WS2812B, Pochette, baie de 5 fiches.
+   Base : le CYD 2 affiche le n° de série et le bouton tactile RÉÉCOUTER (plus de plaque rivetée ni de bouton Réécouter au couvercle).
    Base : TM1637 + OLED + 4 encodeurs, CYD 2 + joystick + serrures I II III, clavier 4×4 | trappes A B C + leviers à capot.
    Portrait 412×915, paysage 915×412 et bureau 1280×800 : tout tient dans l'écran, sans défiler. */
 .hud { padding: calc(env(safe-area-inset-top) + 4px) var(--s-3) 4px; }
@@ -247,20 +249,12 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
 .ws { display: grid; gap: 3px; width: 100%; justify-items: center; }
 .ws-nums { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; width: 100%; padding: 0 4px; pointer-events: none; }
 .ws-nums span { min-width: 0; text-align: center; font: 700 11px/1 var(--f-tech); font-variant-numeric: tabular-nums; letter-spacing: 0; color: var(--silk); text-shadow: 0 1px 0 rgb(0 0 0 / .55); user-select: none; }
-.ws-bar { width: 100%; gap: 4px; padding: 4px; }
+.ws-bar { width: 100%; gap: 6px; padding: 4px; }
 .ws-bar i { min-width: 0; aspect-ratio: auto; height: var(--led-h, 14px); }
-.lid-ctrls { display: grid; grid-template-columns: 1fr .8fr 1.1fr; gap: 6px; align-items: stretch; }
-.replay { width: 100%; min-height: 44px; padding: 0 8px; }
-.pocket { width: 100%; min-height: 44px; grid-auto-flow: column; align-content: center; justify-content: center; align-items: center; padding: 0 6px; gap: 6px; }
+.lid-ctrls { display: flex; justify-content: flex-start; align-items: stretch; gap: 6px; }
+.pocket { width: auto; min-width: 120px; max-width: 168px; min-height: 44px; grid-auto-flow: column; align-content: center; justify-content: center; align-items: center; padding: 0 10px; gap: 6px; }
 .pocket-card { width: 24px; height: 16px; transform: none; border-radius: 2px; }
 .pocket:hover .pocket-card { transform: translateY(-2px); }
-.serial-plate { position: relative; display: grid; justify-items: center; align-content: center; gap: 1px; padding: 3px 10px; border-radius: 3px; min-height: 44px;
-  background: linear-gradient(160deg, #c9ced3, #8e959b 60%, #a8aeb4); color: #16181a; box-shadow: inset 0 1px 0 #fff, 0 2px 4px rgb(0 0 0 / .7); }
-.rivet { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #7b8288 60%, #3e4348); }
-.rivet:nth-child(1) { left: 3px; top: 3px; } .rivet:nth-child(2) { right: 3px; top: 3px; } .rivet:nth-child(3) { left: 3px; bottom: 3px; } .rivet:nth-child(4) { right: 3px; bottom: 3px; }
-.sp-label { font: 700 6px/1 var(--f-tech); letter-spacing: .2em; }
-.sp-num { font: 500 16px/1 var(--f-mono); letter-spacing: .01em; text-shadow: 0 1px 0 rgb(255 255 255 / .5); white-space: nowrap; }
-.sp-lot { font: 500 7px/1 var(--f-mono); color: #3b4045; }
 /* baie de fiches banane Keadic */
 .patchbay { display: grid; gap: 3px; justify-items: center; }
 .jacks { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; width: 100%; padding: 4px 6px 3px; border-radius: 6px; background: linear-gradient(#1f2226, #15171a); box-shadow: inset 0 0 0 1px #2a2e33; }
@@ -383,15 +377,13 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
   .gt-lid span { font-size: 10px; }
   .mod-keys .lock-btn { width: 52px; height: 52px; } .mod-keys .lock-face { width: 34px; height: 34px; }
   .plug { height: 56px; } .jack-socket { width: 28px; height: 28px; margin-left: -14px; }
-  .sp-num { font-size: 20px; } .sp-label { font-size: 7px; }
   .mod .silk, .lid-panel .silk { font-size: 9px; }
 }
 /* très petits écrans (≤ 359 px) : le couvercle se resserre au lieu de déborder */
 .lid, .lid-panel, .lid-hero > *, .lid-ctrls > *, .patchbay { min-width: 0; }
-.lid-ctrls { grid-template-columns: minmax(0, 1fr) minmax(0, .8fr) minmax(0, 1.1fr); }
 @media (max-width: 359px) and (orientation: portrait) {
   :root { --cyd1-h: 88px; --spk: 64px; --kp: 36px; }
-  .lid-ctrls .silk, .serial-plate { font-size: 7px; }
+  .lid-ctrls .silk { font-size: 7px; }
   .mod-toggles { gap: 6px; } .gt-body { width: 50px; }
 }
 
@@ -475,6 +467,39 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
   .mod-keys .lock-btn { width: 36px; height: 36px; }
 }
 
+/* ---------- v0.2.6 : n° de série + RÉÉCOUTER sur le CYD 2 (plus de plaque rivetée ni de bouton au couvercle) ---------- */
+.cyd2-hud { position: absolute; inset: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; align-content: center; justify-content: space-between; gap: 4px 8px; padding: 16px 6px 4px 7px; pointer-events: none; }
+.cyd2-serial { display: grid; justify-items: start; gap: 1px; min-width: 0; flex: 0 1 auto; width: max-content; max-width: calc(100% - 4px); pointer-events: none; }
+.cyd2-slabel { font: 700 7px/1 var(--f-tech); letter-spacing: .16em; color: #7ad7ff; text-shadow: 0 0 6px rgb(82 214 255 / .45); }
+.cyd2-snum { font: 700 18px/1.05 var(--f-mono); letter-spacing: .04em; color: #e9f8ff; text-shadow: 0 0 8px rgb(98 214 255 / .55); white-space: nowrap; }
+.cyd2-slot { font: 500 7px/1 var(--f-mono); color: #7b93a3; letter-spacing: .08em; }
+.cyd2-replay { pointer-events: auto; position: relative; z-index: 2; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 44px; min-height: 44px; padding: 0 8px; border-radius: 6px; border: 1px solid rgb(98 214 255 / .55); background: rgb(2 16 24 / .82); color: #cfefff; font: 700 9px/1 var(--f-tech); letter-spacing: .08em; text-transform: uppercase; box-shadow: 0 0 10px rgb(82 214 255 / .18); }
+.cyd2-replay svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.cyd2-replay:disabled { opacity: .35; }
+.cyd2-replay:not(:disabled):active { background: rgb(8 40 56 / .95); }
+/* étapes 5 et 9 : le labyrinthe prend l'écran, n° + bouton restent visibles en bas, sans chevaucher la jauge */
+.cyd2.maze .cyd2-hud { inset: auto 0 0 0; height: 46px; padding: 1px 4px 1px 6px; align-content: center; flex-wrap: nowrap; background: linear-gradient(180deg, transparent, rgb(0 8 14 / .82) 28%); }
+.cyd2.maze .cyd2-slabel, .cyd2.maze .cyd2-slot { display: none; }
+.cyd2.maze .cyd2-serial { max-width: calc(100% - 48px); }
+.cyd2.maze .cyd2-snum { font-size: 10px; letter-spacing: .02em; min-width: 0; overflow: visible; }
+.cyd2.maze .cyd2-replay { width: 44px; min-width: 44px; min-height: 44px; padding: 0; gap: 0; }
+.cyd2.maze .cyd2-replay span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.cyd2.maze .cyd2-replay svg { width: 16px; height: 16px; }
+@media (min-width: 1000px) and (min-height: 600px) {
+  .cyd2-snum { font-size: 22px; }
+  .cyd2-slabel { font-size: 8px; }
+  .cyd2-replay { font-size: 10px; padding: 0 10px; }
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  .cyd2-hud { padding: 16px 2px 2px 4px; gap: 2px 4px; }
+  .cyd2-snum { font-size: 12px; }
+  .cyd2-slabel { font-size: 6px; }
+  .cyd2-slot { font-size: 6px; }
+  .cyd2-replay { font-size: 8px; padding: 0 6px; }
+  .batt { max-width: 46%; }
+  .cyd2.maze .cyd2-snum { font-size: 8px; letter-spacing: 0; }
+}
+
 /* ---------- v0.2.5e : jauge batterie 3S sur le CYD 2 (coin haut droit), pas sur le CYD 1 ---------- */
 .batt { position: absolute; top: 2px; right: 2px; z-index: 3; display: flex; align-items: center; gap: 3px; padding: 1px 3px; border-radius: 3px; background: rgb(0 0 0 / .72); color: #36f08a; font: 700 8px/1 var(--f-mono); pointer-events: none; --fill: 80%; max-width: 58%; }
 .batt[data-level="mid"] { color: #ffb020; } .batt[data-level="low"] { color: #ff3b30; }
@@ -506,8 +531,8 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
 @media (orientation: portrait) and (max-width: 599px) { .tm-digits { font-size: 22px; } .tm { padding: 4px 6px; } }
 @media (orientation: portrait) and (max-width: 359px) { #btnFs { display: none !important; } .hud-meta { min-width: 0; } .tm-digits { font-size: 19px; } .obj-text { font-size: 10.5px; } .hint-btn { min-width: 46px; } .hud-row { gap: 5px; } }
 @media (orientation: landscape) and (max-height: 520px) { :root { --hud-h: 54px; } .obj-text { -webkit-line-clamp: 2; } body.obj-long { --hud-h: 96px; } body.obj-long .obj-text { -webkit-line-clamp: 5; font-size: 11px; }
-  /* CYD 2 ~104×78 : la jauge (icône + % + V) doit tenir sans couper le « V » ni chevaucher l'ECG */
-  .batt { max-width: 76%; gap: 2px; padding: 1px 2px; }
+  /* CYD 2 ~104×78 : la jauge (icône + % + V) doit tenir sans couper le « V » ni chevaucher le n° de série / RÉÉCOUTER */
+  .batt { max-width: 46%; gap: 2px; padding: 1px 2px; }
   .batt-ico { width: 12px; height: 7px; }
   .batt-txt { gap: 2px; }
 }
