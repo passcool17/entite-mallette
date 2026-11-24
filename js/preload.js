@@ -1,8 +1,8 @@
-// preload.js : précharge la musique, les voix et les polices avant « Ouvrir la mallette », avec un vrai pourcentage.
+// preload.js : précharge la musique, les voix prêtes du manifeste et les polices avant « Ouvrir la mallette », avec un vrai pourcentage.
 // % = octets reçus / octets attendus. Les octets attendus viennent de Content-Length dès que l'en-tête arrive
 // (sinon d'une estimation par fichier). Les polices comptent pour leur taille connue, d'un bloc quand elles sont prêtes.
 // Les fichiers téléchargés sont gardés ici (une promesse par URL) : audio.js les reprend, sans second téléchargement.
-import { VOICE_LIST, voiceUrl, LINES } from './voix.js';
+import { loadManifest, MANIFEST_URL } from './voice-manifest.js';
 
 export const MUSIC_URL = 'audio/tension.mp3';
 const FONTS = [
@@ -10,11 +10,9 @@ const FONTS = [
 ];
 const EST = { music: 192827, voice: 55000 };
 const store = new Map(); // url -> Promise<ArrayBuffer|null>
-let voiceListP = null;
 
 // reprendre un fichier préchargé (une seule fois : decodeAudioData consomme le tampon)
 export function takePreloaded(url) { const p = store.get(url); store.delete(url); return p || null; }
-export function preloadedVoiceList() { return voiceListP; }
 
 export function preloadAll(onProgress) {
   const items = [], failed = [];
@@ -55,9 +53,9 @@ export function preloadAll(onProgress) {
     items.push(it);
     jobs.push((document.fonts?.load(desc) ?? Promise.resolve()).catch(() => {}).finally(() => { it.got = it.total; it.done = true; report(); }));
   }
-  // liste des voix (réseau d'abord, comme dans audio.js), puis chaque fichier listé
-  voiceListP = fetch(VOICE_LIST, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : { files: [] })).catch(() => ({ files: [] }));
-  jobs.push(voiceListP.then((data) => Promise.all((data.files || []).filter((id) => LINES[id]).map((id) => track(voiceUrl(id), EST.voice)))));
+  // manifeste des voix (réseau d'abord), puis seulement les mp3 marqués prêts (aucune requête pour les autres : 0 erreur 404)
+  const manP = fetch(MANIFEST_URL, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : { cues: [] })).catch(() => ({ cues: [] }));
+  jobs.push(manP.then((m) => { loadManifest(m); return Promise.all((m.cues || []).filter((c) => c.mp3Ready).map((c) => track(c.file, EST.voice))); }));
   report();
   return Promise.all(jobs).then(() => ({ failed }));
 }

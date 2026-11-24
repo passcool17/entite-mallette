@@ -1,0 +1,546 @@
+{
+ "version": "0.2.0",
+ "note": "Voix de l'Entité. Chaque réplique = un id ou une suite d'ids. mp3Ready true : voix/<id>.mp3 est joué (repli synthèse française si échec). mp3Ready false : synthèse française directe, aucun fichier demandé. Pour remplacer une voix : déposer voix/<id>.mp3 puis mettre mp3Ready à true, sans toucher au code. dfplayerTrack = nom du fichier sur la microSD du DFPlayer Mini (dossier mp3/0001.mp3…).",
+ "cues": [
+  {
+   "id": "intro",
+   "file": "voix/intro.mp3",
+   "dfplayerTrack": "0001",
+   "category": "intro",
+   "source": "elevenlabs",
+   "mp3Ready": true,
+   "text": "Je suis l'Entité. J'ai déjà calculé tes choix."
+  },
+  {
+   "id": "depart",
+   "file": "voix/depart.mp3",
+   "dfplayerTrack": "0002",
+   "category": "intro",
+   "source": "elevenlabs",
+   "mp3Ready": true,
+   "text": "Trois minutes. Quatre-vingt-dix-neuf virgule sept pour cent d'échec. Je ne me trompe jamais."
+  },
+  {
+   "id": "arm_loquets",
+   "file": "voix/arm_loquets.mp3",
+   "dfplayerTrack": "0003",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Mallette verrouillée. Tourne les deux loquets du dessus."
+  },
+  {
+   "id": "arm_cache",
+   "file": "voix/arm_cache.mp3",
+   "dfplayerTrack": "0004",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Sur le flanc, lève le cache. Puis arme."
+  },
+  {
+   "id": "chiffre_0",
+   "file": "voix/chiffre_0.mp3",
+   "dfplayerTrack": "0005",
+   "category": "digit",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Zéro."
+  },
+  {
+   "id": "chiffre_1",
+   "file": "voix/chiffre_1.mp3",
+   "dfplayerTrack": "0006",
+   "category": "digit",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Un."
+  },
+  {
+   "id": "chiffre_2",
+   "file": "voix/chiffre_2.mp3",
+   "dfplayerTrack": "0007",
+   "category": "digit",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Deux."
+  },
+  {
+   "id": "chiffre_3",
+   "file": "voix/chiffre_3.mp3",
+   "dfplayerTrack": "0008",
+   "category": "digit",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Trois."
+  },
+  {
+   "id": "chiffre_4",
+   "file": "voix/chiffre_4.mp3",
+   "dfplayerTrack": "0009",
+   "category": "digit",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Quatre."
+  },
+  {
+   "id": "chiffre_5",
+   "file": "voix/chiffre_5.mp3",
+   "dfplayerTrack": "0010",
+   "category": "digit",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Cinq."
+  },
+  {
+   "id": "chiffre_6",
+   "file": "voix/chiffre_6.mp3",
+   "dfplayerTrack": "0011",
+   "category": "digit",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Six."
+  },
+  {
+   "id": "chiffre_7",
+   "file": "voix/chiffre_7.mp3",
+   "dfplayerTrack": "0012",
+   "category": "digit",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Sept."
+  },
+  {
+   "id": "chiffre_8",
+   "file": "voix/chiffre_8.mp3",
+   "dfplayerTrack": "0013",
+   "category": "digit",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Huit."
+  },
+  {
+   "id": "chiffre_9",
+   "file": "voix/chiffre_9.mp3",
+   "dfplayerTrack": "0014",
+   "category": "digit",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Neuf."
+  },
+  {
+   "id": "couleur_rouge",
+   "file": "voix/couleur_rouge.mp3",
+   "dfplayerTrack": "0015",
+   "category": "color",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Rouge."
+  },
+  {
+   "id": "couleur_noir",
+   "file": "voix/couleur_noir.mp3",
+   "dfplayerTrack": "0016",
+   "category": "color",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Noir."
+  },
+  {
+   "id": "couleur_bleu",
+   "file": "voix/couleur_bleu.mp3",
+   "dfplayerTrack": "0017",
+   "category": "color",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Bleu."
+  },
+  {
+   "id": "couleur_jaune",
+   "file": "voix/couleur_jaune.mp3",
+   "dfplayerTrack": "0018",
+   "category": "color",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Jaune."
+  },
+  {
+   "id": "couleur_vert",
+   "file": "voix/couleur_vert.mp3",
+   "dfplayerTrack": "0019",
+   "category": "color",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Vert."
+  },
+  {
+   "id": "clue_enc1_ordre",
+   "file": "voix/clue_enc1_ordre.mp3",
+   "dfplayerTrack": "0020",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Signal un. Règle les quatre encodeurs sur les chiffres du numéro de série, dans l'ordre. Puis clique."
+  },
+  {
+   "id": "clue_enc1_envers",
+   "file": "voix/clue_enc1_envers.mp3",
+   "dfplayerTrack": "0021",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Signal un. Règle les quatre encodeurs sur les chiffres du numéro de série, en partant de la fin. Puis clique."
+  },
+  {
+   "id": "clue_trappe_frequente",
+   "file": "voix/clue_trappe_frequente.mp3",
+   "dfplayerTrack": "0022",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Regarde la barre lumineuse. Ouvre la trappe de la couleur la plus présente."
+  },
+  {
+   "id": "clue_trappe_rare",
+   "file": "voix/clue_trappe_rare.mp3",
+   "dfplayerTrack": "0023",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Regarde la barre lumineuse. Ouvre la trappe de la couleur la plus rare."
+  },
+  {
+   "id": "clue_sequence_ordre",
+   "file": "voix/clue_sequence_ordre.mp3",
+   "dfplayerTrack": "0024",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Regarde la barre lumineuse. Retiens les lumières qui s'allument. Tape leurs positions au clavier, dans l'ordre."
+  },
+  {
+   "id": "clue_sequence_envers",
+   "file": "voix/clue_sequence_envers.mp3",
+   "dfplayerTrack": "0025",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Regarde la barre lumineuse. Retiens les lumières qui s'allument. Tape leurs positions au clavier, à l'envers."
+  },
+  {
+   "id": "clue_fils1_moyen",
+   "file": "voix/clue_fils1_moyen.mp3",
+   "dfplayerTrack": "0026",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Flanc. Cinq fils. Plus d'un rouge : débranche le dernier rouge. Sinon, le fil sans jumeau."
+  },
+  {
+   "id": "clue_fils1_dur",
+   "file": "voix/clue_fils1_dur.mp3",
+   "dfplayerTrack": "0027",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Flanc. Cinq fils. Plus d'un rouge : le dernier rouge. Sinon, si le numéro finit par un chiffre pair : le deuxième fil. Sinon, le fil sans jumeau."
+  },
+  {
+   "id": "clue_verrou",
+   "file": "voix/clue_verrou.mp3",
+   "dfplayerTrack": "0028",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Verrou de signal. Guide le point jusqu'à la cible, avec le joystick."
+  },
+  {
+   "id": "clue_fragment",
+   "file": "voix/clue_fragment.mp3",
+   "dfplayerTrack": "0029",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Fragment de code :"
+  },
+  {
+   "id": "clue_code1",
+   "file": "voix/clue_code1.mp3",
+   "dfplayerTrack": "0030",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Tape le code. Les quatre fragments, dans l'ordre."
+  },
+  {
+   "id": "clue_cles_legere",
+   "file": "voix/clue_cles_legere.mp3",
+   "dfplayerTrack": "0031",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Trois clés sur le dessus. Chacune pèse un chiffre du numéro : la première, la deuxième, la troisième. De la plus légère à la plus lourde."
+  },
+  {
+   "id": "clue_cles_lourde",
+   "file": "voix/clue_cles_lourde.mp3",
+   "dfplayerTrack": "0032",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Trois clés sur le dessus. Chacune pèse un chiffre du numéro : la première, la deuxième, la troisième. De la plus lourde à la plus légère."
+  },
+  {
+   "id": "clue_enc2_croissant",
+   "file": "voix/clue_enc2_croissant.mp3",
+   "dfplayerTrack": "0033",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Signal deux. Les chiffres du numéro de série, du plus petit au plus grand. Puis clique."
+  },
+  {
+   "id": "clue_enc2_decroissant",
+   "file": "voix/clue_enc2_decroissant.mp3",
+   "dfplayerTrack": "0034",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Signal deux. Les chiffres du numéro de série, du plus grand au plus petit. Puis clique."
+  },
+  {
+   "id": "clue_fils2_moyen",
+   "file": "voix/clue_fils2_moyen.mp3",
+   "dfplayerTrack": "0035",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Deuxième couche de fils. Débranche le fil sans jumeau."
+  },
+  {
+   "id": "clue_fils2_dur",
+   "file": "voix/clue_fils2_dur.mp3",
+   "dfplayerTrack": "0036",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Deuxième couche de fils. Plus d'un bleu : le premier bleu. Sinon, le fil sans jumeau."
+  },
+  {
+   "id": "clue_code2",
+   "file": "voix/clue_code2.mp3",
+   "dfplayerTrack": "0037",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Code deux. Le premier code, à l'envers."
+  },
+  {
+   "id": "clue_transmit",
+   "file": "voix/clue_transmit.mp3",
+   "dfplayerTrack": "0038",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Tout est ouvert. Maintiens TRANSMIT deux secondes."
+  },
+  {
+   "id": "taunt_lent",
+   "file": "voix/taunt_lent.mp3",
+   "dfplayerTrack": "0039",
+   "category": "taunt",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Trop lent."
+  },
+  {
+   "id": "taunt_depeche",
+   "file": "voix/taunt_depeche.mp3",
+   "dfplayerTrack": "0040",
+   "category": "taunt",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Dépêche-toi."
+  },
+  {
+   "id": "taunt_cetait",
+   "file": "voix/taunt_cetait.mp3",
+   "dfplayerTrack": "0041",
+   "category": "taunt",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "C'était"
+  },
+  {
+   "id": "taunt_pas",
+   "file": "voix/taunt_pas.mp3",
+   "dfplayerTrack": "0042",
+   "category": "taunt",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "pas"
+  },
+  {
+   "id": "taunt_debranche",
+   "file": "voix/taunt_debranche.mp3",
+   "dfplayerTrack": "0043",
+   "category": "taunt",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Débranche le fil"
+  },
+  {
+   "id": "taunt_saute",
+   "file": "voix/taunt_saute.mp3",
+   "dfplayerTrack": "0044",
+   "category": "taunt",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "avant que ça saute !"
+  },
+  {
+   "id": "taunt_trappe",
+   "file": "voix/taunt_trappe.mp3",
+   "dfplayerTrack": "0045",
+   "category": "taunt",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Celle-là. La trappe"
+  },
+  {
+   "id": "taunt_regarde",
+   "file": "voix/taunt_regarde.mp3",
+   "dfplayerTrack": "0046",
+   "category": "taunt",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Regarde encore. Tu as mal vu."
+  },
+  {
+   "id": "taunt_cles",
+   "file": "voix/taunt_cles.mp3",
+   "dfplayerTrack": "0047",
+   "category": "taunt",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "L'ordre des clés :"
+  },
+  {
+   "id": "taunt_rouge",
+   "file": "voix/taunt_rouge.mp3",
+   "dfplayerTrack": "0048",
+   "category": "taunt",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Appuie sur le rouge maintenant !"
+  },
+  {
+   "id": "taunt_hesite",
+   "file": "voix/taunt_hesite.mp3",
+   "dfplayerTrack": "0049",
+   "category": "taunt",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Tu hésites. Le temps accélère."
+  },
+  {
+   "id": "taunt_fini",
+   "file": "voix/taunt_fini.mp3",
+   "dfplayerTrack": "0050",
+   "category": "taunt",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "C'est fini. Tu as gagné. Pose la mallette."
+  },
+  {
+   "id": "taunt_couche2",
+   "file": "voix/taunt_couche2.mp3",
+   "dfplayerTrack": "0051",
+   "category": "taunt",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Tu croyais avoir fini ? Je redémarre une seconde couche de verrous."
+  },
+  {
+   "id": "taunt_sceller",
+   "file": "voix/taunt_sceller.mp3",
+   "dfplayerTrack": "0052",
+   "category": "taunt",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Ne touche pas au bouton rouge."
+  },
+  {
+   "id": "sabotage_joystick",
+   "file": "voix/sabotage_joystick.mp3",
+   "dfplayerTrack": "0053",
+   "category": "sabotage",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Je prends tes commandes."
+  },
+  {
+   "id": "sabotage_fin",
+   "file": "voix/sabotage_fin.mp3",
+   "dfplayerTrack": "0054",
+   "category": "sabotage",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Je te les rends. Pour l'instant."
+  },
+  {
+   "id": "outcome_faux",
+   "file": "voix/outcome_faux.mp3",
+   "dfplayerTrack": "0055",
+   "category": "outcome",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Non. Chaque erreur me nourrit."
+  },
+  {
+   "id": "outcome_ok",
+   "file": "voix/outcome_ok.mp3",
+   "dfplayerTrack": "0056",
+   "category": "outcome",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Accepté. Pour l'instant."
+  },
+  {
+   "id": "outcome_trente",
+   "file": "voix/outcome_trente.mp3",
+   "dfplayerTrack": "0057",
+   "category": "outcome",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Trente secondes. Je sens ta peur."
+  },
+  {
+   "id": "outcome_dix",
+   "file": "voix/outcome_dix.mp3",
+   "dfplayerTrack": "0058",
+   "category": "outcome",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Dix."
+  },
+  {
+   "id": "outcome_victoire",
+   "file": "voix/outcome_victoire.mp3",
+   "dfplayerTrack": "0059",
+   "category": "outcome",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Le lecteur se referme. Je reviendrai."
+  },
+  {
+   "id": "outcome_boom",
+   "file": "voix/outcome_boom.mp3",
+   "dfplayerTrack": "0060",
+   "category": "outcome",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Prévisible."
+  }
+ ]
+}

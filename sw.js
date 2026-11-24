@@ -1,17 +1,16 @@
 // sw.js : service worker versionné, écrit à la main. Changer VERSION à chaque publication.
-const VERSION = '0.1.5';
-// Nom distinct pour écarter le cache v0.1.6 sur les téléphones ; ne pas reprendre entite-mallette-0.1.5.
-const CACHE = 'entite-mallette-v0.1.5-base';
-const MEDIA = ['./audio/tension.mp3', './fonts/chakra-petch-latin-500-normal.woff2', './fonts/chakra-petch-latin-700-normal.woff2', './fonts/jetbrains-mono-latin-500-normal.woff2'];
+const VERSION = '0.2.0';
+const CACHE = `entite-mallette-v${VERSION}`;
+const MEDIA = ['./audio/tension.mp3', './voix/intro.mp3', './voix/depart.mp3', './fonts/chakra-petch-latin-500-normal.woff2', './fonts/chakra-petch-latin-700-normal.woff2', './fonts/jetbrains-mono-latin-500-normal.woff2'];
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
-  './css/app.css?v=0.1.5', './js/app.js?v=0.1.5', './voix/voix.json',
-  './js/eye.js', './js/eye-config.js', './js/panel-config.js', './js/audio.js', './js/voix.js', './js/preload.js',
+  './css/app.css?v=0.2.0', './js/app.js?v=0.2.0', './voix/manifest.json', './voix/voix.json',
+  './js/eye.js', './js/eye-config.js', './js/game.js', './js/panel-config.js', './js/audio.js', './js/sfx.js', './js/voice-manifest.js', './js/preload.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
 ];
 
 self.addEventListener('install', (e) => {
-  // code : forcé depuis le réseau ; médias : cache HTTP accepté (déjà téléchargés par l'écran de chargement, pas de 2e téléchargement)
+  // code : forcé depuis le réseau ; médias : cache HTTP accepté (déjà téléchargés par l'écran de chargement)
   e.waitUntil(caches.open(CACHE).then((c) => Promise.all([
     c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' }))),
     c.addAll(MEDIA),
@@ -21,21 +20,21 @@ self.addEventListener('message', (e) => { if (e.data === 'SKIP_WAITING') self.sk
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
     const keys = await caches.keys();
-    // Supprimer les anciens caches de cette app, mais jamais ceux de l'archive v0.1.6 (entite-mallette-v016-*) sur le même origine.
-    await Promise.all(keys.filter((k) => k.startsWith('entite-mallette-') && !k.startsWith('entite-mallette-v016-') && k !== CACHE).map((k) => caches.delete(k)));
+    // anciens caches de l'app principale seulement ; jamais les archives v0.1.5 / v0.1.6 (même origine)
+    await Promise.all(keys.filter((k) => k.startsWith('entite-mallette-') && !k.startsWith('entite-mallette-v015-') && !k.startsWith('entite-mallette-v016-') && k !== CACHE).map((k) => caches.delete(k)));
     await self.clients.claim();
   })());
 });
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
-  if (new URL(req.url).pathname.endsWith('/voix/voix.json')) {
-    // liste des voix : réseau d'abord, pour voir arriver les nouveaux fichiers
+  const path = new URL(req.url).pathname;
+  if (path.endsWith('/voix/manifest.json') || path.endsWith('/voix/voix.json')) {
+    // manifeste des voix : réseau d'abord, pour voir arriver les nouveaux mp3 (mp3Ready) sans changer le code
     e.respondWith(fetch(req).then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); return res; }).catch(() => caches.match(req)));
     return;
   }
   if (req.mode === 'navigate') {
-    // page : réseau d'abord (nouvelle version visible), cache si hors ligne
     e.respondWith(fetch(req).then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put('./index.html', copy)); return res; })
       .catch(() => caches.match('./index.html')));
     return;

@@ -1,49 +1,603 @@
-// app.js : la mallette (logique de désamorçage, panneau, minuterie) + l'aperçu CYD.
+// app.js : La mallette de l'Entité v0.2.0 : mallette d'espion multi-faces (Dessus, Mallette ouverte, Flanc).
+// Règle de Pascal : AUCUN code ni consigne écrit à l'écran. L'Entité dicte (voix), puis presse et ment (œil rouge)
+// pendant que tu choisis. Paliers cachés ~50/50, ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 import { createEye } from './eye.js';
-import { EYE, CYD, deepMerge } from './eye-config.js';
-import { LAYOUT } from './panel-config.js';
-import { initAudio, sfx, speak, voiceLevel, setMuted, isMuted, setCaptionHandler, stopVoice, voiceStats, startMusic, setMusicIntensity, stopMusic, musicStats } from './audio.js';
-window.__musique = musicStats;
+import { EYE, deepMerge } from './eye-config.js';
+import { makeRun, TIME_S, NSTEPS, STEPS, canMove, DIRS } from './game.js';
+import { initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js';
+import { sfx } from './sfx.js';
 import { preloadAll } from './preload.js';
-window.__voix = voiceStats;
 
-const VERSION = '0.1.5';
+const VERSION = '0.2.0';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const q = new URLSearchParams(location.search);
-const rand = (n) => Math.floor(Math.random() * n);
-const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-// Partie reproductible : ?seed=N rejoue les mêmes valeurs, ?debug=1 affiche la graine.
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const SEED_Q = q.has('seed') && /^\d+$/.test(q.get('seed')) ? Number(q.get('seed')) >>> 0 : null;
 const DEBUG = q.get('debug') === '1';
-function mulberry32(a) {
-  return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-}
 const newSeed = () => (SEED_Q ?? (crypto.getRandomValues?.(new Uint32Array(1))[0] ?? Math.floor(Math.random() * 2 ** 32))) >>> 0;
-// Vibrations : no-op silencieux si l'API manque (iPhone)
 const canVibrate = typeof navigator.vibrate === 'function';
-let vibeOn = localStorage.getItem('entite.vibrations') !== '0';
-function buzz(pattern) { if (canVibrate && vibeOn) { try { navigator.vibrate(pattern); } catch { /* rien */ } } }
-const BUZZ = { faux: 70, boom: [500, 120, 300, 120, 700], victoire: [90, 90, 90] };
-const TIME_S = 480; // 8 min : deux couches de verrous (partie ~2x plus longue)
+const buzz = (p) => { if (canVibrate) { try { navigator.vibrate(p); } catch { /* rien */ } } };
 const fmtPct = (v) => v.toFixed(1).replace('.', ',') + ' %';
+const LED = { rouge: '#ff3b30', vert: '#36f08a', bleu: '#3d8bff', ambre: '#ffb020', cyan: '#62d6ff', off: null };
+const WIRE = { rouge: '#d8262b', noir: '#17181b', bleu: '#1f5fd6', jaune: '#f2c230', vert: '#1f9d4f' };
+const ORD = ['1er', '2e', '3e', '4e', '5e'];
 
-if (q.has('cyd')) { bootDone(); registerSW(); initCyd(); } else initCase();
+// ================= état =================
+let run = null;
+const g = {};
+function resetState() {
+  run = makeRun(newSeed());
+  Object.assign(g, {
+    phase: 'idle',               // idle → arm-latch → arm-toggle → play → win | boom
+    step: 0, running: false, ended: false, result: null,
+    endAt: 0, remaining: TIME_S, rate: 1, lastTick: 0, lastSec: null,
+    prob: 99.7, errors: 0, lieUntil: 0, lies: 0,
+    latches: [false, false], cover: false, armed: false,
+    enc: [0, 0, 0, 0], trapOpen: [false, false, false], seqShow: null,
+    pulled: [false, false, false, false, false], wires: run.wires1.colors.slice(),
+    pos: null, code: '', keysTurned: [], hesitating: false, lastInput: 0,
+    sabotage: false, sabT: 0, txDown: 0, said30: false, said10: false,
+    lastClue: null, pressure: [], decoy: null, startT: 0,
+  });
+}
 
-// ================= Écran de chargement =================
-// Le cadre est dans index.html (visible avant tout JS) ; ici : pourcentage des médias, erreurs, fin.
+// ================= voix : file d'attente, mensonges (œil rouge) =================
+let vq = Promise.resolve(), vqGen = 0;
+// ids : un id ou une suite d'ids du manifeste. lie : œil rouge pendant la réplique.
+function voice(ids, { lie = false, now = false, clue = false } = {}) {
+  ids = Array.isArray(ids) ? ids : [ids];
+  if (clue) { g.lastClue = ids; $('#btnReplay').disabled = false; }
+  const gen = now ? ++vqGen : vqGen;
+  const play = () => {
+    if (gen !== vqGen && !now) return Promise.resolve();
+    if (lie) flagLie(true);
+    return speak(ids, { lie }).then(() => { if (lie) flagLie(false); });
+  };
+  if (now) { stopVoice(); vq = play(); } else vq = vq.then(play);
+  return vq;
+}
+function flagLie(on) {
+  if (on) { g.lies++; g.lieUntil = performance.now() + 2600; }
+  const apply = () => {
+    const live = performance.now() < g.lieUntil || on;
+    $('#cyd1').classList.toggle('liar', live);
+    document.body.classList.toggle('lying', live);
+    eye?.setMood(live ? 'angry' : g.running ? 'watching' : 'idle');
+  };
+  apply();
+  if (!on) setTimeout(() => { if (performance.now() >= g.lieUntil) { g.lieUntil = 0; apply(); } }, Math.max(0, g.lieUntil - performance.now()) + 20);
+}
+const digit = (d) => `chiffre_${d}`;
+const color = (c) => `couleur_${c}`;
+
+// ================= faces =================
+let face = 'mallette';
+function showFace(f, focus = false) {
+  face = f;
+  $$('.face-tab').forEach((t) => { const on = t.dataset.face === f; t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1; });
+  $$('.face').forEach((s) => { s.hidden = s.id !== `face-${f}`; });
+  $('#faceTitle').textContent = { dessus: 'Dessus', mallette: 'Mallette ouverte', flancs: 'Flanc' }[f];
+  if (focus) $(`#tab-${f}`).focus();
+  if (f === 'mallette') requestAnimationFrame(() => { eye?.resize?.(); drawCyd2(); });
+  pingFaces();
+}
+function wantedFace() {
+  if (g.phase === 'arm-latch') return 'dessus';
+  if (g.phase === 'arm-toggle') return 'flancs';
+  if (g.phase !== 'play') return null;
+  const st = STEPS[g.step]; return st ? (st.face === 'base' ? 'mallette' : st.face) : null;
+}
+function pingFaces() {
+  const w = wantedFace();
+  $$('.face-tab').forEach((t) => t.classList.toggle('want', !!w && t.dataset.face === w && face !== w));
+}
+
+// ================= construction des pièces =================
+function buildParts() {
+  // encodeurs KY-040
+  const er = $('#encRow'); er.textContent = '';
+  for (let i = 0; i < 4; i++) {
+    const el = document.createElement('div'); el.className = 'enc'; el.dataset.i = i;
+    el.innerHTML = `<button class="enc-step minus" type="button" aria-label="E${i + 1} : un cran à gauche">−</button>
+      <button class="knob" type="button" aria-label="Encodeur E${i + 1} : tourner (glisser) ou cliquer pour valider"><span class="knob-cap"><span class="knob-mark"></span></span></button>
+      <button class="enc-step plus" type="button" aria-label="E${i + 1} : un cran à droite">+</button><span class="silk">E${i + 1}</span>`;
+    er.append(el);
+  }
+  // clavier 4x4
+  const kp = $('#keypad');
+  $$('.kp-key', kp).forEach((k) => k.remove());
+  for (const k of ['1', '2', '3', 'A', '4', '5', '6', 'B', '7', '8', '9', 'C', '*', '0', '#', 'D']) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'kp-key' + (/[A-D*#]/.test(k) ? ' fn' : ''); b.dataset.k = k; b.textContent = k;
+    b.setAttribute('aria-label', `Touche ${k}`); kp.append(b);
+  }
+  // trappes SG90
+  const tr = $('#traps'); tr.textContent = '';
+  run.trapColors.forEach((c, i) => {
+    const t = document.createElement('div'); t.className = 'trap'; t.dataset.i = i; t.style.setProperty('--rim', WIRE[c] === WIRE.noir ? '#555' : LED[c]);
+    t.innerHTML = `<div class="trap-well"></div><button class="trap-door" type="button" aria-label="Trappe T${i + 1}, liseré ${c}"><span class="trap-screw"></span><span class="trap-screw"></span><span class="trap-n">T${i + 1}</span></button>`;
+    tr.append(t);
+  });
+  // fiches banane
+  buildJacks();
+  $('#serial').textContent = run.serial;
+  $('#lot').textContent = `LOT ${run.lot}`;
+}
+function buildJacks() {
+  const j = $('#jacks'); j.textContent = '';
+  g.wires.forEach((c, i) => {
+    const el = document.createElement('div'); el.className = 'jack'; el.dataset.i = i; el.style.setProperty('--w', WIRE[c]);
+    el.innerHTML = `<span class="jack-socket"></span><button class="plug" type="button" aria-label="Fiche ${ORD[i]}, fil ${c} : débrancher"><span class="plug-body"></span><span class="plug-wire"></span></button><span class="silk">${i + 1}</span>`;
+    j.append(el);
+  });
+}
+
+// ================= affichages =================
+function setBar(cols) {
+  const b = $('#bar');
+  if (b.children.length !== 8) { b.textContent = ''; for (let i = 0; i < 8; i++) b.append(document.createElement('i')); }
+  [...b.children].forEach((el, i) => { const c = cols[i]; el.style.setProperty('--c', c || 'transparent'); el.classList.toggle('on', !!c); });
+}
+function showTime(s) {
+  s = Math.max(0, s);
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  const txt = `${m}:${String(sec).padStart(2, '0')}`;
+  $('#timer').textContent = txt; $('#tm2').textContent = txt;
+  $('.tm[role="timer"]').setAttribute('aria-label', `Temps restant ${m} min ${sec} s`);
+}
+function showProb() { $('#prob').textContent = fmtPct(g.prob); }
+function showStep() { $('#stepNo').textContent = g.phase === 'play' ? `${String(g.step).padStart(2, '0')}/${NSTEPS}` : g.phase.startsWith('arm') ? 'ARM' : '—'; pingFaces(); }
+
+// OLED 0,96 po : positions des encodeurs (ce que montrent les boutons, pas la réponse), ou saisie du code masquée
+const oledCtx = () => $('#oledCanvas').getContext('2d');
+function drawOled() {
+  const c = oledCtx(), W = 128, H = 64; c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
+  c.fillStyle = '#9fe8ff'; c.font = '500 9px "JetBrains Mono", monospace'; c.textBaseline = 'top';
+  const codeStep = g.step === 3 || g.step === 6 || g.step === 11;
+  if (g.phase !== 'play') { c.fillText('PC17  ENTITE', 4, 4); c.fillRect(4, 18, 120 * Math.min(1, (performance.now() % 2000) / 2000), 1); $('#oledText').textContent = ''; return; }
+  if (codeStep) {
+    c.fillText('SAISIE', 4, 4);
+    for (let i = 0; i < 4; i++) { const x = 14 + i * 26; c.fillRect(x, 46, 16, 2); if (i < g.code.length) { c.beginPath(); c.arc(x + 8, 34, 5, 0, 7); c.fill(); } }
+    $('#oledText').textContent = `${g.code.length} sur 4`;
+    return;
+  }
+  const lie = performance.now() < g.lieUntil && (g.step === 1 || g.step === 8);
+  c.fillText('E1  E2  E3  E4', 10, 4);
+  c.font = '500 22px "JetBrains Mono", monospace';
+  for (let i = 0; i < 4; i++) {
+    const v = lie && g.decoy?.enc ? g.decoy.enc[i] : g.enc[i];
+    c.fillText(String(v), 12 + i * 30, 22);
+  }
+  if (lie) { for (let k = 0; k < 6; k++) { c.fillStyle = 'rgba(255,60,60,.7)'; c.fillRect(Math.random() * W, Math.random() * H, 20 + Math.random() * 40, 2); } }
+  $('#oledText').textContent = `Encodeurs ${g.enc.join(' ')}`;
+}
+function setEncVisual() {
+  $$('.enc').forEach((el, i) => { $('.knob-cap', el).style.transform = `rotate(${g.enc[i] * 36}deg)`; $('.knob', el).setAttribute('aria-valuenow', g.enc[i]); });
+}
+
+// CYD 2 : verrou de signal (labyrinthe visible), sinon oscilloscope en veille
+function drawCyd2() {
+  const cv = $('#cyd2'); if (!cv) return;
+  const c = cv.getContext('2d'), W = cv.width, H = cv.height, now = performance.now();
+  c.fillStyle = '#020a10'; c.fillRect(0, 0, W, H);
+  const maze = g.phase === 'play' && (g.step === 5 ? run.maze1 : g.step === 9 ? run.maze2 : null);
+  const sab = g.sabotage;
+  if (!maze) {
+    c.strokeStyle = 'rgba(98,214,255,.18)'; c.lineWidth = 1;
+    for (let x = 0; x <= W; x += 20) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke(); }
+    for (let y = 0; y <= H; y += 20) { c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+    c.strokeStyle = g.phase === 'play' ? '#62d6ff' : '#2a6f8a'; c.lineWidth = 2; c.beginPath();
+    for (let x = 0; x <= W; x += 3) { const y = H / 2 + Math.sin(x / 14 + now / 300) * 18 * Math.sin(now / 1700) + Math.sin(x / 5 + now / 90) * 3; x ? c.lineTo(x, y) : c.moveTo(x, y); }
+    c.stroke();
+    return;
+  }
+  const n = maze.n, cs = Math.floor(Math.min((W - 20) / n, (H - 20) / n)), ox = Math.floor((W - cs * n) / 2), oy = Math.floor((H - cs * n) / 2);
+  const ink = sab ? '#ff4b3e' : '#62d6ff';
+  c.strokeStyle = sab ? 'rgba(255,75,62,.16)' : 'rgba(98,214,255,.14)'; c.lineWidth = 1;
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) c.strokeRect(ox + x * cs + 0.5, oy + y * cs + 0.5, cs, cs);
+  c.strokeStyle = ink; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath();
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const w = maze.walls[y][x], X = ox + x * cs, Y = oy + y * cs;
+    if (w & 1) { c.moveTo(X, Y); c.lineTo(X + cs, Y); }
+    if (w & 8) { c.moveTo(X, Y); c.lineTo(X, Y + cs); }
+    if (y === n - 1 && (w & 4)) { c.moveTo(X, Y + cs); c.lineTo(X + cs, Y + cs); }
+    if (x === n - 1 && (w & 2)) { c.moveTo(X + cs, Y); c.lineTo(X + cs, Y + cs); }
+  }
+  c.stroke();
+  // cible : anneau pulsé
+  const [gx, gy] = maze.goal, pr = cs * 0.28 + Math.sin(now / 200) * 2;
+  c.strokeStyle = '#36f08a'; c.lineWidth = 2; c.beginPath(); c.arc(ox + gx * cs + cs / 2, oy + gy * cs + cs / 2, pr, 0, 7); c.stroke();
+  c.beginPath(); c.arc(ox + gx * cs + cs / 2, oy + gy * cs + cs / 2, 3, 0, 7); c.fillStyle = '#36f08a'; c.fill();
+  // curseur
+  const [px, py] = g.pos || maze.start;
+  c.fillStyle = sab ? '#ff4b3e' : '#e9f8ff'; c.shadowColor = ink; c.shadowBlur = 10;
+  c.fillRect(ox + px * cs + cs * 0.3, oy + py * cs + cs * 0.3, cs * 0.4, cs * 0.4); c.shadowBlur = 0;
+  if (sab) { for (let k = 0; k < 8; k++) { c.fillStyle = `rgba(255,${40 + Math.random() * 80},60,${0.2 + Math.random() * 0.4})`; c.fillRect(0, Math.random() * H, W, 1 + Math.random() * 3); } }
+}
+
+// ================= déroulé =================
+function nextStep(n) {
+  g.step = n; g.pressure.forEach(clearTimeout); g.pressure = []; g.decoy = null; clearDecoys();
+  showStep();
+  const hard = run.tier === 'difficile';
+  switch (n) {
+    case 1: g.enc = [0, 0, 0, 0].map(() => Math.floor(Math.random() * 10)); setEncVisual();
+      voice(hard ? 'clue_enc1_envers' : 'clue_enc1_ordre', { clue: true }); pressureEnc(); break;
+    case 2: voice(hard ? 'clue_trappe_rare' : 'clue_trappe_frequente', { clue: true });
+      pressure(5500, () => { const w = (run.trap + 1) % 3; decoy('trap', w); voice(['taunt_trappe', color(run.trapColors[w])], { lie: true, now: true }); }); break;
+    case 3: g.code = ''; voice(hard ? 'clue_sequence_envers' : 'clue_sequence_ordre', { clue: true }).then(() => g.step === 3 && flashSeq(run.seq));
+      pressure(9000, () => { voice('taunt_regarde', { lie: true, now: true }); flashSeq(run.seq.map((d) => (d % 8) + 1), true); }); break;
+    case 4: voice(hard ? 'clue_fils1_dur' : 'clue_fils1_moyen', { clue: true });
+      pressure(6000, () => { const w = run.decoys.wire1; decoy('wire', w); voice(['taunt_debranche', color(g.wires[w]), 'taunt_saute'], { lie: true, now: true }); }); break;
+    case 5: g.pos = run.maze1.start.slice(); voice('clue_verrou', { clue: true });
+      pressure(9000, () => voice('taunt_lent', { now: true })); break;
+    case 6: g.code = ''; voice('clue_code1', { clue: true });
+      pressure(6000, () => { const i = Math.floor(Math.random() * 4); voice(['taunt_cetait', digit(run.decoys.frags[i]), 'taunt_depeche'], { lie: true, now: true }); }); break;
+    case 7: $$('.lock.key .lock-btn').forEach((b) => { b.disabled = false; b.closest('.lock').classList.add('ready'); });
+      voice(hard ? 'clue_cles_lourde' : 'clue_cles_legere', { clue: true });
+      pressure(5000, () => voice(['taunt_cles', ...run.decoys.keys.map((k) => digit(k + 1))], { lie: true, now: true }));
+      if (run.lies.keysTwice) pressure(14000, () => voice(['taunt_cles', ...run.decoys.keys.map((k) => digit(k + 1))], { lie: true, now: true })); break;
+    case 8: g.enc = [0, 0, 0, 0].map(() => Math.floor(Math.random() * 10)); setEncVisual();
+      voice(hard ? 'clue_enc2_decroissant' : 'clue_enc2_croissant', { clue: true }); pressureEnc(); break;
+    case 9: g.pos = run.maze2.start.slice(); voice('clue_verrou', { clue: true }); g.sabT = performance.now() + 5000; break;
+    case 10: g.wires = run.wires2.colors.slice(); g.pulled = [false, false, false, false, false]; buildJacks();
+      sfx.servo(); voice(hard ? 'clue_fils2_dur' : 'clue_fils2_moyen', { clue: true });
+      if (run.lies.wire2False) pressure(6000, () => { const w = run.decoys.wire2; decoy('wire', w); voice(['taunt_debranche', color(g.wires[w]), 'taunt_saute'], { lie: true, now: true }); }); break;
+    case 11: g.code = ''; voice('clue_code2', { clue: true });
+      pressure(7000, () => { decoy('transmit'); voice('taunt_rouge', { lie: true, now: true }); }); break;
+    case 12: $('#transmit').classList.add('armed'); voice('clue_transmit', { clue: true }); voice('taunt_sceller', { lie: true }); break;
+  }
+  drawOled(); drawCyd2();
+}
+// pression pendant le choix : une réplique trompeuse après la consigne (si l'étape n'est pas finie)
+function pressure(ms, fn) { const s = g.step; g.pressure.push(setTimeout(() => { if (g.running && g.step === s) fn(); }, ms)); }
+function pressureEnc() {
+  g._encTaunted = false;
+  if (run.lies.encFalse && g.step === 1) pressure(4000, () => { const tgt = curEncTarget(); g.decoy = { enc: tgt.map((d) => (d + 3) % 10) }; voice(['taunt_cetait', digit(g.decoy.enc[0]), 'taunt_depeche'], { lie: true, now: true }); });
+}
+const curEncTarget = () => (g.step === 1 ? run.enc1 : run.enc2);
+function decoy(kind, i) {
+  clearDecoys();
+  if (kind === 'trap') $(`.trap[data-i="${i}"]`)?.classList.add('decoy');
+  if (kind === 'wire') $(`.jack[data-i="${i}"]`)?.classList.add('decoy');
+  if (kind === 'transmit') $('#transmit').classList.add('decoy');
+  setTimeout(clearDecoys, 3200);
+}
+function clearDecoys() { $$('.decoy').forEach((e) => e.classList.remove('decoy')); }
+
+function good(nextN, fragIdx) {
+  sfx.confirm(); buzz(30);
+  g.prob = Math.max(0.3, g.prob - 7.9); showProb();
+  if (fragIdx != null) {
+    if (run.lies.fragLies.includes(fragIdx)) voice(['clue_fragment', digit(run.decoys.frags[fragIdx])], { lie: true, now: true });
+    voice(['clue_fragment', digit(run.frags[fragIdx])], { clue: true, now: !run.lies.fragLies.includes(fragIdx) });
+  } else voice('outcome_ok', { now: true });
+  if (nextN) setTimeout(() => g.running && nextStep(nextN), 350);
+}
+function bad(sec = 5, line = 'outcome_faux') {
+  sfx.strike(); buzz(70);
+  g.errors++; g.remaining -= sec; g.prob = Math.min(99.9, g.prob + 3.2); showProb();
+  document.body.classList.remove('hit'); void document.body.offsetWidth; document.body.classList.add('hit');
+  eye?.setMood('angry'); setTimeout(() => !g.lieUntil && g.running && eye?.setMood('watching'), 900);
+  if (line) voice(line, { now: true });
+}
+function input() {
+  g.lastInput = performance.now();
+  if (g.hesitating) { g.hesitating = false; g.rate = 1; document.body.classList.remove('hesitate'); }
+}
+
+// ---------- armement ----------
+function startGame() {
+  resetState(); buildParts(); setEncVisual();
+  $('#intro').hidden = true; $('#app').hidden = false; $('#end').hidden = true;
+  initAudio();
+  g.phase = 'arm-latch'; showStep(); showFace('dessus');
+  voice('intro'); voice('arm_loquets', { clue: true });
+  showTime(TIME_S); showProb();
+  if (DEBUG) $('#seedTag').textContent = ` · graine ${run.seed} · ${run.tier}`;
+}
+function latch(i, btn) {
+  if (g.phase !== 'arm-latch' || g.latches[i]) return;
+  g.latches[i] = true; sfx.keyTurn(); btn.setAttribute('aria-pressed', 'true'); btn.closest('.lock').classList.add('on');
+  if (g.latches.every(Boolean)) {
+    g.phase = 'arm-toggle'; showStep(); voice('arm_cache', { clue: true, now: true });
+    setTimeout(() => showFace('flancs'), 650);
+  }
+}
+function armToggle() {
+  if (g.phase !== 'arm-toggle' || !g.cover) return;
+  g.armed = true; $('#lever').setAttribute('aria-checked', 'true'); $('#guard').classList.add('armed');
+  sfx.toggleSnap(); sfx.arm(); buzz([40, 60, 40]);
+  g.phase = 'play'; g.running = true; g.startT = performance.now(); g.lastTick = performance.now(); g.lastInput = performance.now();
+  voice('depart', { now: true });
+  startMusic();
+  setTimeout(() => { showFace('mallette'); $('#face-mallette').classList.add('opening'); sfx.lidOpen(); }, 700);
+  nextStep(1);
+}
+
+// ---------- fin ----------
+function endGame(win) {
+  if (g.ended) return;
+  g.ended = true; g.running = false; g.result = win ? 'win' : 'boom'; g.phase = win ? 'win' : 'boom'; g.endT = performance.now();
+  g.pressure.forEach(clearTimeout); clearDecoys(); g.sabotage = false;
+  document.body.classList.remove('hesitate', 'lying');
+  $('#cyd1').classList.remove('liar');
+  if (win) { stopMusic('fade'); sfx.win(); eye?.setMood('defused'); buzz([90, 90, 90]); voice('outcome_victoire', { now: true }); }
+  else { stopMusic('cut'); sfx.boom(); eye?.setMood('boom'); buzz([500, 120, 300, 120, 700]); voice('outcome_boom', { now: true }); document.body.classList.add('boom'); }
+  const used = TIME_S - Math.max(0, g.remaining), mm = Math.floor(used / 60), ss = Math.floor(used % 60);
+  setTimeout(() => {
+    $('#endKicker').textContent = win ? 'Entité confinée' : 'Détonation';
+    $('#endTitle').textContent = win ? 'Mallette désamorcée' : 'Prévisible.';
+    $('#endSub').textContent = `${mm} min ${String(ss).padStart(2, '0')} s · ${g.errors} erreur${g.errors > 1 ? 's' : ''} · graine ${run.seed}`;
+    $('#end').hidden = false; $('#btnAgain').focus();
+  }, win ? 2200 : 1600);
+}
+
+// ================= gestes =================
+function wire() {
+  $('#btnStart').addEventListener('click', startGame);
+  $('#btnAgain').addEventListener('click', () => { document.body.classList.remove('boom'); stopVoice(); startGame(); });
+  $$('.face-tab').forEach((t) => t.addEventListener('click', () => { showFace(t.dataset.face); sfx.push(); }));
+  $('.faces').addEventListener('keydown', (e) => {
+    const order = ['dessus', 'mallette', 'flancs'], i = order.indexOf(face);
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); showFace(order[(i + (e.key === 'ArrowRight' ? 1 : 2)) % 3], true); }
+  });
+  $('#btnReplay').addEventListener('click', () => { if (!g.lastClue) return; voice(g.lastClue, { now: true }).then(() => { if (g.running && g.step === 3 && g.code === '') flashSeq(run.seq); }); });
+  $('#btnPocket').addEventListener('click', () => { sfx.push(); $('#pocketDlg').showModal(); });
+  $('#btnSon').addEventListener('click', () => { const m = !isMuted(); setMuted(m); $('#btnSon').setAttribute('aria-pressed', String(m)); $('#btnSon').setAttribute('aria-label', m ? 'Rétablir le son' : 'Couper le son'); });
+
+  // dessus : loquets + clés
+  $$('.lock.latch').forEach((l) => $('.lock-btn', l).addEventListener('click', (e) => { input(); latch(+l.dataset.latch, e.currentTarget); }));
+  $$('.lock.key').forEach((l) => $('.lock-btn', l).addEventListener('click', (e) => {
+    input(); if (g.step !== 7) return;
+    const k = +l.dataset.key; if (g.keysTurned.includes(k)) return;
+    sfx.keyTurn();
+    const expect = run.keyOrder[g.keysTurned.length];
+    if (k !== expect) {
+      bad(5); g.keysTurned = []; $$('.lock.key').forEach((x) => { x.classList.remove('on'); $('.lock-btn', x).setAttribute('aria-pressed', 'false'); }); return;
+    }
+    g.keysTurned.push(k); l.classList.add('on'); e.currentTarget.setAttribute('aria-pressed', 'true');
+    if (g.keysTurned.length === 3) good(8);
+  }));
+
+  // flanc : cache + interrupteur, fiches banane
+  $('#cover').addEventListener('click', () => {
+    input(); g.cover = !g.cover; $('#guard').classList.toggle('open', g.cover);
+    $('#cover').setAttribute('aria-expanded', String(g.cover)); $('#lever').disabled = !g.cover || g.armed;
+    g.cover ? sfx.coverUp() : sfx.coverDown();
+  });
+  $('#lever').addEventListener('click', () => { input(); armToggle(); });
+  $('#jacks').addEventListener('click', (e) => {
+    const b = e.target.closest('.plug'); if (!b) return;
+    input(); const i = +b.closest('.jack').dataset.i;
+    if (g.pulled[i]) return;
+    sfx.plugPull();
+    const step = g.step, set = step === 4 ? run.wires1 : step === 10 ? run.wires2 : null;
+    const jack = b.closest('.jack');
+    if (!set) { jack.classList.add('wiggle'); setTimeout(() => jack.classList.remove('wiggle'), 400); if (g.phase === 'play') bad(5); return; }
+    if (i === set.cut) { g.pulled[i] = true; jack.classList.add('pulled'); b.setAttribute('aria-label', `Fiche ${ORD[i]} débranchée`); good(step === 4 ? 5 : 11, step === 4 ? 2 : null); }
+    else { jack.classList.add('pulled'); setTimeout(() => jack.classList.remove('pulled'), 650); bad(8); }
+  });
+
+  // encodeurs : − / + (crans), glisser sur le bouton, molette ; clic = valider
+  $('#encRow').addEventListener('click', (e) => {
+    const st = e.target.closest('.enc-step'); if (!st) return;
+    const i = +st.closest('.enc').dataset.i; turn(i, st.classList.contains('plus') ? 1 : -1);
+  });
+  // délégation sur #encRow : les boutons sont reconstruits à chaque partie (buildParts)
+  const er = $('#encRow');
+  let kn = null, ki = 0, sx = 0, sy = 0, acc = 0, moved = false;
+  er.addEventListener('pointerdown', (e) => {
+    kn = e.target.closest('.knob'); if (!kn) return;
+    ki = +kn.closest('.enc').dataset.i; sx = e.clientX; sy = e.clientY; acc = 0; moved = false;
+    kn.setPointerCapture(e.pointerId);
+  });
+  er.addEventListener('pointermove', (e) => {
+    if (!kn || !kn.hasPointerCapture(e.pointerId)) return;
+    const d = (e.clientX - sx) - (e.clientY - sy); // droite ou haut = sens horaire
+    if (Math.abs(d - acc) >= 16) { const s = Math.sign(d - acc); acc += s * 16; moved = true; turn(ki, s); }
+  });
+  // clic du KY-040 : relâché sans avoir tourné, ou Entrée/Espace au clavier (click sans pointeur)
+  er.addEventListener('pointerup', (e) => {
+    if (!kn) return;
+    if (kn.hasPointerCapture(e.pointerId)) kn.releasePointerCapture(e.pointerId);
+    if (!moved) pushEnc(); kn = null;
+  });
+  er.addEventListener('pointercancel', () => { kn = null; });
+  er.addEventListener('click', (e) => { if (e.detail === 0 && e.target.closest('.knob')) pushEnc(); });
+  er.addEventListener('wheel', (e) => { const k = e.target.closest('.knob'); if (!k) return; e.preventDefault(); turn(+k.closest('.enc').dataset.i, e.deltaY < 0 ? 1 : -1); }, { passive: false });
+  er.addEventListener('keydown', (e) => {
+    const k = e.target.closest('.knob'); if (!k) return; const i = +k.closest('.enc').dataset.i;
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); turn(i, 1); }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); turn(i, -1); }
+  });
+
+  // trappes SG90
+  $('#traps').addEventListener('click', (e) => {
+    const door = e.target.closest('.trap-door'); if (!door) return;
+    input();
+    const t = door.closest('.trap'), i = +t.dataset.i;
+    const shake = () => { t.classList.add('wiggle'); setTimeout(() => t.classList.remove('wiggle'), 400); };
+    if (g.step !== 2 || g.trapOpen[i]) { sfx.wall(); shake(); return; }
+    if (i === run.trap) { openTrap(i, 'ok'); good(3); }
+    else { shake(); sfx.servo(); bad(5); }
+  });
+
+  // clavier 4x4 (clavier pur)
+  $('#keypad').addEventListener('pointerdown', (e) => { const k = e.target.closest('.kp-key'); if (!k) return; input(); press(k.dataset.k); });
+  $('#keypad').addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.kp-key')) { e.preventDefault(); input(); press(e.target.dataset.k); } });
+
+  // joystick : glisser le chapeau, ou toucher une direction
+  const joy = $('#joy'), cap = $('#joyCap');
+  let jx = 0, jy = 0, jfired = false;
+  $('.joy-well', joy).addEventListener('pointerdown', (e) => { jx = e.clientX; jy = e.clientY; jfired = false; e.currentTarget.setPointerCapture(e.pointerId); });
+  $('.joy-well', joy).addEventListener('pointermove', (e) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+    const dx = e.clientX - jx, dy = e.clientY - jy, r = Math.min(18, Math.hypot(dx, dy)), a = Math.atan2(dy, dx);
+    cap.style.transform = `translate(${Math.cos(a) * r}px, ${Math.sin(a) * r}px)`;
+    if (!jfired && Math.hypot(dx, dy) > 22) { jfired = true; stick(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up')); }
+  });
+  const release = () => { cap.style.transform = ''; };
+  $('.joy-well', joy).addEventListener('pointerup', release); $('.joy-well', joy).addEventListener('pointercancel', release);
+  $$('.joy-dir', joy).forEach((b) => b.addEventListener('click', () => {
+    const d = b.dataset.dir, v = DIRS[d]; cap.style.transform = `translate(${v[0] * 14}px, ${v[1] * 14}px)`; setTimeout(release, 140); stick(d);
+  }));
+
+  // TRANSMIT : maintenir 2 s à l'étape 12 ; avant, c'est le raccourci que pousse l'Entité
+  const tx = $('#transmit');
+  tx.addEventListener('pointerdown', (e) => { e.preventDefault(); txDown(); });
+  tx.addEventListener('pointerup', txUp); tx.addEventListener('pointerleave', txUp); tx.addEventListener('pointercancel', txUp);
+  tx.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) { e.preventDefault(); txDown(); } });
+  tx.addEventListener('keyup', (e) => { if (e.key === 'Enter' || e.key === ' ') txUp(); });
+
+  // clavier physique : flèches/WASD = joystick (face mallette), chiffres = clavier 4x4
+  addEventListener('keydown', (e) => {
+    if (!g.running || e.target.closest?.('.knob, .faces, dialog')) return;
+    const map = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right' };
+    if (map[e.key] && face === 'mallette' && (g.step === 5 || g.step === 9)) { e.preventDefault(); input(); stick(map[e.key]); }
+    else if (/^[0-9]$/.test(e.key) && face === 'mallette') { input(); press(e.key); }
+  });
+}
+
+function turn(i, s) {
+  input(); if (g.phase !== 'play') return;
+  g.enc[i] = (g.enc[i] + s + 10) % 10; sfx.detent(); setEncVisual(); drawOled();
+  // pression : quand un encodeur tombe juste, l'Entité affirme le contraire (une fois par étape)
+  if ((g.step === 1 || g.step === 8) && !g._encTaunted && g.enc[i] === curEncTarget()[i] && g.enc.filter((v, k) => v === curEncTarget()[k]).length >= 2) {
+    g._encTaunted = true;
+    const right = curEncTarget()[i], wrong = (right + 3 + Math.floor(Math.random() * 5)) % 10;
+    setTimeout(() => g.running && voice(['taunt_cetait', digit(wrong), 'taunt_depeche'], { lie: true, now: true }), 300);
+  }
+}
+function pushEnc() {
+  input(); sfx.push();
+  if (g.step !== 1 && g.step !== 8) return;
+  const ok = g.enc.every((v, k) => v === curEncTarget()[k]);
+  if (ok) { $$('.enc').forEach((e) => e.classList.add('locked')); setTimeout(() => $$('.enc').forEach((e) => e.classList.remove('locked')), 900); good(g.step === 1 ? 2 : 9, g.step === 1 ? 0 : null); }
+  else bad(5);
+}
+function openTrap(i, what) {
+  g.trapOpen[i] = true; sfx.servo();
+  const t = $(`.trap[data-i="${i}"]`); t.classList.add('open');
+  const well = $('.trap-well', t);
+  well.innerHTML = what === 'keys' ? '<span class="keyset" role="img" aria-label="Clés I, II, III"><i></i><i></i><i></i></span>' : '<span class="trap-led" role="img" aria-label="Trappe ouverte"></span>';
+}
+// séquence lumineuse sur la barre WS2812B (étape 3) ; fake = fausse séquence de l'Entité (œil rouge)
+function flashSeq(seq, fake = false) {
+  const t0 = performance.now(), on = 520, gap = 260;
+  g.seqShow = { seq, t0, on, gap, fake };
+  seq.forEach((d, k) => setTimeout(() => g.seqShow?.t0 === t0 && sfx.simon(fake ? 'rouge' : ['bleu', 'vert', 'ambre', 'rouge'][k % 4]), k * (on + gap)));
+  setTimeout(() => { if (g.seqShow?.t0 === t0) g.seqShow = null; }, seq.length * (on + gap) + 50);
+}
+function press(k) {
+  sfx.keypad();
+  const kp = $(`.kp-key[data-k="${k}"]`); kp?.classList.add('down'); setTimeout(() => kp?.classList.remove('down'), 110);
+  if (g.step !== 3 && g.step !== 6 && g.step !== 11) return;
+  if (!/^[0-9]$/.test(k)) { if (k === '*') { g.code = ''; drawOled(); } return; }
+  g.code += k; drawOled();
+  if (g.code.length < 4) return;
+  const want = g.step === 3 ? run.seqCode : g.step === 6 ? run.code1 : run.code2, step = g.step;
+  if (g.code === want) {
+    g.code = ''; drawOled();
+    if (step === 3) good(4, 1);
+    else if (step === 6) {
+      sfx.confirm(); g.prob = Math.max(0.3, g.prob - 7.9); showProb();
+      voice('taunt_fini', { lie: true, now: true }); voice('taunt_couche2');
+      openTrap((run.trap + 1) % 3, 'keys');
+      setTimeout(() => g.running && nextStep(7), 400);
+    } else good(12);
+  } else { g.code = ''; setTimeout(drawOled, 250); bad(8); }
+}
+function stick(dir) {
+  input(); sfx.joy();
+  if (g.step !== 5 && g.step !== 9) return;
+  const inv = { up: 'down', down: 'up', left: 'right', right: 'left' };
+  const d = g.sabotage ? inv[dir] : dir;
+  const maze = g.step === 5 ? run.maze1 : run.maze2;
+  if (!canMove(maze, g.pos, d)) { sfx.wall(); $('.cyd2').classList.remove('bump'); void $('.cyd2').offsetWidth; $('.cyd2').classList.add('bump'); drawCyd2(); return; }
+  g.pos = [g.pos[0] + DIRS[d][0], g.pos[1] + DIRS[d][1]];
+  drawCyd2();
+  if (g.pos[0] === maze.goal[0] && g.pos[1] === maze.goal[1]) {
+    if (g.sabotage) endSabotage();
+    good(g.step === 5 ? 6 : 10, g.step === 5 ? 3 : null);
+  }
+}
+function startSabotage() { g.sabotage = true; g.sabEnd = performance.now() + 5500; $('.cyd2').classList.add('sab'); voice('sabotage_joystick', { lie: true, now: true }); sfx.glitch(); }
+function endSabotage() { g.sabotage = false; $('.cyd2').classList.remove('sab'); g.sabT = performance.now() + 7000; if (g.running && g.step === 9) voice('sabotage_fin', { now: true }); }
+function txDown() {
+  input(); const tx = $('#transmit'); tx.classList.add('down');
+  if (g.phase !== 'play') return;
+  if (g.step !== 12) { bad(8); return; } // raccourci poussé par l'Entité : erreur
+  g.txDown = performance.now(); sfx.hold(); tx.classList.add('holding');
+}
+function txUp() {
+  const tx = $('#transmit'); tx.classList.remove('down', 'holding');
+  if (!g.txDown) return;
+  const held = performance.now() - g.txDown; g.txDown = 0;
+  if (g.step === 12 && g.running && held < 2000) bad(5);
+}
+
+// ================= boucle =================
+let eye = null;
+function loop(now) {
+  requestAnimationFrame(loop);
+  if (eye) { eye.setVoice(voiceLevel()); eye.lookAt(Math.sin(now / 2300) * 0.5, Math.sin(now / 3100) * 0.35); }
+  if (g.running) {
+    const dt = (now - g.lastTick) / 1000; g.lastTick = now;
+    g.remaining -= dt * g.rate;
+    showTime(g.remaining);
+    const sec = Math.ceil(g.remaining);
+    if (sec !== g.lastSec) {
+      g.lastSec = sec;
+      if (sec > 0) sfx.tick(sec <= 10 || g.hesitating);
+      if (g.hesitating) sfx.joy();
+      if (sec <= 30 && !g.said30) { g.said30 = true; sfx.alarm(); voice('outcome_trente', { now: true }); }
+      if (sec <= 10 && !g.said10) { g.said10 = true; voice('outcome_dix', { now: true }); }
+    }
+    if (g.remaining <= 0) { showTime(0); endGame(false); return; }
+    // hésitation : 15 s sans geste → le temps accélère jusqu'au prochain geste
+    if (!g.hesitating && now - g.lastInput > 15000) { g.hesitating = true; g.rate = 1.6; document.body.classList.add('hesitate'); voice('taunt_hesite', { now: true }); }
+    // TRANSMIT à l'étape 12 : maintenu 2 s
+    if (g.txDown && g.step === 12 && now - g.txDown >= 2000) { g.txDown = 0; $('#transmit').classList.remove('holding'); endGame(true); return; }
+    // sabotage du joystick (étape 9) : fenêtres de 5,5 s, axes inversés, œil rouge
+    if (g.step === 9) {
+      if (!g.sabotage && now > g.sabT) startSabotage();
+      else if (g.sabotage && now > g.sabEnd) endSabotage();
+    }
+    if (!g.lieUntil && eye && !g.ended) eye.setMood(g.remaining <= 30 ? 'angry' : 'watching');
+    setMusicIntensity(Math.pow(Math.min(1, Math.max(0, 1 - g.remaining / TIME_S)), 1.8));
+  }
+  // barre WS2812B : avant l'étape 2 progression ; à partir de l'étape 2 la barre montre ses 8 couleurs (indice de la trappe)
+  if (now - (loop.t || 0) > 80) {
+    loop.t = now;
+    let cols;
+    if (g.phase === 'play' && g.step === 2) cols = run.bar.map((c) => LED[c]);
+    else if (g.phase === 'play' && g.step === 3) {
+      cols = Array(8).fill(null);
+      const sh = g.seqShow;
+      if (sh) { const t = now - sh.t0, k = Math.floor(t / (sh.on + sh.gap)); if (k < sh.seq.length && t % (sh.on + sh.gap) < sh.on) cols[sh.seq[k] - 1] = sh.fake ? LED.rouge : LED.cyan; }
+    }
+    else if (g.phase === 'play') { const done = Math.round((g.step - 1) / NSTEPS * 8); cols = Array.from({ length: 8 }, (_, i) => (i < done ? LED.cyan : i === done && Math.floor(now / 300) % 2 ? LED.ambre : null)); }
+    else if (g.phase === 'win') { const a = Math.floor(((Math.sin(now / 500) + 1) / 2) * 8); cols = Array.from({ length: 8 }, (_, i) => (i <= a ? LED.cyan : null)); }
+    else if (g.phase === 'boom') cols = Array.from({ length: 8 }, () => (Math.floor(now / 90) % 2 ? LED.rouge : null));
+    else { const p = Math.floor(now / 110) % 14, pos = p < 8 ? p : 14 - p; cols = Array.from({ length: 8 }, (_, i) => (i === pos ? '#3d8bff' : null)); }
+    if (performance.now() < g.lieUntil) cols = cols.map((c, i) => (Math.random() < 0.35 ? LED.rouge : c));
+    setBar(cols);
+    if (face === 'mallette') { drawCyd2(); drawOled(); }
+  }
+}
+
+// ================= démarrage =================
 function bootDone() {
   const el = document.getElementById('boot'), b = window.__boot;
   if (b) { b.ready = true; b.code = 1; b.asset = 1; b.paint(); }
   if (!el || el.hidden) return;
-  el.classList.add('gone');
-  setTimeout(() => { el.hidden = true; }, 380);
+  el.classList.add('gone'); setTimeout(() => { el.hidden = true; }, 380);
 }
 function runBoot(onReady) {
   const b = window.__boot || { paint() {}, problem() {} };
   b.ready = true; b.code = 1; b.paint();
-  const $id = (id) => document.getElementById(id), t0 = performance.now();
+  const $id = (id) => document.getElementById(id);
   let finished = false;
   const finish = () => { if (finished) return; finished = true; clearTimeout(slow); bootDone(); onReady(); };
   const start = () => {
@@ -52,953 +606,58 @@ function runBoot(onReady) {
       .then(({ failed }) => {
         if (finished) return;
         if (!failed.length) { finish(); return; }
-        $id('bootRetry').hidden = false;
-        b.problem(`${failed.length} fichier${failed.length > 1 ? 's' : ''} n'${failed.length > 1 ? 'ont' : 'a'} pas pu être chargé${failed.length > 1 ? 's' : ''}. Tu peux réessayer, ou jouer sans (voix du téléphone, sans musique).`, true);
+        b.problem(`${failed.length} fichier(s) n’ont pas pu être chargés. Tu peux réessayer, ou jouer sans.`, true);
       });
   };
-  $id('bootRetry').onclick = () => { b.asset = 0; b.shown = Math.min(b.shown, 0.15); start(); };
+  $id('bootRetry').onclick = () => { b.asset = 0; start(); };
   $id('bootSkip').onclick = finish;
-  // filet : après 8 s, on peut ouvrir sans attendre (le chargement continue en arrière-plan)
-  const slow = setTimeout(() => {
-    if (finished) return;
-    if ($id('bootActions').hidden) { $id('bootSkip').textContent = 'Ouvrir sans attendre'; b.problem('Réseau lent : le chargement continue.', true); $id('bootRetry').hidden = true; }
-  }, 8000);
+  const slow = setTimeout(() => { if (!finished && $id('bootActions').hidden) { $id('bootSkip').textContent = 'Ouvrir sans attendre'; b.problem('Réseau lent : le chargement continue.', true); $id('bootRetry').hidden = true; } }, 8000);
   start();
-  return () => performance.now() - t0;
 }
-
-// ================= Mallette =================
-function initCase() {
-  $('#ver').textContent = VERSION;
-  $('#btnStart').disabled = true;
-  // le service worker ne s'installe qu'après le préchargement : il ne lui vole pas la bande passante
-  runBoot(() => { $('#btnStart').disabled = false; $('#btnStart').focus({ preventScroll: true }); registerSW(); });
-  const eye = createEye($('#eye'), { config: deepMerge(EYE, { radiusOfMin: 0.25, center: { x: 0.5, y: 0.53 } }), reducedMotion: reduced });
-  window.__eye = eye;
-  eye.start();
-  setCaptionHandler((t) => { $('#caption').textContent = t; });
-
-  // ---------- panneau à l'échelle réelle ----------
-  const panel = $('#panel');
-  const landMQ = matchMedia('(orientation: landscape) and (min-width: 700px)');
-  function layoutPanel() {
-    const L = landMQ.matches ? LAYOUT.landscape : LAYOUT.portrait;
-    panel.classList.toggle('land', L === LAYOUT.landscape);
-    if (L === LAYOUT.landscape) {
-      // paysage : le panneau entier tient dans la hauteur visible (barres du navigateur comprises), rapport 273:169 gardé
-      const top = panel.getBoundingClientRect().top + scrollY;
-      const avail = Math.max(160, innerHeight - top - 8);
-      panel.style.width = `min(100%, ${Math.floor(avail * L.width / L.height)}px)`;
-    } else panel.style.width = '';
-    const mm = panel.clientWidth / L.width;
-    panel.style.setProperty('--mm', mm + 'px');
-    for (const el of $$('[data-part]', panel)) {
-      const r = L[el.dataset.part];
-      if (!r) continue;
-      Object.assign(el.style, { left: r.x * mm + 'px', top: r.y * mm + 'px', width: r.w * mm + 'px', height: r.h * mm + 'px' });
-      el.classList.toggle('rot', !!r.rot);
-    }
-  }
-  layoutPanel();
-  new ResizeObserver(layoutPanel).observe(panel);
-  new ResizeObserver(layoutPanel).observe($('.status'));
-  addEventListener('resize', layoutPanel);
-  landMQ.addEventListener('change', () => { layoutPanel(); applyLoupe(); });
-
-  // CYD 1 : miroir de l'œil, cadré comme l'écran réel (240x320)
-  const c1 = $('#cyd1'), c1x = c1.getContext('2d', { alpha: false }), eyeCanvas = $('#eye');
-  c1.width = 180; c1.height = 240;
-  function mirrorCyd1() {
-    const e = eye.center;
-    let sw = Math.min(e.w, e.r * 4.4), sh = sw * 4 / 3;
-    if (sh > e.h) { sh = e.h; sw = sh * 3 / 4; }
-    c1x.drawImage(eyeCanvas, e.x - sw / 2, Math.max(0, Math.min(e.h - sh, e.y - sh / 2)), sw, sh, 0, 0, 180, 240);
-  }
-
-  // ---------- 7 segments ----------
-  const SEG = { 0: 'abcdef', 1: 'bc', 2: 'abged', 3: 'abgcd', 4: 'fgbc', 5: 'afgcd', 6: 'afgedc', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg' };
-  const h = (x0, x1, y) => `${x0 + 3},${y} ${x0 + 6},${y - 3} ${x1 - 6},${y - 3} ${x1 - 3},${y} ${x1 - 6},${y + 3} ${x0 + 6},${y + 3}`;
-  const v = (x, y0, y1) => `${x},${y0 + 3} ${x + 3},${y0 + 6} ${x + 3},${y1 - 6} ${x},${y1 - 3} ${x - 3},${y1 - 6} ${x - 3},${y0 + 6}`;
-  const segPts = { a: h(4, 30, 4), g: h(4, 30, 30), d: h(4, 30, 56), f: v(4, 4, 30), b: v(30, 4, 30), e: v(4, 30, 56), c: v(30, 30, 56) };
-  const offs = [0, 36, 86, 122];
-  let svg = '<svg viewBox="0 0 160 60" aria-hidden="true"><g transform="skewX(-6) translate(6 0)">';
-  offs.forEach((ox, d) => { for (const k in segPts) svg += `<polygon data-d="${d}" data-s="${k}" transform="translate(${ox} 0)" points="${segPts[k]}" class="off"/>`; });
-  svg += '<g class="colon"><circle cx="76" cy="20" r="3.2" class="on"/><circle cx="74" cy="42" r="3.2" class="on"/></g></g></svg>';
-  $('#timer').innerHTML = svg; $('#tm1637').innerHTML = svg;
-  const segEls = $$('#timer polygon, #tm1637 polygon');
-  const colons = $$('#timer .colon, #tm1637 .colon');
-  let shownTime = '';
-  function showTime(sec) {
-    sec = Math.max(0, Math.ceil(sec));
-    const m = Math.floor(sec / 60), s = sec % 60, str = `${String(m).padStart(2, '0')}${String(s).padStart(2, '0')}`;
-    if (str === shownTime) return;
-    shownTime = str;
-    for (const el of segEls) el.setAttribute('class', SEG[str[+el.dataset.d]].includes(el.dataset.s) ? 'on' : 'off');
-    $('#timer').setAttribute('aria-label', `Temps restant ${m} minute${m > 1 ? 's' : ''} ${s} seconde${s > 1 ? 's' : ''}`);
-  }
-
-  // ---------- barres WS2812B ----------
-  const mkBar = (b) => { for (let i = 0; i < 8; i++) { const l = document.createElement('span'); l.className = 'led'; b.append(l); } return [...b.children]; };
-  const bars = [[mkBar($('#bar1')), mkBar($('#pbar1'))], [mkBar($('#bar2')), mkBar($('#pbar2'))]];
-  function setBar(n, colors) { for (const leds of bars[n]) leds.forEach((l, i) => { const c = colors[i]; l.classList.toggle('lit', !!c); if (c) l.style.setProperty('--c', c); }); }
-
-  // ---------- clés Gebildet ----------
-  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  defs.setAttribute('width', '0'); defs.setAttribute('height', '0'); defs.style.position = 'absolute';
-  defs.innerHTML = '<defs><linearGradient id="keymetal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f3f6f8"/><stop offset=".5" stop-color="#9aa6b0"/><stop offset="1" stop-color="#e2e8ec"/></linearGradient></defs>';
-  document.body.prepend(defs);
-  const CROSS = '<path class="bow" d="M24 6h12v18h18v12H36v18H24V36H6V24h18z"/><circle cx="30" cy="30" r="4" fill="#20262c"/>';
-  const BLADE = '<rect class="bow" x="23" y="5" width="14" height="50" rx="6"/><circle cx="30" cy="13" r="2.6" fill="#20262c"/>';
-  const KEYS = [
-    { id: 'xa', label: 'Croix A', cross: true }, { id: 'xb', label: 'Croix B', cross: true },
-    { id: 'k1', label: 'I' }, { id: 'k2', label: 'II' }, { id: 'k3', label: 'III' },
-  ];
-  const keyEl = {};
-  for (const k of KEYS) {
-    const w = document.createElement('div');
-    w.className = 'keysw'; w.dataset.key = k.id; w.dataset.state = 'empty';
-    w.innerHTML = `<button class="keysw-btn" type="button" role="switch" aria-checked="false" aria-label="Clé ${k.label}, vide">
-      <span class="keysw-nut"></span><span class="keysw-face"></span><span class="keysw-slot${k.cross ? ' x' : ''}"></span>
-      <span class="keysw-head"><svg viewBox="0 0 60 60">${k.cross ? CROSS : BLADE}</svg></span>
-      <span class="keysw-dots"><span class="keysw-dot r"></span><span class="keysw-dot g"></span></span></button>
-      <span class="part-label${k.cross ? ' x' : ''}">${k.label}</span>`;
-    $('#keyrow').append(w);
-    keyEl[k.id] = { w, btn: w.querySelector('button'), label: k.label };
-    const btn = keyEl[k.id].btn;
-    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); lookAtEl(btn); onKey(k.id); });
-    btn.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onKey(k.id); } });
-  }
-  function setKey(id, state, extra = {}) {
-    const k = keyEl[id];
-    k.w.dataset.state = state;
-    k.w.classList.toggle('locked', !!extra.locked);
-    k.w.classList.toggle('pending', !!extra.pending);
-    k.btn.setAttribute('aria-checked', state === 'on' ? 'true' : 'false');
-    k.btn.setAttribute('aria-label', `Clé ${k.label}, ${state === 'empty' ? 'vide' : state === 'on' ? 'tournée (marche)' : 'insérée (arrêt)'}${extra.locked ? ', verrouillée' : ''}`);
-  }
-  function denyKey(id) { const w = keyEl[id].w; w.classList.remove('deny'); void w.offsetWidth; w.classList.add('deny'); sfx.error(); buzz(BUZZ.faux); }
-
-  // ---------- trappes ----------
-  const TRAP_ART = {
-    croix: `<svg viewBox="0 0 120 52" aria-hidden="true"><g fill="url(#keymetal)" stroke="#1c2329"><path d="M12 14h8v8h8v8h-8v8h-8v-8H4v-8h8z"/><rect x="28" y="23" width="26" height="6" rx="2"/><path d="M66 14h8v8h8v8h-8v8h-8v-8h-8v-8h8z" transform="translate(18 0)"/><rect x="100" y="23" width="16" height="6" rx="2"/></g></svg>`,
-    badge: `<svg viewBox="0 0 120 52" aria-hidden="true"><rect x="22" y="6" width="76" height="42" rx="5" fill="#0e2a3a" stroke="#62d6ff" stroke-width="1.5"/><rect x="30" y="16" width="16" height="12" rx="2" fill="#c6a76a"/><path d="M30 22h16M38 16v12" stroke="#7d6538" stroke-width="1"/><text x="54" y="26" font-family="JetBrains Mono" font-size="9" fill="#dce9f4">PODKOVA</text><path d="M54 36h34" stroke="#62d6ff" stroke-width="2" stroke-dasharray="3 2"/></svg>`,
-    cles: `<svg viewBox="0 0 120 52" aria-hidden="true"><circle cx="20" cy="26" r="11" fill="none" stroke="#c6a76a" stroke-width="3"/><g fill="url(#keymetal)" stroke="#1c2329"><rect x="30" y="8" width="64" height="7" rx="3"/><rect x="30" y="22.5" width="80" height="7" rx="3"/><rect x="30" y="37" width="70" height="7" rx="3"/></g><g font-family="JetBrains Mono" font-size="7" fill="#1c2329"><text x="80" y="14">I</text><text x="96" y="28.5">II</text><text x="84" y="43">III</text></g></svg>`,
-  };
-  const TRAP_LABEL = { croix: 'Prendre les deux moitiés de la clé en croix', badge: 'Prendre les trois badges Podkova', cles: 'Prendre les clés I, II et III' };
-  const traps = {};
-  for (const t of $$('.trap')) {
-    const n = t.dataset.trap, b = t.querySelector('.trap-key');
-    // étape 2 : la trappe de la clé en croix se déduit ; chaque trappe fermée devient touchable
-    const pick = document.createElement('button');
-    pick.type = 'button'; pick.className = 'trap-pick'; pick.hidden = true; pick.setAttribute('aria-label', `Ouvrir la trappe ${n}`);
-    pick.addEventListener('click', () => chooseTrap(+n));
-    t.append(pick);
-    traps[n] = { el: t, btn: b, pick, item: '' };
-    b.addEventListener('click', () => pickTrap(+n));
-  }
-  function trapsChoosable(on) { for (const n in traps) traps[n].pick.hidden = !on || traps[n].el.classList.contains('taken'); $('#traps').classList.toggle('choose', on); }
-  function chooseTrap(n) {
-    if (!g.running || g.step !== 1) return;
-    lookAtEl(traps[n].el);
-    if (n === g.trapOf.croix) { trapsChoosable(false); openTrap('croix'); return; }
-    const d = traps[n].el; d.classList.remove('deny'); void d.offsetWidth; d.classList.add('deny');
-    penalty(PEN.ordre, 'trappeVide');
-    setStatus(`Trappe ${n} vide. Cinq secondes de moins. Trappe = (reste de 1er chiffre du n° ${g.serial} ÷ 3) + 1.`);
-  }
-  // chaque partie range la clé en croix, le badge et les clés I-III dans des trappes tirées au sort
-  function fillTraps() {
-    for (const item in g.trapOf) {
-      const t = traps[g.trapOf[item]];
-      t.item = item; t.btn.innerHTML = TRAP_ART[item]; t.btn.setAttribute('aria-label', TRAP_LABEL[item]);
-    }
-  }
-  function openTrap(item) {
-    const t = traps[g.trapOf[item]];
-    t.el.classList.add('open');
-    t.btn.hidden = false;
-    sfx.servo();
-    setTimeout(() => speak('trappe'), 700);
-  }
-  function pickTrap(n) {
-    const t = traps[n];
-    if (!g.running || t.btn.hidden) return;
-    t.btn.hidden = true;
-    t.el.classList.remove('open'); t.el.classList.add('taken');
-    sfx.pickup();
-    const item = t.item;
-    if (item === 'badge') {
-      g.badge = true; g.badgeSel = -1;
-      c2View('badges');
-      speak('clones');
-      setStatus(`Trois clones Podkova. Le vrai porte une lettre du n° ${g.serial} : choisis-le sur l'écran 2, puis présente-le au lecteur RFID.`);
-      return;
-    }
-    const ids = item === 'croix' ? ['xa', 'xb'] : ['k1', 'k2', 'k3'];
-    ids.forEach((id) => setKey(id, 'off'));
-    keyEl[ids[0]].btn.focus({ preventScroll: true });
-    if (item === 'cles') { g.keysPicked3 = true; const sub = $('[data-sub]', c2); if (sub) sub.textContent = ''; }
-    setStatus(item === 'croix' ? 'Clés insérées. Tourne Croix A et Croix B ensemble, à moins d\'une seconde d\'écart (deux doigts, ou l\'une puis l\'autre très vite).' : `Clés insérées. I = 1er chiffre, II = 2e chiffre, III = 3e chiffre du n° ${g.serial} (ignore les lettres) : tourne de la plus légère à la plus lourde.`);
-  }
-
-  // ---------- clavier ----------
-  const KP = ['1', '2', '3', 'A', '4', '5', '6', 'B', '7', '8', '9', 'C', '*', '0', '#', 'D'];
-  for (const c of KP) {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'kp' + (/[A-D]/.test(c) ? ' l' : /[*#]/.test(c) ? ' s' : ''); b.textContent = c;
-    b.setAttribute('aria-label', c === '*' ? 'Effacer' : c === '#' ? 'Valider' : `Touche ${c}`);
-    b.addEventListener('click', () => onKeypad(c));
-    $('#keypad').append(b);
-  }
-  function showEntry() { const el = $('[data-entry]', c2); if (el) el.textContent = [0, 1, 2, 3].map((i) => g.entry[i] || '_').join(' '); }
-
-  // ---------- écran 2 (CYD) ----------
-  const c2 = $('#cyd2');
-
-  // ---------- loupe (paysage) ----------
-  // En paysage, l'écran 2 à l'échelle est trop petit pour les fils et le code : à ces étapes, l'écran 2 (et le clavier
-  // pour le code) passent agrandis dans la colonne de l'œil, avec des zones de 44 px. Un fantôme reste à leur place.
-  const LOUPE = { wires: ['#cyd2'], badges: ['#cyd2'], pilule: ['#cyd2', '#keypad'] };
-  const loupe = $('#loupe'), home = new Map();
-  function applyLoupe() {
-    // portrait : seulement les fils, si la zone de l'œil peut contenir les 5 fils de 44 px (sinon, défilement vers l'écran 2)
-    const big = g.c2 === 'wires' || g.c2 === 'badges';
-    const portraitWires = !landMQ.matches && big && $('#stage').clientHeight >= 330;
-    const want = g.running && (landMQ.matches || portraitWires) ? (portraitWires ? ['#cyd2'] : LOUPE[g.c2] || []).map((sel) => $(sel)) : [];
-    if (g.running && big && !landMQ.matches) {
-      if (portraitWires) scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' }); // règle (barre d'étape) + fils visibles ensemble
-      else c2.scrollIntoView({ block: 'end', behavior: reduced ? 'auto' : 'smooth' });
-    }
-    for (const [el, h] of home) {
-      if (want.includes(el)) continue;
-      h.ghost.replaceWith(el); home.delete(el);
-    }
-    for (const el of want) {
-      if (home.has(el)) continue;
-      const ghost = el.cloneNode(false);
-      ghost.removeAttribute('id'); ghost.removeAttribute('role'); ghost.removeAttribute('aria-live'); ghost.removeAttribute('aria-label');
-      ghost.classList.add('ghost'); ghost.setAttribute('aria-hidden', 'true'); ghost.textContent = 'agrandi ◀';
-      el.replaceWith(ghost); home.set(el, { ghost });
-      loupe.append(el);
-    }
-    loupe.dataset.view = want.length ? g.c2 : '';
-    loupe.hidden = !want.length;
-    layoutPanel();
-  }
-  const WIRES = { rouge: '#ff3b30', bleu: '#3d8bff', jaune: '#ffd23d', vert: '#3dff95', blanc: '#e8eef2' };
-  function c2Head() { return `<div class="c2-head"><span>CYD2</span><span data-code>${g.code1Done ? 'CODE 1 ' + g.code : g.codeKnown ? 'CODE ' + g.partial : 'HORS LIGNE'}</span></div>`; }
-  const P2 = () => g.step >= 6; // seconde couche
-  function c2View(view) {
-    g.c2 = view;
-    clearInterval(g.lieTimer);
-    queueMicrotask(applyLoupe);
-    if (view === 'locked') c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg">SYSTÈME VERROUILLÉ</span><span class="c2-msg c2-dim">attente du code source</span></div>`;
-    if (view === 'code') {
-      c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg">PODKOVA · FRAGMENT</span><span class="c2-big" data-big></span><span class="c2-msg c2-dim">2e et 4e chiffres</span></div>`;
-      glitchSwap($('[data-big]', c2), [...fakeCode()].join(' '), [...g.partial].join(' '), 1500);
-    }
-    if (view === 'order') {
-      const p2 = P2(), cur = p2 ? g.order2 : g.order, st = g.step;
-      c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg">ORDRE${p2 ? ' · COUCHE 2' : ''}</span><span class="c2-big c2-mid" data-big></span><span class="c2-msg c2-dim" data-sub>${p2 ? 'à l\'envers' : g.keysPicked3 ? '' : `trappe ${g.trapOf.cles} ouverte`}</span></div>`;
-      const truth = p2 ? 'LOURD → LÉGER' : 'PÈSE-LES';
-      const lie = () => { let o; do { o = shuffle([0, 1, 2]); } while (o.join() === cur.join()); return o.map((i) => ['I', 'II', 'III'][i]).join(' · '); };
-      glitchSwap($('[data-big]', c2), lie(), truth, 1800);
-      if (g.hard) g.lieTimer = setInterval(() => { const el = $('[data-big]', c2); if (el && g.step === st) glitchSwap(el, lie(), truth, 700); }, 7000 + rand(3000));
-    }
-    if (view === 'badges') {
-      c2.innerHTML = `${c2Head()}<span class="c2-msg">PODKOVA · 3 CLONES</span><div class="badges">${g.badges.map((b, i) => `<button class="badge" type="button" data-i="${i}" aria-pressed="false" aria-label="Badge Podkova ${b}">PODKOVA·${b}</button>`).join('')}</div>`;
-      $$('.badge', c2).forEach((bt) => bt.addEventListener('click', () => {
-        if (!g.running || g.step !== 2) return;
-        sfx.click(); g.badgeSel = +bt.dataset.i;
-        $$('.badge', c2).forEach((o) => o.setAttribute('aria-pressed', String(o === bt)));
-        $('#rfid').classList.add('ready');
-        setStatus(`Badge PODKOVA·${g.badges[g.badgeSel]} en main. Présente-le au lecteur RFID.`);
-        if (!landMQ.matches) $('#rfid').scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
-      }));
-    }
-    if (view === 'reboot') c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-big">COUCHE 2</span><span class="c2-msg">redémarrage des verrous</span></div>`;
-    if (view === 'fini') c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-big glitch">TERMINÉ</span><span class="c2-msg">tu as gagné</span></div>`;
-    if (view === 'wires') {
-      const ws = P2() ? g.wires2 : g.wires;
-      let html = `${c2Head()}<span class="c2-msg" data-hint></span><div class="wires">`;
-      ws.forEach((w, i) => {
-        html += `<button class="wire" type="button" data-i="${i}" style="--wc:${WIRES[w]}" aria-label="Fil ${i + 1}, ${w}"><svg viewBox="0 0 130 22" preserveAspectRatio="none" aria-hidden="true"><path class="w-l" d="M2 11 C 20 ${rand(2) ? 3 : 19}, 40 ${rand(2) ? 3 : 19}, 63 11"/><path class="w-r" d="M67 11 C 88 ${rand(2) ? 3 : 19}, 108 ${rand(2) ? 3 : 19}, 128 11"/></svg><span class="wire-name">${w.toUpperCase()}</span></button>`;
-      });
-      c2.innerHTML = html + '</div>';
-      const fake = P2() ? g.fakeWire2 : g.fakeWire; // un faux fil, jamais le bon
-      glitchSwap($('[data-hint]', c2), `COUPE LE FIL ${fake + 1}`, 'APPLIQUE LA RÈGLE', 1500);
-      $$('.wire', c2).forEach((b) => b.addEventListener('click', () => cutWire(+b.dataset.i, b)));
-    }
-    if (view === 'pilule') {
-      c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg" data-hint>PILULE EMPOISONNÉE${P2() ? ' · 2' : ''}</span><span class="c2-big c2-entry" data-entry>_ _ _ _</span><span class="c2-msg c2-dim">tape le code au clavier</span></div>`;
-      if (P2()) glitchSwap($('[data-hint]', c2), `CODE 2 = ${fakeCode()}`, 'CODE 1 À L\'ENVERS', 1600);
-    }
-    if (view === 'upload') {
-      c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-msg">PILULE EMPOISONNÉE</span><span class="c2-big" data-pct>0 %</span><span class="c2-bar"><i data-bar></i></span><span class="c2-msg c2-dim">téléversement</span></div>`;
-    }
-    if (view === 'sealed') c2.innerHTML = `${c2Head()}<div class="c2-center"><span class="c2-big">LECTEUR 5D</span><span class="c2-msg">ENTITÉ CONFINÉE</span></div>`;
-    if (view === 'boom') c2.innerHTML = `<div class="c2-center"><span class="c2-big glitch">ERREUR</span><span class="c2-msg">signal perdu</span></div>`;
-  }
-  function fakeCode() { let s; do { s = String(rand(10000)).padStart(4, '0'); } while (s === g.code || s === g.code2); return s; }
-  // l'Entité ment : son œil grésille (rouge, saccadé) tant que le faux texte est affiché
-  let lieT = 0;
-  function flagLie(ms, caption = false) {
-    const st = $('#stage'), p1 = $('[data-part="cyd1"]'), cap = $('#caption');
-    st.classList.add('liar'); p1.classList.add('liar');
-    if (caption) cap.classList.add('glitch'); // la réplique elle-même est un mensonge
-    clearTimeout(lieT);
-    lieT = setTimeout(() => { st.classList.remove('liar'); p1.classList.remove('liar'); cap.classList.remove('glitch'); }, ms);
-  }
-  function glitchSwap(el, lie, truth, ms) {
-    if (!el) return;
-    el.textContent = lie; el.classList.add('glitch');
-    flagLie(reduced ? Math.min(ms, 900) : ms);
-    const chars = '█▓▒░#%&@0123456789';
-    setTimeout(() => {
-      let n = 0;
-      const iv = setInterval(() => {
-        n++;
-        el.textContent = n > 5 ? truth : [...truth].map((c) => (c === ' ' || c === '·' ? c : chars[rand(chars.length)])).join('');
-        if (n > 5) { clearInterval(iv); el.classList.remove('glitch'); }
-      }, 60);
-    }, reduced ? Math.min(ms, 900) : ms);
-  }
-
-  // ---------- état ----------
-  // 12 étapes : couche 1 (0-5) puis seconde couche (6-11)
-  const STEPS = [
-    () => `Interrupteurs : n° ${g.serial} avec une voyelle (A, E, U, Y) → bleu d'abord ; sinon, dernier chiffre pair → bleu d'abord, impair → rouge d'abord. Lève les caches.`,
-    () => `Clé en croix : trappe = (reste de 1er chiffre du n° ${g.serial} ÷ 3) + 1 (ex. 7 → reste 1 → trappe 2). Touche-la, prends la clé, puis tourne Croix A et Croix B ensemble.`,
-    () => `La trappe ${g.trapOf.badge} est ouverte : trois clones Podkova. Le vrai porte une lettre du n° ${g.serial}. Prends-les, choisis le vrai sur l'écran 2, puis présente-le au lecteur RFID.`,
-    () => `La trappe ${g.trapOf.cles} est ouverte : prends les clés. Note le fragment de code de l'écran 2 : il servira.`,
-    () => (g.hard ? `Fils : plus d'un rouge → le dernier rouge ; sinon, dernier chiffre du n° ${g.serial} pair → le 2e ; sinon → le sans-jumeau.` : `Fils : plus d'un rouge → le dernier rouge ; sinon → le sans-jumeau.`),
-    () => `Code : 1er = dernier chiffre du n° ${g.serial} ; 3e = ${rule3()} ; 2e et 4e = fragment de l'écran 2. Il part dès le 4e chiffre.`,
-    () => `Seconde couche. Interrupteurs : 1er chiffre du n° ${g.serial} pair → bleu d'abord ; impair → rouge d'abord. Lève les caches.`,
-    'Ramène Croix A et Croix B à l\'arrêt, ensemble (moins d\'une seconde).',
-    () => `Clés à l'envers : de la plus lourde à la plus légère. I = 1er chiffre, II = 2e chiffre, III = 3e chiffre du n° ${g.serial} (ignore les lettres).`,
-    () => (g.hard ? 'Fils, panneau 2 : plus d\'un bleu → le 1er bleu ; sinon → le sans-jumeau.' : 'Fils, panneau 2 : coupe le sans-jumeau.'),
-    'Code 2 : le code 1 (en haut de l\'écran 2) à l\'envers. Il part dès le 4e chiffre.',
-    'Maintiens le gros bouton rouge pour sceller le lecteur 5D.',
-  ];
-  const NSTEPS = STEPS.length;
-  const PEN = { ordre: 5, code: 8, jump: 3.2 }; // pénalités allégées (0.1.4 : 10 s, 15 s, +6,4 %)
-  const rule3 = () => (g.hard ? 'somme de ses 4 chiffres, unités seules' : 'son 1er chiffre');
-  const PROB = [99.7, 94.1, 87.6, 80.2, 72.5, 64.3, 55.8, 47.0, 38.1, 28.6, 19.4, 9.7, 0];
-  const g = window.__game = { running: false, ended: false, step: -1, endAt: 0, code: '', codeKnown: false, entry: '', order: [], orderPos: 0, wires: [], unique: '', trapOf: { croix: 1, badge: 2, cles: 3 }, seed: 0, crossT: 0, lastSec: -1, errUntil: 0, said30: false, said10: false };
-
-  function setStatus(text) {
-    const el = $('#status');
-    el.textContent = text;
-    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
-  }
-  function setProb(val, lie = false) {
-    const box = $('#probBox'), out = $('#prob');
-    out.textContent = fmtPct(val);
-    out.classList.toggle('glitch', lie);
-    const o2 = $('#prob2'); o2.textContent = fmtPct(val); o2.classList.toggle('glitch', lie);
-  }
-  function goStep(n) {
-    g.step = n;
-    $('#stepNo').textContent = `Étape ${Math.min(n + 1, NSTEPS)}/${NSTEPS}`;
-    setProb(PROB[n]);
-    if (n < NSTEPS) setStatus(typeof STEPS[n] === 'function' ? STEPS[n]() : STEPS[n]);
-    lookAtEl(null);
-  }
-  function penalty(sec, line) {
-    g.endAt -= sec * 1000;
-    g.errUntil = performance.now() + 2200;
-    sfx.error();
-    buzz(BUZZ.faux);
-    $('#probBox').classList.add('up');
-    setProb(Math.min(99.9, PROB[Math.floor(g.step)] + PEN.jump));
-    setTimeout(() => { $('#probBox').classList.remove('up'); if (g.running) setProb(PROB[Math.floor(g.step)]); }, 1600);
-    if (line) speak(line);
-  }
-
-  function resetBoard() {
-    for (const k of KEYS) setKey(k.id, 'empty');
-    for (const n in traps) { traps[n].el.classList.remove('open', 'taken'); traps[n].btn.hidden = true; }
-    $$('.guard').forEach((gd) => {
-      const c = gd.querySelector('.cover'), l = gd.querySelector('.lever');
-      c.setAttribute('aria-expanded', 'false'); c.hidden = false; l.disabled = true; l.setAttribute('aria-checked', 'false');
-    });
-    $('#rfid').classList.remove('scan', 'done', 'ready');
-    $('#bigbtn').classList.remove('armed', 'holding');
-    resetHold();
-    g.entry = ''; showEntry();
-  }
-
-  // valeurs d'une partie, toutes tirées d'une seule graine (même graine = même partie)
-  // Deux paliers cachés, ~50/50 selon la graine : 'moyen-difficile' et 'difficile'. Le palier change la chaîne de
-  // déduction (fils, 3e chiffre du code), les leurres et le nombre de mensonges. Chaque tirage est noté ; s'il sort de
-  // la bande de son palier, on retire avec la sous-graine suivante (déterministe : même ?seed = même partie).
-  const TIERS = {
-    // mensonges gardés au même rythme qu'en 0.1.4 (4 / 6 par couche de 6 étapes), donc doublés sur 12 étapes
-    'moyen-difficile': { band: [30, 32], lies: 8 }, // par couche : faux code/fragment, faux ordre, faux fil, 1 mensonge parlé
-    difficile: { band: [37, 39], lies: 12 }, // + « le bleu/rouge d'abord » parlé x2, faux ordres répétés, fausse probabilité
-  };
-  const VOW = /[AEUY]/;
-  function draw(sub, tier) {
-    const hard = tier === 'difficile';
-    const r = mulberry32(sub), ri = (n) => Math.floor(r() * n);
-    const sh = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = ri(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-    // n° de série : 4 chiffres (les 3 premiers distincts) + 2 lettres, ex. 4K7-29B
-    const [d1, d2, d3] = sh([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).slice(0, 3), d4 = ri(10);
-    const LET = 'ABCDEFGHJKLMNPRSTUVWXYZ';
-    const L1 = LET[ri(LET.length)], L2 = LET[ri(LET.length)];
-    const serial = `${d1}${L1}${d2}-${d3}${d4}${L2}`;
-    // n° de lot (leurre) : au palier difficile, fait des chiffres du n° de série pour tenter
-    const lot = hard ? Number(sh([d1, d2, d3, d4]).filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => !a - !b).slice(0, 3).join('')) : 100 + ri(900);
-    const even = d4 % 2 === 0, vowel = VOW.test(L1 + L2);
-    // interrupteurs : voyelle -> bleu ; sinon dernier chiffre pair -> bleu, impair -> rouge
-    const first = vowel || even ? 'bleu' : 'rouge';
-    // trappes : la clé en croix est dans la trappe (d1 mod 3) + 1 ; badges et clés dans les deux autres
-    const rest = sh([1, 2, 3].filter((n) => n !== (d1 % 3) + 1));
-    const trapOf = { croix: (d1 % 3) + 1, badge: rest[0], cles: rest[1] };
-    // badges : 3 clones, le vrai porte une lettre du n° de série, les 2 autres non
-    const others = sh([...LET].filter((c) => c !== L1 && c !== L2)).slice(0, 2);
-    const badges = sh([ri(2) ? L1 : L2, ...others]);
-    const badgeIdx = badges.findIndex((c) => c === L1 || c === L2);
-    // clés : I pèse le 1er chiffre, II le 2e, III le 3e ; couche 1 léger -> lourd, couche 2 l'inverse
-    const weights = [d1, d2, d3];
-    const order = [0, 1, 2].sort((a, b) => weights[a] - weights[b]);
-    const order2 = [...order].reverse();
-    // code : 1er = dernier chiffre ; 3e = 1er chiffre (moyen) ou somme des 4 chiffres, unités (difficile) ; 2e, 4e = écran 2
-    const sum = d1 + d2 + d3 + d4;
-    const b2 = ri(10), b4 = ri(10);
-    const code = `${d4}${b2}${hard ? sum % 10 : d1}${b4}`;
-    const code2 = [...code].reverse().join('');
-    // fils couche 1 : moyen = plus d'un rouge -> le dernier rouge, sinon le sans-jumeau ; difficile = + « sinon n° pair -> le 2e »
-    const cols = sh(Object.keys(WIRES));
-    const wires = sh([cols[0], cols[1], cols[1], cols[2], cols[2]]);
-    const reds = wires.map((w, i) => (w === 'rouge' ? i : -1)).filter((i) => i >= 0);
-    let wireIdx, branch;
-    if (reds.length > 1) { wireIdx = reds[reds.length - 1]; branch = 1; } else if (hard && even) { wireIdx = 1; branch = 2; } else { wireIdx = wires.indexOf(cols[0]); branch = hard ? 3 : 2; }
-    const fakeWire = (wireIdx + 1 + ri(4)) % 5; // faux fil au hasard (plus de « fil tentant » : un leurre de moins)
-    // fils couche 2 : moyen = le sans-jumeau ; difficile = plus d'un bleu -> le 1er bleu, sinon le sans-jumeau
-    const cols2 = sh(Object.keys(WIRES));
-    const wires2 = sh([cols2[0], cols2[1], cols2[1], cols2[2], cols2[2]]);
-    const blues = wires2.map((w, i) => (w === 'bleu' ? i : -1)).filter((i) => i >= 0);
-    let wireIdx2, branch2;
-    if (hard && blues.length > 1) { wireIdx2 = blues[0]; branch2 = 1; } else { wireIdx2 = wires2.indexOf(cols2[0]); branch2 = hard ? 2 : 1; }
-    const fakeWire2 = (wireIdx2 + 1 + ri(4)) % 5;
-    const first2 = d1 % 2 === 0 ? 'bleu' : 'rouge';
-    const run = { serial, lot, first, first2, vowel, weights, code, code2, partial: `_${b2}_${b4}`, order, order2, unique: cols[0], wires, wireIdx, fakeWire, branch, wires2, wireIdx2, fakeWire2, branch2, badges, badgeIdx, trapOf };
-    run.score = scoreRun(run, tier, sum);
-    return run;
-  }
-  // note de difficulté = étapes de déduction + leurres + mensonges signalés + pièges non triviaux
-  function scoreRun(run, tier, sum) {
-    const hard = tier === 'difficile', o = run.order.join('');
-    const steps = (run.vowel ? 1 : 2) /* interrupteurs */ + 2 /* trappe */ + 2 /* badge */ + 1 /* clés */ + run.branch /* fils */ + (hard ? 3 : 2) /* code */
-      + 1 /* interrupteurs 2 */ + 1 /* croix */ + 1 /* clés 2 */ + run.branch2 /* fils 2 */ + 1 /* code 2 */;
-    const lotDigits = String(run.lot);
-    const decoys = 1 /* lot */ + ([...lotDigits].some((c) => run.serial.includes(c)) ? 1 : 0) + 2 /* faux badges */;
-    const lies = TIERS[tier].lies;
-    const flags = (o !== '012' ? 1 : 0) + (o !== '210' ? 1 : 0) + (run.wireIdx !== 0 ? 1 : 0) + (run.wireIdx2 !== 0 ? 1 : 0) + (new Set(run.code).size === 4 ? 1 : 0) + (hard && sum >= 10 ? 1 : 0) - (run.code.includes(lotDigits) ? 2 : 0);
-    return { total: steps + decoys + lies + flags, steps, decoys, lies, flags };
-  }
-  // garde-fous en plus de la bande : jamais l'ordre I II III (ni III II I, l'ordre de la couche 2), code 2 ≠ code 1
-  function accept(run, tier, lo, hi) {
-    const o = run.order.join('');
-    return run.score.total >= lo && run.score.total <= hi && o !== '012' && o !== '210' && run.code2 !== run.code;
-  }
-  function makeRun(seed) {
-    seed >>>= 0;
-    const tier = mulberry32(seed ^ 0x9e3779b9)() < 0.5 ? 'moyen-difficile' : 'difficile';
-    const [lo, hi] = TIERS[tier].band;
-    let run, tries = 0;
-    do { run = draw((seed + tries * 0x632be5ab) >>> 0, tier); tries++; } while (!accept(run, tier, lo, hi) && tries < 200);
-    return { seed, tier, tries, ...run, lies: TIERS[tier].lies, hard: tier === 'difficile' };
-  }
-  window.__makeRun = makeRun; window.__puzzle = { draw, accept, TIERS };
-
-  function startGame() {
-    initAudio();
-    const run = makeRun(newSeed());
-    Object.assign(g, run, {
-      running: true, ended: false, codeKnown: false, entry: '', orderPos: 0,
-      lastSec: -1, errUntil: 0, said30: false, said10: false, crossT: 0, endAt: performance.now() + TIME_S * 1000, keysPicked3: false, badge: false, badgeSel: -1, code1Done: false,
-    });
-    resetBoard();
-    fillTraps();
-    $('[data-part="label"]').textContent = `N° DE SÉRIE ${g.serial} · LOT ${g.lot}`;
-    if (DEBUG) { $('#seed').hidden = false; $('#seed').textContent = ` · graine ${g.seed} · ${g.tier} · note ${g.score.total}`; console.info('[entite] graine', g.seed, run); }
-    startMusic();
-    $('#intro').hidden = true; $('#end').hidden = true;
-    eye.setMood('watching');
-    c2View('locked');
-    goStep(0);
-    trapsChoosable(false);
-    speak('intro');
-    setTimeout(() => g.running && g.step === 0 && speak('depart8'), 3600);
-    if (g.hard) { scheduleProbLie(); colorLie(0, 9500); } // palier difficile : fausse probabilité + mensonge parlé
-  }
-  // mensonge parlé (palier difficile) : l'Entité annonce la mauvaise couleur d'abord ; œil rouge + sous-titre qui grésille
-  function colorLie(step, ms) {
-    clearTimeout(g.vTimer);
-    g.vTimer = setTimeout(() => {
-      if (!g.running || g.step !== step) return;
-      const truth = step === 0 ? g.first : g.first2;
-      speak(truth === 'bleu' ? 'menteRouge' : 'menteBleu'); flagLie(2600, true);
-    }, ms);
-  }
-
-  function scheduleProbLie() {
-    clearTimeout(g.probLie);
-    g.probLie = setTimeout(() => {
-      if (!g.running) return;
-      setProb(99.9 - Math.random() * 3, true);
-      flagLie(800);
-      setTimeout(() => g.running && setProb(PROB[Math.floor(g.step)]), 800);
-      scheduleProbLie();
-    }, 9000 + rand(6000));
-  }
-
-  function endGame(win, reason) {
-    if (g.ended) return;
-    g.running = false; g.ended = true;
-    clearTimeout(g.probLie); clearInterval(g.lieTimer); clearTimeout(g.crossTimer); clearTimeout(g.vTimer);
-    const left = Math.max(0, (g.endAt - performance.now()) / 1000);
-    if (win) {
-      eye.setMood('defused');
-      sfx.defused();
-      stopMusic('fade');
-      buzz(BUZZ.victoire);
-      setProb(0);
-      $('#stepNo').textContent = `Étape ${NSTEPS}/${NSTEPS}`;
-      setStatus('Lecteur scellé. L\'Entité est confinée.');
-      c2View('sealed');
-      setTimeout(() => speak('desamorce'), 900);
-    } else {
-      stopVoice();
-      eye.setMood('boom');
-      sfx.boom();
-      stopMusic('cut');
-      setProb(100);
-      c2View('boom');
-      setStatus(reason);
-      if (!reduced) { document.body.classList.add('shake'); setTimeout(() => document.body.classList.remove('shake'), 700); }
-      buzz(BUZZ.boom);
-      setTimeout(() => speak(reason.startsWith('Secousse') ? 'secousse' : 'boom'), 1300);
-    }
-    g.result = win ? 'win' : 'boom'; g.endT = performance.now();
-    setTimeout(() => {
-      const end = $('#end');
-      end.classList.toggle('lose', !win);
-      $('#endTitle').textContent = win ? 'Entité piégée' : 'Explosion';
-      const m = Math.floor(left / 60), s = Math.floor(left % 60);
-      $('#endText').textContent = win
-        ? `Elle s'est repliée dans le lecteur optique 5D, avec ${m}:${String(s).padStart(2, '0')} au compteur. Elle avait calculé l'inverse.`
-        : `${reason} La probabilité d'échec était juste, cette fois.`;
-      end.hidden = false;
-      $('#btnAgain').focus({ preventScroll: true });
-    }, win ? 3400 : 2600);
-  }
-
-  // ---------- actions ----------
-  function notYet() { sfx.error(); $('#status').classList.remove('flash'); void $('#status').offsetWidth; $('#status').classList.add('flash'); }
-
-  function onKey(id) {
-    if (!g.running) return;
-    const st = keyEl[id].w.dataset.state;
-    if (st === 'empty') { denyKey(id); return; }
-    if (keyEl[id].w.classList.contains('locked')) { denyKey(id); return; }
-    const cross = id === 'xa' || id === 'xb';
-    if (cross && (g.step === 1 || g.step === 7)) {
-      const tgt = g.step === 1 ? 'on' : 'off', back = g.step === 1 ? 'off' : 'on';
-      if (st === tgt) return;
-      sfx.keyTurn();
-      const other = id === 'xa' ? 'xb' : 'xa';
-      setKey(id, tgt, { pending: true });
-      if (keyEl[other].w.dataset.state === tgt && performance.now() - g.crossT <= 1000) {
-        clearTimeout(g.crossTimer);
-        setKey('xa', tgt, { locked: true }); setKey('xb', tgt, { locked: true });
-        sfx.ok(); speak('cle');
-        if (g.step === 1) { goStep(2); setTimeout(() => openTrap('badge'), 400); }
-        else { goStep(8); ['k1', 'k2', 'k3'].forEach((k) => setKey(k, 'off')); g.orderPos = 0; c2View('order'); }
-        return;
-      }
-      g.crossT = performance.now();
-      clearTimeout(g.crossTimer);
-      g.crossTimer = setTimeout(() => {
-        setKey('xa', back); setKey('xb', back);
-        denyKey(id);
-        speak('tropLent');
-        setStatus("Trop lent : les deux moitiés de la clé en croix doivent tourner ensemble (moins d'une seconde).");
-      }, 1000);
-      return;
-    }
-    if (!cross && (g.step === 3 || g.step === 8)) {
-      if (st === 'on') return;
-      const idx = ['k1', 'k2', 'k3'].indexOf(id), p2 = g.step === 8, cur = p2 ? g.order2 : g.order;
-      sfx.keyTurn();
-      if (idx === cur[g.orderPos]) {
-        setKey(id, 'on');
-        g.orderPos++;
-        if (g.orderPos === 3) {
-          ['k1', 'k2', 'k3'].forEach((k) => setKey(k, 'on', { locked: true }));
-          sfx.ok();
-          goStep(p2 ? 9 : 4);
-          c2View('wires');
-          speak(p2 ? 'fils2' : 'fils');
-        }
-      } else {
-        setKey(id, 'on');
-        setTimeout(() => { ['k1', 'k2', 'k3'].forEach((k) => setKey(k, 'off')); }, 350);
-        g.orderPos = 0;
-        penalty(PEN.ordre, 'ordreFaux5');
-        setStatus(`Mauvais ordre : les clés reviennent à l'arrêt. I = 1er chiffre, II = 2e, III = 3e du n° ${g.serial} (ignore les lettres) : de la plus ${p2 ? 'lourde à la plus légère' : 'légère à la plus lourde'}.`);
-      }
-      return;
-    }
-    denyKey(id);
-  }
-
-  $$('.guard').forEach((gd) => {
-    const color = gd.dataset.guard, cover = gd.querySelector('.cover'), lever = gd.querySelector('.lever');
-    cover.addEventListener('click', () => {
-      if (!g.running) return;
-      lookAtEl(cover);
-      const open = cover.getAttribute('aria-expanded') !== 'true';
-      cover.setAttribute('aria-expanded', String(open));
-      cover.setAttribute('aria-label', `${open ? 'Refermer' : 'Lever'} le cache ${color}`);
-      lever.disabled = !open;
-      sfx.cover();
-    });
-    lever.addEventListener('click', () => {
-      if (!g.running) return;
-      lookAtEl(lever);
-      if (lever.getAttribute('aria-checked') === 'true') { sfx.error(); return; }
-      if (g.step !== 0 && g.step !== 6) { notYet(); return; }
-      const p2 = g.step === 6, want = p2 ? g.first2 : g.first;
-      sfx.click();
-      lever.setAttribute('aria-checked', 'true');
-      const firstLever = $(`.guard-${want === 'rouge' ? 'red' : 'blue'} .lever`);
-      if (color !== want && firstLever.getAttribute('aria-checked') !== 'true') {
-        setTimeout(() => lever.setAttribute('aria-checked', 'false'), 260);
-        penalty(PEN.ordre, 'ordreFaux5');
-        setStatus(p2 ? `Mauvais ordre. Cinq secondes de moins. Seconde couche : 1er chiffre du n° ${g.serial} pair → bleu ; impair → rouge.` : `Mauvais ordre. Cinq secondes de moins. N° ${g.serial} : une voyelle (A, E, U, Y) → bleu ; sinon dernier chiffre pair → bleu, impair → rouge.`);
-        return;
-      }
-      if (color !== want) {
-        sfx.ok();
-        if (p2) { goStep(7); setKey('xa', 'on'); setKey('xb', 'on'); }
-        else { goStep(1); trapsChoosable(true); }
-      } else if (!p2) {
-        speak('caches');
-      }
-    });
+function initFullscreen() {
+  const ok = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled), btn = $('#btnFs');
+  if (!ok) return;
+  btn.hidden = false;
+  const active = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  btn.addEventListener('click', async () => {
+    try { if (active()) await (document.exitFullscreen || document.webkitExitFullscreen).call(document); else await (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen).call(document.documentElement); } catch { /* refusé */ }
   });
-
-  $('#rfid').addEventListener('click', () => {
-    if (!g.running) return;
-    const pad = $('#rfid');
-    lookAtEl(pad);
-    if (g.step !== 2 || pad.classList.contains('scan')) { notYet(); return; }
-    if (!g.badge) { notYet(); setStatus(`Il te faut un badge Podkova : ils sont dans la trappe ${g.trapOf.badge}.`); return; }
-    if (g.badgeSel < 0) { notYet(); setStatus(`Choisis d'abord le vrai badge sur l'écran 2 : il porte une lettre du n° ${g.serial}.`); return; }
-    if (g.badgeSel !== g.badgeIdx) {
-      const bad = g.badges[g.badgeSel];
-      g.badgeSel = -1; pad.classList.remove('ready'); c2View('badges');
-      penalty(PEN.ordre, 'badgeFaux');
-      setStatus(`PODKOVA·${bad} est un clone. Cinq secondes de moins. Le vrai porte une lettre du n° ${g.serial}.`);
-      return;
-    }
-    pad.classList.add('scan');
-    sfx.scan();
-    setTimeout(() => {
-      if (!g.running) return;
-      pad.classList.remove('scan'); pad.classList.add('done');
-      sfx.rfid();
-      g.codeKnown = true;
-      goStep(3);
-      c2View('code');
-      speak('badgeOk');
-      setTimeout(() => openTrap('cles'), 900);
-      setTimeout(() => { if (g.running && g.step === 3) c2View('order'); }, 4600);
-    }, 900);
-  });
-
-
-  function cutWire(i, btn) {
-    if (!g.running || (g.step !== 4 && g.step !== 9) || btn.classList.contains('cut')) return;
-    lookAtEl(btn);
-    btn.classList.add('cut');
-    sfx.snip();
-    if (i === (g.step === 9 ? g.wireIdx2 : g.wireIdx)) {
-      sfx.ok();
-      const nx = g.step === 9 ? 10 : 5;
-      g.entry = '';
-      goStep(nx);
-      speak(nx === 10 ? 'code2' : 'pilule');
-      setTimeout(() => { if (g.running && g.step === nx) { c2View('pilule'); showEntry(); } }, 600);
-    } else {
-      setTimeout(() => endGame(false, 'Mauvais fil coupé.'), 250);
-    }
-  }
-
-  function onKeypad(c) {
-    if (!g.running) return;
-    sfx.key();
-    if (g.step !== 5 && g.step !== 10) { if (/\d/.test(c)) notYet(); return; }
-    if (c === '*') { g.entry = ''; showEntry(); return; }
-    if (/[A-D]/.test(c)) return;
-    if (c === '#') { if (g.entry.length === 4) checkCode(); return; }
-    if (g.entry.length >= 4) return;
-    g.entry += c; showEntry();
-    if (g.entry.length === 4) setTimeout(checkCode, 180);
-  }
-  function checkCode() {
-    if (g.step !== 5 && g.step !== 10) return;
-    const p2 = g.step === 10;
-    if (g.entry === (p2 ? g.code2 : g.code)) {
-      sfx.ok();
-      g.step += 0.5;
-      speak('codeOk');
-      c2View('upload');
-      const t0 = performance.now(), dur = 2400;
-      const tick = () => {
-        if (!g.running) return;
-        const p = Math.min(1, (performance.now() - t0) / dur);
-        const pct = $('[data-pct]', c2), bar = $('[data-bar]', c2);
-        if (pct) pct.textContent = Math.round(p * 100) + ' %';
-        if (bar) bar.style.width = p * 100 + '%';
-        if (p < 1) requestAnimationFrame(tick);
-        else if (p2) { goStep(11); $('#bigbtn').classList.add('armed'); speak('sceller'); flagLie(3200, true); }
-        else secondLayer();
-      };
-      tick();
-    } else {
-      const lcd = $('[data-entry]', c2) || document.createElement('span');
-      lcd.classList.remove('bad'); void lcd.offsetWidth; lcd.classList.add('bad');
-      penalty(PEN.code, 'codeFaux');
-      setStatus(p2 ? 'Code refusé. Huit secondes de moins. Code 2 = le code 1 (en haut de l\'écran 2) à l\'envers.' : `Code refusé. Huit secondes de moins. 1er : dernier chiffre du n° ${g.serial} ; 3e : ${rule3()} ; 2e et 4e : écran 2.`);
-      setTimeout(() => { g.entry = ''; showEntry(); lcd.classList.remove('bad'); }, 700);
-    }
-  }
-
-  // fin de la couche 1 : l'Entité ment (« c'est fini »), puis redémarre une seconde couche de verrous
-  function secondLayer() {
-    g.code1Done = true;
-    c2View('fini');
-    speak('mentFini'); flagLie(2800, true);
-    setTimeout(() => {
-      if (!g.running) return;
-      goStep(6);
-      $$('.guard').forEach((gd) => {
-        const c = gd.querySelector('.cover'), l = gd.querySelector('.lever');
-        c.setAttribute('aria-expanded', 'false'); c.setAttribute('aria-label', `Lever le cache ${gd.dataset.guard}`); l.disabled = true; l.setAttribute('aria-checked', 'false');
-      });
-      $('#rfid').classList.remove('done');
-      c2View('reboot');
-      sfx.servo();
-      speak('couche2');
-      if (g.hard) colorLie(6, 5200);
-    }, 3000);
-  }
-
-  // gros bouton : maintenir 1,5 s
-  const big = $('#bigbtn'), prog = $('.bigbtn-prog');
-  let holdT = 0;
-  function resetHold() { clearTimeout(holdT); prog.style.transition = 'stroke-dashoffset 0.25s'; prog.style.strokeDashoffset = '289'; big.classList.remove('holding'); }
-  function startHold() {
-    if (!g.running) return;
-    lookAtEl(big);
-    if (g.step !== 11) { notYet(); return; }
-    big.classList.add('holding');
-    sfx.hold();
-    prog.style.transition = 'stroke-dashoffset 1.5s linear';
-    prog.style.strokeDashoffset = '0';
-    holdT = setTimeout(() => { big.classList.remove('armed'); endGame(true); }, 1500);
-  }
-  big.addEventListener('pointerdown', (e) => { e.preventDefault(); big.setPointerCapture?.(e.pointerId); startHold(); });
-  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => big.addEventListener(ev, () => { if (!g.ended) resetHold(); }));
-  big.addEventListener('keydown', (e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); startHold(); } });
-  big.addEventListener('keyup', (e) => { if ((e.key === ' ' || e.key === 'Enter') && !g.ended) resetHold(); });
-  big.addEventListener('contextmenu', (e) => e.preventDefault());
-
-  // secousse
-  $('#btnShake').addEventListener('click', () => { if (g.running) endGame(false, 'Secousse détectée.'); else notYet(); });
-  function onMotion(e) {
-    if (!g.running) return;
-    const a = e.acceleration;
-    let m = 0;
-    if (a && a.x != null) m = Math.hypot(a.x, a.y, a.z);
-    else if (e.accelerationIncludingGravity) { const b = e.accelerationIncludingGravity; m = Math.abs(Math.hypot(b.x, b.y, b.z) - 9.81); }
-    if (m > 24) endGame(false, 'Secousse détectée.');
-  }
-
-  // plein écran (+ verrouillage paysage si permis)
-  const fsEl = document.documentElement;
-  const fsSupported = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
-  const fsActive = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
-  const standalone = matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || navigator.standalone;
-  const btnFs = $('#btnFs');
-  if (fsSupported) btnFs.hidden = false;
-  else if (!standalone) $('#fsHint').hidden = false;
-  async function enterFs() {
-    if (!fsSupported || fsActive()) return;
-    try {
-      if (fsEl.requestFullscreen) await fsEl.requestFullscreen({ navigationUI: 'hide' });
-      else if (fsEl.webkitRequestFullscreen) fsEl.webkitRequestFullscreen();
-    } catch { return; }
-    try { await screen.orientation?.lock?.('landscape'); } catch { /* orientation actuelle conservée */ }
-  }
-  async function exitFs() {
-    try { screen.orientation?.unlock?.(); } catch { /* rien */ }
-    try { if (document.exitFullscreen) await document.exitFullscreen(); else document.webkitExitFullscreen?.(); } catch { /* rien */ }
-  }
-  function syncFs() {
-    const on = fsActive();
-    btnFs.setAttribute('aria-pressed', String(on));
-    btnFs.setAttribute('aria-label', on ? 'Quitter le plein écran' : 'Plein écran');
-    if (!on) { try { screen.orientation?.unlock?.(); } catch { /* rien */ } }
-  }
-  document.addEventListener('fullscreenchange', syncFs);
-  document.addEventListener('webkitfullscreenchange', syncFs);
-  btnFs.addEventListener('click', () => (fsActive() ? exitFs() : enterFs()));
-
-  // son
-  $('#btnSon').addEventListener('click', () => {
-    const m = !isMuted();
-    setMuted(m);
-    $('#btnSon').setAttribute('aria-pressed', String(m));
-    $('#btnSon').setAttribute('aria-label', m ? 'Rétablir le son' : 'Couper le son');
-  });
-
-  // vibrations (réglage gardé dans localStorage)
-  const btnVib = $('#btnVib');
-  if (canVibrate) {
-    btnVib.hidden = false;
-    const syncVib = () => btnVib.setAttribute('aria-pressed', String(vibeOn));
-    syncVib();
-    btnVib.addEventListener('click', () => {
-      vibeOn = !vibeOn;
-      try { localStorage.setItem('entite.vibrations', vibeOn ? '1' : '0'); } catch { /* navigation privée */ }
-      syncVib();
-      buzz(40);
-    });
-  }
-
-  $('#btnStart').addEventListener('click', async () => {
-    initAudio();
-    const fs = enterFs();
-    if (typeof DeviceMotionEvent !== 'undefined') {
-      try {
-        if (typeof DeviceMotionEvent.requestPermission === 'function') {
-          const r = await DeviceMotionEvent.requestPermission();
-          if (r === 'granted') addEventListener('devicemotion', onMotion);
-        } else addEventListener('devicemotion', onMotion);
-      } catch { /* bouton de secours */ }
-    }
-    await fs;
-    startGame();
-  });
-  $('#btnAgain').addEventListener('click', startGame);
-
-  // regard : l'œil suit le dernier geste
-  let lookUntil = 0;
-  function lookAtEl(el) {
-    if (!el) { lookUntil = 0; return; }
-    const r = el.getBoundingClientRect(), s = $('#stage').getBoundingClientRect();
-    const x = ((r.left + r.width / 2) - (s.left + s.width / 2)) / (s.width / 2);
-    const y = ((r.top + r.height / 2) - (s.top + s.height * 0.53)) / (s.height * 0.8);
-    eye.lookAt(x, Math.min(1, y));
-    lookUntil = performance.now() + 2600;
-  }
-
-  // ---------- boucle ----------
-  let ledT = 0;
-  showTime(TIME_S);
-  function loop(now) {
-    requestAnimationFrame(loop);
-    eye.setVoice(voiceLevel());
-    mirrorCyd1();
-    if (now > lookUntil) eye.lookAt(Math.sin(now / 2300) * 0.5, Math.sin(now / 3100) * 0.35);
-    let tl = TIME_S;
-    if (g.running) {
-      tl = (g.endAt - now) / 1000;
-      showTime(tl);
-      const sec = Math.ceil(tl);
-      if (sec !== g.lastSec) {
-        g.lastSec = sec;
-        colons.forEach((c) => c.classList.toggle('blink', sec % 2 === 0));
-        if (sec > 0) sfx.tick(sec <= 10);
-        if (sec <= 30 && !g.said30) { g.said30 = true; speak('trente'); sfx.alarm(); }
-        if (sec <= 10 && !g.said10) { g.said10 = true; speak('dix'); }
-      }
-      if (tl <= 0) { showTime(0); endGame(false, 'Temps écoulé.'); }
-      eye.setMood(tl <= 30 || now < g.errUntil ? 'angry' : 'watching');
-      // tension : 0 au départ, 1 à la fin du compte à rebours (courbe qui accélère sous 60 s)
-      setMusicIntensity(Math.pow(Math.min(1, Math.max(0, 1 - tl / TIME_S)), 1.8));
-    } else if (!g.ended) eye.setMood('idle');
-    if (now - ledT > 66) {
-      ledT = now;
-      const b1 = [], b2 = [];
-      if (g.running) {
-        const done = Math.round((Math.floor(g.step) / NSTEPS) * 8);
-        for (let i = 0; i < 8; i++) b1[i] = i < done ? '#62d6ff' : i === done && Math.floor(now / 300) % 2 ? '#ffb020' : null;
-        const lit = Math.ceil((tl / TIME_S) * 8), col = tl > 60 ? '#3dff95' : tl > 30 ? '#ffb020' : '#ff3b30';
-        const blink = tl <= 30 && Math.floor(now / 180) % 2;
-        for (let i = 0; i < 8; i++) b2[i] = i < lit && !blink ? col : null;
-      } else if (g.ended && g.result === 'win') {
-        const a = Math.floor(((Math.sin(now / 500) + 1) / 2) * 8);
-        for (let i = 0; i < 8; i++) { b1[i] = i <= a ? '#62d6ff' : null; b2[i] = i <= a ? '#62d6ff' : null; }
-      } else if (g.ended) {
-        const age = now - g.endT;
-        for (let i = 0; i < 8; i++) { const on = age < 1500 ? Math.floor(now / 90) % 2 : Math.random() < 0.04; b1[i] = on ? '#ff3b30' : null; b2[i] = on ? '#ff3b30' : null; }
-      } else {
-        const p = Math.floor(now / 110) % 14, pos = p < 8 ? p : 14 - p;
-        for (let i = 0; i < 8; i++) { b1[i] = Math.abs(i - pos) < 1 ? '#3d8bff' : Math.abs(i - pos) < 2 ? '#123a7a' : null; b2[i] = b1[7 - i] ? b1[i] && null : null; }
-        for (let i = 0; i < 8; i++) b2[i] = b1[7 - i];
-      }
-      setBar(0, b1); setBar(1, b2);
-    }
-  }
-  requestAnimationFrame(loop);
+  document.addEventListener('fullscreenchange', () => btn.setAttribute('aria-pressed', String(active())));
 }
-
-// ================= Aperçu CYD 240x320 =================
-function initCyd() {
-  document.body.classList.add('cyd');
-  document.title = 'Aperçu CYD · Entité';
-  $('#cydView').hidden = false;
-  const cfg = deepMerge(EYE, CYD.overrides);
-  const eye = createEye($('#cydCanvas'), { config: cfg, fixedSize: { w: CYD.width, h: CYD.height }, fpsCap: CYD.fps, reducedMotion: reduced });
-  window.__eye = eye;
-  eye.start();
-  setCaptionHandler(() => {});
-  $$('.cyd-moods button').forEach((b) => b.addEventListener('click', () => {
-    initAudio();
-    eye.setMood(b.dataset.mood);
-    $$('.cyd-moods button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-  }));
-  $('#cydSpeak').addEventListener('click', () => { initAudio(); speak('intro'); });
-  setInterval(() => {
-    $('#cydMeta').textContent = `ILI9341 240×320 · ${eye.stats.fps} i/s (max ${CYD.fps}) · ${eye.stats.dots} points`;
-  }, 1000);
-  (function loop() { requestAnimationFrame(loop); eye.setVoice(voiceLevel()); eye.lookAt(Math.sin(performance.now() / 2300) * 0.5, Math.sin(performance.now() / 3100) * 0.35); })();
-}
-
-// ================= Service worker =================
 function registerSW() {
   if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
-  // recharger seulement pour une MISE À JOUR (il y avait déjà un SW) ; à la 1re visite, clients.claim() déclenchait
-  // un controllerchange qui rechargeait la page au milieu du chargement (cause du « plus rien ne bouge »)
   const hadController = !!navigator.serviceWorker.controller;
   const go = async () => {
     try {
       const reg = await navigator.serviceWorker.register('./sw.js');
-      reg.addEventListener('updatefound', () => {
-        const w = reg.installing;
-        w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) w.postMessage('SKIP_WAITING'); });
-      });
+      reg.addEventListener('updatefound', () => { const w = reg.installing; w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) w.postMessage('SKIP_WAITING'); }); });
       let reloaded = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!hadController || reloaded || window.__game?.running) return;
-        reloaded = true; location.reload();
-      });
+      navigator.serviceWorker.addEventListener('controllerchange', () => { if (!hadController || reloaded || g.running) return; reloaded = true; location.reload(); });
     } catch { /* hors ligne non disponible */ }
   };
   if (document.readyState === 'complete') go(); else addEventListener('load', go, { once: true });
 }
+
+function init() {
+  $('#ver').textContent = VERSION;
+  if (DEBUG && SEED_Q != null) { $('#seedTag').hidden = false; $('#seedTag').textContent = ` · graine ${SEED_Q}`; }
+  resetState();
+  // secours silencieux : sous-titre seulement si la synthèse vocale manque (ou son coupé)
+  setCaptionHandler((text, lie) => { const c = $('#caption'); c.textContent = text; c.classList.toggle('show', !!text); c.classList.toggle('lie', !!lie); });
+  eye = createEye($('#eye'), { config: deepMerge(EYE, { radiusOfMin: 0.3, center: { x: 0.5, y: 0.5 } }), reducedMotion: reduced });
+  eye.start();
+  wire(); initFullscreen();
+  showTime(TIME_S); showProb();
+  requestAnimationFrame(loop);
+  runBoot(() => { $('#btnStart').disabled = false; $('#btnStart').focus({ preventScroll: true }); registerSW(); });
+  if (DEBUG) {
+    window.__entiteDebug = {
+      version: VERSION,
+      get run() { return run; }, get state() { return g; }, get face() { return face; },
+      voiceLog, voiceStats, musicStats, ttsAvailable,
+      forceSabotage(on) { if (on) startSabotage(); else endSabotage(); },
+      idle(ms) { g.lastInput = performance.now() - ms; },
+    };
+  }
+}
+init();

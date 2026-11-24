@@ -1,17 +1,31 @@
 {
-  "name": "Entité · Mallette",
+  "name": "La mallette de l’Entité",
   "short_name": "Entité",
-  "description": "Simulateur de la mallette de désamorçage, sous l'œil de l'Entité.",
+  "description": "Mallette d’espion sous l’œil de l’Entité : elle dicte, elle ment, elle presse.",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#02070d",
-  "theme_color": "#02070d",
+  "orientation": "any",
+  "background_color": "#060708",
+  "theme_color": "#060708",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ]
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "/entite-mallette/"
 }
