@@ -1,4 +1,5 @@
-// app.js : La mallette de l'Entité v0.2.0 : mallette d'espion multi-faces (Dessus, Mallette ouverte, Flanc).
+// app.js : La mallette de l'Entité v0.2.1 : une seule vue, la mallette ouverte (couvercle intérieur + base).
+// Tout est à l'intérieur de la valise. Deux leviers à capot : bleu (armement) et rouge (TRANSMIT, la fin).
 // Règle de Pascal : AUCUN code ni consigne écrit à l'écran. L'Entité dicte (voix), puis presse et ment (œil rouge)
 // pendant que tu choisis. Paliers cachés ~50/50, ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 import { createEye } from './eye.js';
@@ -8,7 +9,7 @@ import { initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setCaptionH
 import { sfx } from './sfx.js';
 import { preloadAll } from './preload.js';
 
-const VERSION = '0.2.0';
+const VERSION = '0.2.1';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -29,15 +30,15 @@ const g = {};
 function resetState() {
   run = makeRun(newSeed());
   Object.assign(g, {
-    phase: 'idle',               // idle → arm-latch → arm-toggle → play → win | boom
+    phase: 'idle',               // idle → arm-toggle (capot bleu) → play → win | boom
     step: 0, running: false, ended: false, result: null,
     endAt: 0, remaining: TIME_S, rate: 1, lastTick: 0, lastSec: null,
     prob: 99.7, errors: 0, lieUntil: 0, lies: 0,
-    latches: [false, false], cover: false, armed: false,
+    coverArm: false, coverTx: false, armed: false, txOn: false,
     enc: [0, 0, 0, 0], trapOpen: [false, false, false], seqShow: null,
     pulled: [false, false, false, false, false], wires: run.wires1.colors.slice(),
     pos: null, code: '', keysTurned: [], hesitating: false, lastInput: 0,
-    sabotage: false, sabT: 0, txDown: 0, said30: false, said10: false,
+    sabotage: false, sabT: 0, said30: false, said10: false,
     lastClue: null, pressure: [], decoy: null, startT: 0,
   });
 }
@@ -71,27 +72,9 @@ function flagLie(on) {
 const digit = (d) => `chiffre_${d}`;
 const color = (c) => `couleur_${c}`;
 
-// ================= faces =================
-let face = 'mallette';
-function showFace(f, focus = false) {
-  face = f;
-  $$('.face-tab').forEach((t) => { const on = t.dataset.face === f; t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1; });
-  $$('.face').forEach((s) => { s.hidden = s.id !== `face-${f}`; });
-  $('#faceTitle').textContent = { dessus: 'Dessus', mallette: 'Mallette ouverte', flancs: 'Flanc' }[f];
-  if (focus) $(`#tab-${f}`).focus();
-  if (f === 'mallette') requestAnimationFrame(() => { eye?.resize?.(); drawCyd2(); });
-  pingFaces();
-}
-function wantedFace() {
-  if (g.phase === 'arm-latch') return 'dessus';
-  if (g.phase === 'arm-toggle') return 'flancs';
-  if (g.phase !== 'play') return null;
-  const st = STEPS[g.step]; return st ? (st.face === 'base' ? 'mallette' : st.face) : null;
-}
-function pingFaces() {
-  const w = wantedFace();
-  $$('.face-tab').forEach((t) => t.classList.toggle('want', !!w && t.dataset.face === w && face !== w));
-}
+// ================= vue unique : la mallette ouverte =================
+const face = 'mallette';
+function refreshView() { requestAnimationFrame(() => { eye?.resize?.(); drawCyd2(); }); }
 
 // ================= construction des pièces =================
 function buildParts() {
@@ -115,7 +98,7 @@ function buildParts() {
   const tr = $('#traps'); tr.textContent = '';
   run.trapColors.forEach((c, i) => {
     const t = document.createElement('div'); t.className = 'trap'; t.dataset.i = i; t.style.setProperty('--rim', WIRE[c] === WIRE.noir ? '#555' : LED[c]);
-    t.innerHTML = `<div class="trap-well"></div><button class="trap-door" type="button" aria-label="Trappe T${i + 1}, liseré ${c}"><span class="trap-screw"></span><span class="trap-screw"></span><span class="trap-n">T${i + 1}</span></button>`;
+    t.innerHTML = `<div class="trap-well"></div><button class="trap-door" type="button" aria-label="Trappe ${"ABC"[i]}, liseré ${c}"><span class="trap-screw"></span><span class="trap-screw"></span><span class="trap-n">${"ABC"[i]}</span></button>`;
     tr.append(t);
   });
   // fiches banane
@@ -127,7 +110,7 @@ function buildJacks() {
   const j = $('#jacks'); j.textContent = '';
   g.wires.forEach((c, i) => {
     const el = document.createElement('div'); el.className = 'jack'; el.dataset.i = i; el.dataset.c = c; el.style.setProperty('--w', WIRE[c]);
-    el.innerHTML = `<span class="jack-socket"></span><button class="plug" type="button" aria-label="Fiche ${ORD[i]}, fil ${c} : débrancher"><span class="plug-body"></span><span class="plug-wire"></span></button><span class="silk">${i + 1}</span>`;
+    el.innerHTML = `<button class="plug" type="button" aria-label="Fiche ${ORD[i]}, fil ${c} : débrancher"><span class="plug-wire"></span><span class="jack-socket"></span><span class="plug-body"></span></button><span class="silk">${i + 1}</span>`;
     j.append(el);
   });
 }
@@ -146,7 +129,7 @@ function showTime(s) {
   $('.tm[role="timer"]').setAttribute('aria-label', `Temps restant ${m} min ${sec} s`);
 }
 function showProb() { $('#prob').textContent = fmtPct(g.prob); }
-function showStep() { $('#stepNo').textContent = g.phase === 'play' ? `${String(g.step).padStart(2, '0')}/${NSTEPS}` : g.phase.startsWith('arm') ? 'ARM' : '—'; pingFaces(); }
+function showStep() { $('#stepNo').textContent = g.phase === 'play' ? `${String(g.step).padStart(2, '0')}/${NSTEPS}` : g.phase.startsWith('arm') ? 'ARM' : '—'; }
 
 // OLED 0,96 po : positions des encodeurs (ce que montrent les boutons, pas la réponse), ou saisie du code masquée
 const oledCtx = () => $('#oledCanvas').getContext('2d');
@@ -244,8 +227,8 @@ function nextStep(n) {
       sfx.servo(); voice(hard ? 'clue_fils2_dur' : 'clue_fils2_moyen', { clue: true });
       if (run.lies.wire2False) pressure(6000, () => { const w = run.decoys.wire2; decoy('wire', w); voice(['taunt_debranche', color(g.wires[w]), 'taunt_saute'], { lie: true, now: true }); }); break;
     case 11: g.code = ''; voice('clue_code2', { clue: true });
-      pressure(7000, () => { decoy('transmit'); voice('taunt_rouge', { lie: true, now: true }); }); break;
-    case 12: $('#transmit').classList.add('armed'); voice('clue_transmit', { clue: true }); voice('taunt_sceller', { lie: true }); break;
+      pressure(7000, () => { decoy('tx'); voice('taunt_rouge', { lie: true, now: true }); }); break;
+    case 12: $('#gtTx').classList.add('armed'); voice('clue_transmit', { clue: true }); voice('taunt_sceller', { lie: true }); break;
   }
   drawOled(); drawCyd2();
 }
@@ -260,7 +243,7 @@ function decoy(kind, i) {
   clearDecoys();
   if (kind === 'trap') $(`.trap[data-i="${i}"]`)?.classList.add('decoy');
   if (kind === 'wire') $(`.jack[data-i="${i}"]`)?.classList.add('decoy');
-  if (kind === 'transmit') $('#transmit').classList.add('decoy');
+  if (kind === 'tx') $('#gtTx').classList.add('decoy');
   setTimeout(clearDecoys, 3200);
 }
 function clearDecoys() { $$('.decoy').forEach((e) => e.classList.remove('decoy')); }
@@ -287,32 +270,52 @@ function input() {
 }
 
 // ---------- armement ----------
+function resetHardware() {
+  $$('.lock.key').forEach((l) => { l.classList.remove('on', 'ready'); const b = $('.lock-btn', l); b.disabled = true; b.setAttribute('aria-pressed', 'false'); });
+  for (const k of ['Arm', 'Tx']) {
+    const t = $(`#gt${k}`); t.classList.remove('open', 'on', 'armed', 'decoy', 'snap');
+    $(`#cover${k}`).setAttribute('aria-expanded', 'false'); const lv = $(`#lever${k}`); lv.disabled = true; lv.setAttribute('aria-checked', 'false');
+  }
+}
 function startGame() {
-  resetState(); buildParts(); setEncVisual();
+  resetState(); buildParts(); setEncVisual(); resetHardware();
   $('#intro').hidden = true; $('#app').hidden = false; $('#end').hidden = true;
   initAudio();
-  g.phase = 'arm-latch'; showStep(); showFace('dessus');
-  voice('intro'); voice('arm_loquets', { clue: true });
+  // la mallette s'ouvre tout de suite : tout est à l'intérieur ; on arme avec le levier à capot bleu
+  g.phase = 'arm-toggle'; showStep(); refreshView();
+  $('#face-mallette').classList.remove('opening'); void $('#face-mallette').offsetWidth; $('#face-mallette').classList.add('opening'); sfx.lidOpen();
+  $('#gtArm').classList.add('armed');
+  voice('intro'); voice('arm_cache', { clue: true });
   showTime(TIME_S); showProb();
   if (DEBUG) $('#seedTag').textContent = ` · graine ${run.seed} · ${run.tier}`;
 }
-function latch(i, btn) {
-  if (g.phase !== 'arm-latch' || g.latches[i]) return;
-  g.latches[i] = true; sfx.keyTurn(); btn.setAttribute('aria-pressed', 'true'); btn.closest('.lock').classList.add('on');
-  if (g.latches.every(Boolean)) {
-    g.phase = 'arm-toggle'; showStep(); voice('arm_cache', { clue: true, now: true });
-    setTimeout(() => showFace('flancs'), 650);
-  }
+// levier à capot : 1er geste lève le capot, 2e bascule le levier (le capot se rabat si on le touche encore)
+function coverTap(k) {
+  input(); const key = k === 'Arm' ? 'coverArm' : 'coverTx';
+  if (k === 'Arm' && g.armed) return;
+  if (k === 'Tx' && g.txOn) return;
+  g[key] = !g[key]; $(`#gt${k}`).classList.toggle('open', g[key]);
+  $(`#cover${k}`).setAttribute('aria-expanded', String(g[key])); $(`#lever${k}`).disabled = !g[key];
+  g[key] ? sfx.coverUp() : sfx.coverDown();
 }
 function armToggle() {
-  if (g.phase !== 'arm-toggle' || !g.cover) return;
-  g.armed = true; $('#lever').setAttribute('aria-checked', 'true'); $('#guard').classList.add('armed');
+  if (g.phase !== 'arm-toggle' || !g.coverArm) return;
+  g.armed = true; $('#leverArm').setAttribute('aria-checked', 'true'); $('#gtArm').classList.remove('armed'); $('#gtArm').classList.add('on');
   sfx.toggleSnap(); sfx.arm(); buzz([40, 60, 40]);
   g.phase = 'play'; g.running = true; g.startT = performance.now(); g.lastTick = performance.now(); g.lastInput = performance.now();
   voice('depart', { now: true });
   startMusic();
-  setTimeout(() => { showFace('mallette'); $('#face-mallette').classList.add('opening'); sfx.lidOpen(); }, 700);
   nextStep(1);
+}
+// levier rouge TRANSMIT : avant l'étape 12, c'est le raccourci que pousse l'Entité (−8 s, une erreur) ; le levier retombe
+function txFlip() {
+  input(); if (!g.coverTx || g.txOn) return;
+  const t = $('#gtTx'), lv = $('#leverTx');
+  sfx.toggleSnap();
+  if (g.phase !== 'play') { t.classList.add('snap'); setTimeout(() => t.classList.remove('snap'), 420); return; }
+  if (g.step !== 12) { t.classList.add('snap'); setTimeout(() => t.classList.remove('snap'), 420); bad(8); return; }
+  g.txOn = true; lv.setAttribute('aria-checked', 'true'); t.classList.remove('armed'); t.classList.add('on'); sfx.hold();
+  setTimeout(() => g.running && endGame(true), 450);
 }
 
 // ---------- fin ----------
@@ -337,17 +340,11 @@ function endGame(win) {
 function wire() {
   $('#btnStart').addEventListener('click', startGame);
   $('#btnAgain').addEventListener('click', () => { document.body.classList.remove('boom'); stopVoice(); startGame(); });
-  $$('.face-tab').forEach((t) => t.addEventListener('click', () => { showFace(t.dataset.face); sfx.push(); }));
-  $('.faces').addEventListener('keydown', (e) => {
-    const order = ['dessus', 'mallette', 'flancs'], i = order.indexOf(face);
-    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); showFace(order[(i + (e.key === 'ArrowRight' ? 1 : 2)) % 3], true); }
-  });
   $('#btnReplay').addEventListener('click', () => { if (!g.lastClue) return; voice(g.lastClue, { now: true }).then(() => { if (g.running && g.step === 3 && g.code === '') flashSeq(run.seq); }); });
   $('#btnPocket').addEventListener('click', () => { sfx.push(); $('#pocketDlg').showModal(); });
   $('#btnSon').addEventListener('click', () => { const m = !isMuted(); setMuted(m); $('#btnSon').setAttribute('aria-pressed', String(m)); $('#btnSon').setAttribute('aria-label', m ? 'Rétablir le son' : 'Couper le son'); });
 
-  // dessus : loquets + clés
-  $$('.lock.latch').forEach((l) => $('.lock-btn', l).addEventListener('click', (e) => { input(); latch(+l.dataset.latch, e.currentTarget); }));
+  // serrures Gebildet I, II, III (couvercle intérieur)
   $$('.lock.key').forEach((l) => $('.lock-btn', l).addEventListener('click', (e) => {
     input(); if (g.step !== 7) return;
     const k = +l.dataset.key; if (g.keysTurned.includes(k)) return;
@@ -360,13 +357,12 @@ function wire() {
     if (g.keysTurned.length === 3) good(8);
   }));
 
-  // flanc : cache + interrupteur, fiches banane
-  $('#cover').addEventListener('click', () => {
-    input(); g.cover = !g.cover; $('#guard').classList.toggle('open', g.cover);
-    $('#cover').setAttribute('aria-expanded', String(g.cover)); $('#lever').disabled = !g.cover || g.armed;
-    g.cover ? sfx.coverUp() : sfx.coverDown();
-  });
-  $('#lever').addEventListener('click', () => { input(); armToggle(); });
+  // leviers à capot (base) : bleu = armement, rouge = TRANSMIT
+  $('#coverArm').addEventListener('click', () => coverTap('Arm'));
+  $('#leverArm').addEventListener('click', () => { input(); armToggle(); });
+  $('#coverTx').addEventListener('click', () => coverTap('Tx'));
+  $('#leverTx').addEventListener('click', txFlip);
+  // fiches banane (couvercle intérieur)
   $('#jacks').addEventListener('click', (e) => {
     const b = e.target.closest('.plug'); if (!b) return;
     input(); const i = +b.closest('.jack').dataset.i;
@@ -443,13 +439,6 @@ function wire() {
     const d = b.dataset.dir, v = DIRS[d]; cap.style.transform = `translate(${v[0] * 14}px, ${v[1] * 14}px)`; setTimeout(release, 140); stick(d);
   }));
 
-  // TRANSMIT : maintenir 2 s à l'étape 12 ; avant, c'est le raccourci que pousse l'Entité
-  const tx = $('#transmit');
-  tx.addEventListener('pointerdown', (e) => { e.preventDefault(); txDown(); });
-  tx.addEventListener('pointerup', txUp); tx.addEventListener('pointerleave', txUp); tx.addEventListener('pointercancel', txUp);
-  tx.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) { e.preventDefault(); txDown(); } });
-  tx.addEventListener('keyup', (e) => { if (e.key === 'Enter' || e.key === ' ') txUp(); });
-
   // clavier physique : flèches/WASD = joystick (face mallette), chiffres = clavier 4x4
   addEventListener('keydown', (e) => {
     if (!g.running || e.target.closest?.('.knob, .faces, dialog')) return;
@@ -524,24 +513,13 @@ function stick(dir) {
 }
 function startSabotage() { g.sabotage = true; g.sabEnd = performance.now() + 5500; $('.cyd2').classList.add('sab'); voice('sabotage_joystick', { lie: true, now: true }); sfx.glitch(); }
 function endSabotage() { g.sabotage = false; $('.cyd2').classList.remove('sab'); g.sabT = performance.now() + 7000; if (g.running && g.step === 9) voice('sabotage_fin', { now: true }); }
-function txDown() {
-  input(); const tx = $('#transmit'); tx.classList.add('down');
-  if (g.phase !== 'play') return;
-  if (g.step !== 12) { bad(8); return; } // raccourci poussé par l'Entité : erreur
-  g.txDown = performance.now(); sfx.hold(); tx.classList.add('holding');
-}
-function txUp() {
-  const tx = $('#transmit'); tx.classList.remove('down', 'holding');
-  if (!g.txDown) return;
-  const held = performance.now() - g.txDown; g.txDown = 0;
-  if (g.step === 12 && g.running && held < 2000) bad(5);
-}
-
 // ================= boucle =================
 let eye = null;
+const spkEl = document.getElementById('face-mallette');
 function loop(now) {
   requestAnimationFrame(loop);
-  if (eye) { eye.setVoice(voiceLevel()); eye.lookAt(Math.sin(now / 2300) * 0.5, Math.sin(now / 3100) * 0.35); }
+  const vl = voiceLevel(); if (vl !== loop.vl) { loop.vl = vl; spkEl.style.setProperty('--vl', vl.toFixed(3)); } // haut-parleurs du couvercle
+  if (eye) { eye.setVoice(vl); eye.lookAt(Math.sin(now / 2300) * 0.5, Math.sin(now / 3100) * 0.35); }
   if (g.running) {
     const dt = (now - g.lastTick) / 1000; g.lastTick = now;
     g.remaining -= dt * g.rate;
@@ -557,8 +535,6 @@ function loop(now) {
     if (g.remaining <= 0) { showTime(0); endGame(false); return; }
     // hésitation : 15 s sans geste → le temps accélère jusqu'au prochain geste
     if (!g.hesitating && now - g.lastInput > 15000) { g.hesitating = true; g.rate = 1.6; document.body.classList.add('hesitate'); voice('taunt_hesite', { now: true }); }
-    // TRANSMIT à l'étape 12 : maintenu 2 s
-    if (g.txDown && g.step === 12 && now - g.txDown >= 2000) { g.txDown = 0; $('#transmit').classList.remove('holding'); endGame(true); return; }
     // sabotage du joystick (étape 9) : fenêtres de 5,5 s, axes inversés, œil rouge
     if (g.step === 9) {
       if (!g.sabotage && now > g.sabT) startSabotage();

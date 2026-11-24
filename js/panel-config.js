@@ -1,5 +1,6 @@
 // panel-config.js : dimensions réelles de la mallette et des pièces (simulateur ET futur panneau imprimé en 3D).
-// Toutes les valeurs sont en millimètres. Fiche officielle Lykus HC-3010 (v0.2.0, 23 nov. 2026).
+// Toutes les valeurs sont en millimètres. Fiche officielle Lykus HC-3010 (v0.2.1, 23 nov. 2026).
+// Rien n'est percé dans les parois étanches : les flancs restent vides, tout est sur les panneaux intérieurs.
 
 export const CASE = {
   model: 'Lykus HC-3010',
@@ -13,50 +14,52 @@ export const CASE = {
 };
 
 // Pièces que Pascal a déjà (zéro achat de plus). w x h = encombrement vu de face.
+// v0.2.1 : TOUT est à l'intérieur de la valise ouverte. Coque (dessus, flancs) : aucun composant, aucun perçage.
 export const PARTS = {
-  // Dessus (extérieur)
-  latch:     { hole: 12, w: 20.6, h: 26, count: 2, note: 'Gebildet 12 mm métal (loquets d’armement), points rouge/vert' },
-  keySwitch: { hole: 12, w: 20.6, h: 26, count: 3, note: 'Gebildet 12 mm métal, clés I, II, III, points rouge/vert' },
-  // Flancs
-  toggle:    { w: 22, h: 46, note: 'interrupteur à levier sous cache de sécurité basculant (armement)' },
-  jacks:     { count: 5, hole: 8, pitch: 18, note: 'fiches et douilles banane Keadic, 5 couleurs (rouge, noir, bleu, jaune, vert)' },
-  serial:    { w: 70, h: 22, note: 'plaque de n° de série rivetée' },
-  // Couvercle (32 mm)
-  cyd1:      { w: 86, h: 50, screen: { w: 57.6, h: 43.2 }, note: 'CYD 1 ESP32-2432S028 2,8 po ILI9341 240x320 : œil de l’Entité' },
+  // Couvercle intérieur (32 mm)
+  cyd1:      { w: 86, h: 50, screen: { w: 57.6, h: 43.2 }, note: 'CYD 1 ESP32-2432S028 2,8 po ILI9341 240x320 : œil de l’Entité, au centre du couvercle' },
+  speaker:   { d: 40, count: 2, power: '3 W', impedance: '8 Ω', note: 'deux haut-parleurs 3 W 8 Ω (SPK-L, SPK-R) de chaque côté de l’œil (DFPlayer SPK1/SPK2)' },
   ledBar:    { w: 53, h: 10, leds: 8, note: 'barrette WS2812B 8 DEL' },
   pocket:    { w: 90, h: 60, depth: 6, note: 'pochette à fiche (note tactique)' },
+  serial:    { w: 70, h: 22, note: 'plaque de n° de série rivetée' },
+  jacks:     { count: 5, hole: 8, pitch: 18, note: 'fiches et douilles banane Keadic, 5 couleurs (rouge, noir, bleu, jaune, vert)' },
   // Base (83 mm)
-  encoder:   { w: 26, h: 19, shaft: 6, count: 4, note: 'KY-040 encodeur rotatif + poussoir' },
-  oled:      { w: 27, h: 27, screen: { w: 22, h: 11 }, note: 'OLED 0,96 po I2C 128x64' },
-  joystick:  { w: 35, h: 35, note: 'joystick compact 2 axes + poussoir' },
-  cyd2:      { w: 86, h: 50, screen: { w: 57.6, h: 43.2 }, note: 'CYD 2 ESP32-2432S028 2,8 po : écran interactif (verrou de signal, labyrinthe)' },
-  keypad:    { w: 69, h: 77, note: 'clavier membrane 4x4' },
   tm1637:    { w: 42, h: 24, note: 'afficheur 4 chiffres 0,56 po' },
-  trap:      { w: 32.3, h: 27, count: 3, note: 'trappe motorisée servo SG90' },
-  transmit:  { d: 44, note: 'gros bouton rouge lumineux TRANSMIT' },
-  speaker:   { d: 40, power: '3 W', impedance: '8 Ω', note: 'haut-parleur 3 W 8 Ω sous grille (DFPlayer SPK1/SPK2)' },
+  oled:      { w: 27, h: 27, screen: { w: 22, h: 11 }, note: 'OLED 0,96 po I2C 128x64' },
+  encoder:   { w: 26, h: 19, shaft: 6, count: 4, note: 'KY-040 encodeur rotatif + poussoir' },
+  cyd2:      { w: 86, h: 50, screen: { w: 57.6, h: 43.2 }, note: 'CYD 2 ESP32-2432S028 2,8 po : écran interactif (verrou de signal, labyrinthe)' },
+  joystick:  { w: 35, h: 35, note: 'joystick compact 2 axes + poussoir' },
+  keySwitch: { hole: 12, w: 20.6, h: 26, count: 3, note: 'serrures Gebildet 12 mm métal, clés I, II, III, points rouge/vert' },
+  keypad:    { w: 69, h: 77, note: 'clavier membrane 4x4 (clavier seul : pas de RFID, pas d’empreinte)' },
+  trap:      { w: 32.3, h: 27, count: 3, note: 'trappes motorisées servo SG90 (A, B, C)' },
+  guardedToggle: { w: 22, h: 46, count: 2, note: 'interrupteurs à levier sous capot de sécurité basculant (style DaierTek) : capot bleu ARM, capot rouge TRANSMIT ; DEL d’état' },
 };
 
-// Implantation du panneau de la base (paysage 273 x 169). Le joint des deux moitiés est à x = 136,5 ;
-// rien de fragile ne le chevauche. Pas de lecteur RFID (retiré le 23 nov. 2026 : peu d'intérêt, câblage compliqué).
+// Implantation (panneaux 273 x 169). Le joint des deux moitiés de la base est à x = 136,5 ; rien de fragile ne le chevauche.
+// Pas de lecteur RFID (retiré le 23 nov. 2026 : peu d'intérêt, câblage compliqué). Pas de bouton TRANSMIT rond : remplacé par le levier à capot rouge.
 export const LAYOUT = {
-  base: {
-    width: 273, height: 169, seam: 136.5,
-    tm1637:   { x: 6,   y: 6,   w: 42, h: 24 },
-    oled:     { x: 54,  y: 4,   w: 27, h: 27 },
-    encoders: { x: 6,   y: 38,  w: 124, h: 26 },   // 4 x KY-040, pas de 31 mm
-    traps:    { x: 6,   y: 72,  w: 103, h: 27 },   // T1, T2, T3
-    transmit: { x: 74,  y: 108, w: 50, h: 50 },
-    speaker:  { x: 8,   y: 108, w: 52, h: 52 },
-    cyd2:     { x: 143, y: 6,   w: 86, h: 50 },
-    joystick: { x: 234, y: 13,  w: 35, h: 35 },
-    keypad:   { x: 150, y: 66,  w: 69, h: 77 },
-      label:    { x: 143, y: 150, w: 126, h: 14 },
-  },
   lid: {
     width: 273, height: 169, depth: 32,
-    cyd1:   { x: 20,  y: 30, w: 86, h: 50 },
-    ledBar: { x: 20,  y: 92, w: 53, h: 10 },
-    pocket: { x: 160, y: 30, w: 90, h: 60 },
+    spkL:   { x: 12,  y: 22,  w: 44, h: 44 },
+    cyd1:   { x: 93.5, y: 18, w: 86, h: 50 },   // centré
+    spkR:   { x: 217, y: 22,  w: 44, h: 44 },
+    ledBar: { x: 110, y: 78,  w: 53, h: 10 },
+    pocket: { x: 12,  y: 96,  w: 90, h: 60 },
+    serial: { x: 110, y: 96,  w: 70, h: 22 },
+    jacks:  { x: 110, y: 128, w: 90, h: 30 },   // 5 douilles, pas de 18 mm
   },
+  base: {
+    width: 273, height: 169, seam: 136.5,
+    tm1637:    { x: 6,   y: 6,   w: 42, h: 24 },
+    oled:      { x: 54,  y: 4,   w: 27, h: 27 },
+    encoders:  { x: 6,   y: 38,  w: 124, h: 26 },   // 4 x KY-040, pas de 31 mm
+    toggleArm: { x: 20,  y: 106, w: 30, h: 54 },    // capot bleu : armement
+    toggleTx:  { x: 60,  y: 106, w: 30, h: 54 },    // capot rouge : TRANSMIT
+    traps:     { x: 6,   y: 70,  w: 103, h: 27 },   // A, B, C
+    cyd2:      { x: 143, y: 6,   w: 86, h: 50 },
+    joystick:  { x: 234, y: 13,  w: 35, h: 35 },
+    keySwitches: { x: 236, y: 66, w: 26, h: 90 },   // I, II, III
+    keypad:    { x: 150, y: 62,  w: 69, h: 77 },
+  },
+  shell: { top: [], sides: [] },                    // coque : rien
 };

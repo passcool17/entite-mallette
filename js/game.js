@@ -1,4 +1,4 @@
-// game.js : tirage d'une partie v0.2.0 (logique pure, sans DOM). Même graine = même partie.
+// game.js : tirage d'une partie v0.2.1 (logique pure, sans DOM). Même graine = même partie.
 // Paliers cachés ~50/50 : 'moyen-difficile' et 'difficile'. Pas de mode facile.
 // Tout se déduit de la mallette elle-même (plaque du n° de série, écrans, barre DEL) : aucun manuel externe.
 
@@ -18,15 +18,15 @@ export const STEPS = [
   { face: 'base',   part: 'enc',    title: 'Signal 1 · encodeurs' },
   { face: 'base',   part: 'traps',  title: 'Trappe' },
   { face: 'base',   part: 'bar',    title: 'Séquence lumineuse' },
-  { face: 'flancs', part: 'wires',  title: 'Fils · flanc' },
+  { face: 'base',   part: 'wires',  title: 'Fiches banane' },
   { face: 'base',   part: 'cyd2',   title: 'Verrou de signal' },
   { face: 'base',   part: 'keypad', title: 'Code 1' },
-  { face: 'dessus', part: 'keys',   title: 'Clés I · II · III' },
+  { face: 'base',   part: 'keys',   title: 'Clés I · II · III' },
   { face: 'base',   part: 'enc',    title: 'Signal 2 · encodeurs' },
   { face: 'base',   part: 'cyd2',   title: 'Verrou saboté' },
-  { face: 'flancs', part: 'wires',  title: 'Fils · 2e couche' },
+  { face: 'base',   part: 'wires',  title: 'Fiches · 2e couche' },
   { face: 'base',   part: 'keypad', title: 'Code 2' },
-  { face: 'base',   part: 'transmit', title: 'TRANSMIT' },
+  { face: 'base',   part: 'toggleTx', title: 'Levier rouge' },
 ];
 
 export function makeRun(seed) {
@@ -62,7 +62,7 @@ export function makeRun(seed) {
   const seq = shuffle([1, 2, 3, 4, 5, 6, 7, 8]).slice(0, 4);
   const seqCode = (hard ? seq.slice().reverse() : seq).join('');
 
-  // ---- 4 et 10. fils (5 fiches banane sur le flanc)
+  // ---- 4 et 10. fils (5 fiches banane dans le couvercle)
   const ruleWires1 = (w) => {
     const reds = w.map((c, i) => (c === 'rouge' ? i : -1)).filter((i) => i >= 0);
     if (reds.length > 1) return reds[reds.length - 1];

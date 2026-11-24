@@ -9,31 +9,34 @@ Lien : https://passcool17.github.io/entite-mallette/
 Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/entite-mallette-v015/
 (dépôt passcool17/entite-mallette-v015, cache séparé `entite-mallette-v015-0.1.5`).
 
-## Version 0.2.0 (23 nov. 2026)
+## Version 0.2.1 (23 nov. 2026)
 
-Refonte « Cool Escape Props » de la v0.1.5 : la mallette est dessinée comme le vrai boîtier
-(coque noire nervurée, panneaux anodisés chanfreinés, vis hexagonales, marque PC17), avec trois faces.
+Tout est dans la valise : une seule vue, la mallette ouverte, sans onglet et sans aucune pièce sur la coque extérieure.
+Le jeu démarre directement mallette ouverte.
 
-- **Dessus** : deux loquets d’armement et trois serrures à clé Gebildet (I, II, III).
-- **Flanc** : interrupteur à cache rabattable, 5 fiches banane Keadic (rouge, noir, bleu, jaune, vert),
-  plaque de série rivetée. Rien d’autre.
-- **Mallette ouverte**
-  - Couvercle : CYD 1 (l’œil de l’Entité + bouton « Réécouter »), barre WS2812B de 8 LED,
-    pochette fine (note tactique).
-  - Base : 4 encodeurs KY-040, joystick + CYD 2 (labyrinthe ; l’Entité peut inverser les axes),
-    clavier membrane 4×4 (clavier seul, sans lecteur), TM1637 + OLED, 3 trappes SG90,
-    grille du haut-parleur 3 W 8 Ω, gros bouton rouge TRANSMIT.
+- **Couvercle (vue intérieure, panneau 273×169, 32 mm)**
+  - En haut, symétrique : haut-parleur gauche `SPK-L` (3 W 8 Ω) | CYD 1, l’œil de l’Entité, au centre | haut-parleur droit `SPK-R`.
+    Les deux grilles pulsent quand l’Entité parle.
+  - Barre WS2812B de 8 LED sur toute la largeur.
+  - Bouton « Réécouter » (≥ 44 px), pochette fine (note tactique), plaque de série rivetée.
+  - Baie de 5 fiches banane Keadic (rouge, noir, bleu, jaune, vert).
+- **Base (83 mm)** : TM1637 + OLED, 4 encodeurs KY-040, CYD 2 + joystick (labyrinthe ; l’Entité peut inverser les axes),
+  clavier membrane 4×4 seul, 3 trappes SG90 (A, B, C), 3 serrures à clé Gebildet (I, II, III),
+  et deux **leviers à capot** : bleu `ARM` (armement) et rouge `TRANSMIT` (fin de partie).
+  Il n’y a plus de bouton rond TRANSMIT ni de haut-parleur dans la base.
 
-### Mise en page (r2)
+Levier à capot : toucher le capot pour le lever, puis toucher le levier pour le basculer.
+Basculer le levier rouge avant l’étape 12 coûte −8 s et 1 erreur (le levier retombe) ; l’Entité pousse à le faire.
 
-La face Mallette tient entière dans l’écran, sans défiler :
+### Mise en page
 
-- Portrait 412×915 : bandeau + onglets, couvercle (CYD 1 à gauche ; barre WS2812B 8 LED, Réécouter et Pochette à droite),
-  puis la base : TM1637 + OLED et 4 encodeurs, CYD 2 + joystick, clavier 4×4 à gauche | trappes, haut-parleur et TRANSMIT à droite.
-- Paysage 915×412 et bureau 1280×800 : couvercle à gauche, base à droite en trois colonnes
-  (encodeurs + TRANSMIT | clavier + trappes | CYD 2 + joystick).
+La mallette tient entière dans l’écran, sans défiler, sans chevauchement :
+
+- Portrait 412×915 : bandeau compact, couvercle (haut-parleurs + œil, barre LED, Réécouter / Pochette / série, fiches),
+  puis la base : TM1637 + OLED et encodeurs, CYD 2 + joystick | serrures, clavier 4×4 | trappes et leviers à capot.
+- Paysage 915×412 et bureau 1280×800 : couvercle à gauche, base à droite en trois colonnes.
 - Écrans plus courts : la page défile et une pastille « ↓ COMMANDES » s’affiche tant que le bas n’est pas visible.
-- Bandeau : « PROB. ÉCHEC » (probabilité d’échec). Réécouter fait toujours au moins 44 px de haut.
+- Bandeau : « PROB. ÉCHEC » (probabilité d’échec).
 
 Il n’y a pas de lecteur RFID, pas de badge, pas de manuel, pas de mode à deux joueurs et pas de mode facile.
 
@@ -45,19 +48,18 @@ et l’œil comme la forme d’onde pulsent avec la voix. « Réécouter » sur 
 Une courte légende silencieuse s’affiche seulement si la synthèse vocale est absente ou si le son est coupé.
 
 **Œil rouge = mensonge.** Pendant que tu choisis, l’Entité affirme des choses fausses (« C’était 7…, dépêche-toi »,
-« Débranche le bleu avant que ça saute ! », « Appuie sur le rouge maintenant ! »), allume de faux repères,
+« Débranche le bleu avant que ça saute ! », « Bascule le levier rouge maintenant ! »), allume de faux repères,
 accélère le tic-tac si tu hésites (15 s sans geste : chrono ×1,6), et pousse vers les mauvais raccourcis
-(TRANSMIT trop tôt, mauvaise fiche, mauvais encodeur, joystick inversé).
+(levier rouge trop tôt, mauvaise fiche, mauvais encodeur, joystick inversé).
 
 ### Déroulé (8 minutes, 12 étapes après l’armement)
 
-Armement : tourner les deux loquets (Dessus), lever le cache puis basculer l’interrupteur (Flanc).
-Le couvercle s’ouvre et le chrono part.
+Armement : lever le capot bleu puis basculer le levier ARM. Le chrono part.
 
 1. Encodeurs (fragment 1) · 2. Trappe · 3. Séquence lumineuse sur la barre, retapée au clavier (fragment 2) ·
 4. Fiches banane (fragment 3) · 5. Labyrinthe (fragment 4) · 6. Code 1 au clavier — une trappe libère les clés ·
-7. Serrures à clé dans le bon ordre · 8. Encodeurs, couche 2 · 9. Labyrinthe saboté (axes inversés par moments) ·
-10. Fiches, couche 2 · 11. Code 2 · 12. Maintenir TRANSMIT 2 s.
+7. Serrures à clé (I, II, III), dans le bon ordre · 8. Encodeurs, couche 2 · 9. Labyrinthe saboté (axes inversés par moments) ·
+10. Fiches, couche 2 · 11. Code 2 · 12. Lever le capot rouge et basculer le levier TRANSMIT.
 
 Erreur : −5 s ou −8 s et +3,2 % d’échec. Avertissements à 30 s et 10 s ; à zéro, la mallette saute.
 Deux paliers cachés (moyen-difficile, difficile) tirés ~50/50 ; les règles changent selon le palier
@@ -71,7 +73,7 @@ Deux paliers cachés (moyen-difficile, difficile) tirés ~50/50 ; les règles ch
 
 ## Voix : `voix/manifest.json`
 
-Toutes les répliques (60) sont listées dans `voix/manifest.json`. Chaque entrée :
+Toutes les répliques (59) sont listées dans `voix/manifest.json`. Chaque entrée :
 
 | champ | sens |
 |---|---|
@@ -101,30 +103,33 @@ jamais publiés.
 - `js/app.js` : déroulé, gestes, pression de l’Entité, boucle.
 - `js/game.js` : tirage d’une partie (graine mulberry32, paliers, réponses, mensonges, labyrinthes).
 - `js/panel-config.js` : cotes Lykus HC-3010 (extérieur 335×260×130, intérieur 300×200×120, base 83, couvercle 32,
-  panneau 273×169 en deux moitiés 136,5×169) et implantation des pièces.
+  panneau 273×169 en deux moitiés 136,5×169) et implantation des pièces : tout dans le couvercle (`lid`) ou la base (`base`),
+  2 haut-parleurs `SPK-L` / `SPK-R` de part et d’autre du CYD 1 centré, aucune pièce sur la coque.
 - `js/audio.js`, `js/voice-manifest.js`, `js/sfx.js`, `js/eye.js`, `js/preload.js` : voix, sons, œil, préchargement.
 - `audio/tension.mp3` (192827 octets) : musique de tension.
-- `sw.js` : service worker, cache `entite-mallette-v0.2.0-r2` (manifeste des voix inclus). À l’activation, les anciens
-  caches `entite-mallette-*` (dont `entite-mallette-v0.2.0` et `entite-mallette-v0.1.5-base`) sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`).
+- `sw.js` : service worker, cache `entite-mallette-v0.2.1` (manifeste des voix inclus). À l’activation, les anciens
+  caches `entite-mallette-*` (dont `entite-mallette-v0.2.0-r2`, `entite-mallette-v0.2.0` et `entite-mallette-v0.1.5-base`) sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`).
 
 ## Tests
 
 ```
 python3 -m http.server 8794 --bind 127.0.0.1 &
-node tests/v020.mjs            # ou : node tests/v020.mjs <base> <graine>
+node tests/v021.mjs            # ou : node tests/v021.mjs <base> <graine>
 ```
 
-`tests/v020.mjs` (Playwright) joue une partie complète (graine 42) en portrait puis vérifie le paysage :
-aucune trace de RFID/badge ni de manuel, aucun code écrit, mensonges (œil rouge), TRANSMIT trop tôt = erreur,
-hésitation ×1,6, sabotage du joystick, victoire, tailles des mp3, schéma du manifeste, cache du service worker,
-0 erreur console/réseau. Elle vérifie aussi, en 412×915, 915×412 et 1280×800, que toutes les commandes de la face Mallette sont dans le premier écran,
-sans chevauchement ni défilement, puis la pastille de défilement sur un écran 360×600.
-Captures dans `/workspace/qa/entite-mallette/v0.2.0-fix/` (`01-mallette-412.png`, `02-mallette-915x412.png`, `03-mallette-1280x800.png`).
-Les anciens tests (`tests/v011*.mjs` … `v015`, `paliers.mjs`, `run.mjs`) concernent la v0.1.x.
+`tests/v021.mjs` (Playwright) joue une partie complète (graine 42) en portrait puis vérifie le paysage et le bureau :
+aucun onglet Dessus/Flanc, aucun bouton TRANSMIT rond, plaque de série + 5 fiches + 3 serrures + 2 leviers à capot
++ 2 haut-parleurs dans la valise et dans le premier écran (412×915, 915×412, 1280×800, sans chevauchement ni défilement),
+couvercle symétrique, levier rouge trop tôt = −8 s + 1 erreur, joystick 4 directions × 2 orientations (normal + sabotage),
+aucun code écrit, mensonges (œil rouge), hésitation ×1,6, victoire, tailles des mp3, manifeste propre, cache du service worker,
+pastille de défilement en 360×600, 0 erreur console/réseau.
+Captures dans `/workspace/qa/entite-mallette/v0.2.1-dev/` (`01-mallette-412.png`, `02-mallette-915x412.png`, `03-mallette-1280x800.png`).
+`tests/v020.mjs` concerne la v0.2.0 (trois faces). Les anciens tests (`tests/v011*.mjs` … `v015`, `paliers.mjs`, `run.mjs`) concernent la v0.1.x.
 
 ## Historique
 
-- 0.2.0 : refonte complète (ci-dessus). Plus de lecteur RFID, plus d’éléments Keep Talking.
+- 0.2.1 : une seule vue, tout dans la valise ; haut-parleurs de part et d’autre de l’œil ; leviers à capot à la place du bouton TRANSMIT.
+- 0.2.0 : refonte « Cool Escape Props » en trois faces (Dessus, Flanc, Mallette). Plus de lecteur RFID, plus d’éléments Keep Talking.
 - 0.1.5 : 12 étapes en deux couches, 8 minutes (archivée sur entite-mallette-v015).
 - 0.1.6 : énigmes de logique visuelle (archivée sur entite-mallette-v016).
 - 0.1.4 et avant : déductions depuis le n° de série, mensonges, plein écran, musique, graines.
