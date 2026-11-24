@@ -7,17 +7,17 @@
 // Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 // v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 1, variantes d'énigmes
 // tirées par étape (deux parties de suite ne se ressemblent pas : signature de la partie précédente dans localStorage).
-import { createEye } from './eye.js?v=0.2.5';
-import { EYE, deepMerge } from './eye-config.js?v=0.2.5';
-import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.5';
-import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.2.5';
-import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.5';
-import { sfx } from './sfx.js?v=0.2.5';
-import { preloadAll } from './preload.js?v=0.2.5';
-import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.2.5';
-import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.2.5';
+import { createEye } from './eye.js?v=0.2.5b';
+import { EYE, deepMerge } from './eye-config.js?v=0.2.5b';
+import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS } from './game.js?v=0.2.5b';
+import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.2.5b';
+import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable } from './audio.js?v=0.2.5b';
+import { sfx } from './sfx.js?v=0.2.5b';
+import { preloadAll } from './preload.js?v=0.2.5b';
+import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.2.5b';
+import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.2.5b';
 
-const VERSION = '0.2.5';
+const VERSION = '0.2.5b';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
