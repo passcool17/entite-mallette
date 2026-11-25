@@ -2,7 +2,7 @@
 // Une réplique = un id ou une suite d'ids, ex. ['clue_fragment', 'chiffre_4'] ou (v0.2.3, baie banane)
 // ['clue_patch_route', 'cable_rouge', 'prise_3']. Catégories : intro, clue, digit, color, socket, letter, taunt, sabotage, outcome.
 // Pour remplacer une voix : déposer voix/<id>.mp3 et mettre "mp3Ready": true dans le manifeste. Aucun code à changer.
-export const VOICE_VER = '0.3.1';
+export const VOICE_VER = '0.3.2';
 export const MANIFEST_URL = `voix/manifest.json?v=${VOICE_VER}`;
 const cues = new Map();
 let loading = null;

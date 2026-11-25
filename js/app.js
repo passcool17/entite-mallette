@@ -8,17 +8,17 @@
 // Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 // v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 2, variantes d'énigmes
 // tirées par étape (deux parties de suite ne se ressemblent pas : signature de la partie précédente dans localStorage).
-import { createEye } from './eye.js?v=0.3.1';
-import { EYE, deepMerge } from './eye-config.js?v=0.3.1';
-import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS, NENC, SIMON, STICK_COLORS, STICK_NAMES, simonTiming, beatMs, scannerFrame } from './game.js?v=0.3.1';
-import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.3.1';
-import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable, preloadJingle, playJingle, stopJingle, jingleStats } from './audio.js?v=0.3.1';
-import { sfx } from './sfx.js?v=0.3.1';
-import { preloadAll } from './preload.js?v=0.3.1';
-import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.3.1';
-import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.3.1';
+import { createEye } from './eye.js?v=0.3.2';
+import { EYE, deepMerge } from './eye-config.js?v=0.3.2';
+import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS, NENC, SIMON, STICK_COLORS, STICK_NAMES, simonTiming, beatMs, scannerFrame } from './game.js?v=0.3.2';
+import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.3.2';
+import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable, preloadJingle, playJingle, stopJingle, jingleStats } from './audio.js?v=0.3.2';
+import { sfx } from './sfx.js?v=0.3.2';
+import { preloadAll } from './preload.js?v=0.3.2';
+import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.3.2';
+import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.3.2';
 
-const VERSION = '0.3.1';
+const VERSION = '0.3.2';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);

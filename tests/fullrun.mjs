@@ -42,8 +42,8 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.3.1';
-import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.3.1';
+import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.3.2';
+import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.3.2';
 
 const require = createRequire(import.meta.url);
 function loadChromium() {
