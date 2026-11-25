@@ -12,9 +12,18 @@ Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/ent
 Archive figée de la v0.2.6a (commit 7d2ea7b) : https://passcool17.github.io/entite-mallette-v026a/
 (dépôt passcool17/entite-mallette-v026a, cache séparé `entite-mallette-v026a-0.2.6a`).
 
+## Version 0.3.1 (25 nov. 2026)
+
+État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.3.1`, imports `?v=0.3.1`).
+
+- **Cibles de toucher** : les pièces du plan ne bougent pas. Une zone invisible de toucher (au moins 44×44 CSS px quand l’écart au voisin le permet, sinon jusqu’au milieu de l’écart) est centrée sur capots ARM/TRANSMIT, leviers, molettes, trappes, touches du clavier et serrures. Le test complet le vérifie en 412×915 et 915×412 (elementFromPoint).
+- **Sérigraphie** des molettes : « KY-040 ×5 · 20 CRANS », 10 px, plus coupée en portrait.
+- **CYD 2** : les 5 lettres des molettes se redessinent après un changement d’orientation (la classe et le texte ne restent plus vides).
+- **Filets** : à l’étape 3, pas d’indice automatique ; si la lecture Simon reste coincée en « play », la saisie s’ouvre ; l’écran de fin (#end) s’affiche aussi depuis la boucle d’animation si le minuteur de 2,2 s est en retard.
+
 ## Version 0.3.0 (24 nov. 2026) — « version 3 »
 
-État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.3.0`, imports `?v=0.3.0`).
+État : publiée (commit `9192290`), remplacée par la 0.3.1.
 Conception : `qa/entite-mallette/v0.3/DESIGN-v0.3.md` ; matériel : [`HARDWARE.md`](HARDWARE.md).
 
 - **Étape 3 = Simon** : la barre unique de 32 LED disparaît. Le couvercle a **5 barrettes** de 8 LED en zigzag, une
@@ -307,7 +316,7 @@ sinon la phrase est dite directement par la synthèse vocale. Aucun mp3 non prê
 
 En v0.3.0, 178 répliques au manifeste : les mp3 ElevenLabs (pass de clarté v0.2.5g ; `intro` 43669 octets,
 `depart` 66656 octets) sauf 25 répliques v0.3 en synthèse (6 nouvelles, 19 réécrites, voir `voix/A-ENREGISTRER-v0.3.md`)
-et 8 retirées. Les URL portent `?v=0.3.0`. Pour remplacer une voix : enregistrer `voix/<id>.mp3`
+et 8 retirées. Les URL portent `?v=0.3.1`. Pour remplacer une voix : enregistrer `voix/<id>.mp3`
 avec le texte exact, garder `mp3Ready` à `true` et `source` à `elevenlabs`, puis monter la version du
 service worker. Les fichiers numérotés `dfplayerTrack` se copient tels quels sur la carte SD du DFPlayer
 (`0001.mp3`, …).
@@ -326,7 +335,7 @@ jamais publiés.
 - `js/audio.js`, `js/voice-manifest.js`, `js/sfx.js`, `js/eye.js`, `js/preload.js` : voix, sons, œil, préchargement.
 - `audio/tension.mp3` (192827 octets) : musique de tension.
 - `js/guide.js` : objectifs, modules actifs, indices (v0.2.5 : bandeau étape 10 = consigne dictée). `js/battery.js` : modèle de batterie 3S (v0.2.4).
-- `sw.js` : service worker, cache `entite-mallette-v0.3.0` (manifeste des voix inclus). À l’activation, les anciens
+- `sw.js` : service worker, cache `entite-mallette-v0.3.1` (manifeste des voix inclus). À l’activation, les anciens
   caches `entite-mallette-*` (dont `entite-mallette-v0.2.2`, `entite-mallette-v0.2.1`, `entite-mallette-v0.2.0-r2`, `entite-mallette-v0.2.0` et `entite-mallette-v0.1.5-base`) sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`, `entite-mallette-v026a-*`).
 
 ## Tests

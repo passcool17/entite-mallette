@@ -42,8 +42,8 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.3.0';
-import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.3.0';
+import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.3.1';
+import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.3.1';
 
 const require = createRequire(import.meta.url);
 function loadChromium() {
@@ -287,6 +287,7 @@ const snap = (p) => D(p, () => {
     label: document.querySelector('#objLabel')?.textContent,
     text: document.querySelector('#objText')?.textContent,
     endVisible: !!(end && !end.hidden),
+    vis: document.visibilityState,
     endTitle: document.querySelector('#endTitle')?.textContent,
     errors: g.errors,
     hint: g.hint,
@@ -450,7 +451,7 @@ async function doMaze(p, { waitSab = false } = {}) {
 // ---- Simon (v0.3) : lecture des barrettes côté page (journal rAF __stickLog), touchers par vrais taps
 const simonInfo = (p) => D(p, () => {
   const S = __entiteDebug.simon; if (!S) return null;
-  return { phase: S.phase, round: S.round, len: S.len, plays: S.plays, errors: S.errors, timeouts: S.timeouts, ignored: S.ignored, t0: S.t0, input: S.input.length, played: (S.played || []).slice(), rounds: S.rounds.map((r) => ({ ...r })), speed: __entiteDebug.simonSpeed };
+  return { phase: S.phase, round: S.round, len: S.len, plays: S.plays, errors: S.errors, timeouts: S.timeouts, ignored: S.ignored, t0: S.t0, input: S.input.length, wd: S.wd || 0, played: (S.played || []).slice(), rounds: S.rounds.map((r) => ({ ...r })), speed: __entiteDebug.simonSpeed };
 });
 async function waitSimon(p, pred, ms = 30000) {
   const t0 = Date.now(); let s = null;
@@ -556,6 +557,105 @@ async function readCyd2Hud(p) {
       overflowX: Math.max(0, se.scrollWidth - se.clientWidth),
     };
   });
+}
+
+
+// Cibles de toucher v0.3.1 : boîte réelle (elementFromPoint), en CSS px à zoom 1.
+// Quand deux pièces sont plus proches que 44 px, la zone va jusqu'au milieu de l'écart (pas de chevauchement).
+function hitProbeFn() {
+  const zoom = parseFloat(document.getElementById('face-mallette')?.style.zoom || '1') || 1;
+  const matches = (t, el, sel) => !!(t && (t === el || el.contains(t) || t.closest?.(sel) === el));
+  const extents = (el, sel) => {
+    const r = el.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const hit = (x, y) => {
+      if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) return false;
+      return matches(document.elementFromPoint(x, y), el, sel);
+    };
+    const walk = (dx, dy) => {
+      if (!hit(cx, cy)) return 0;
+      let lo = 0, hi = 48 * zoom;
+      while (lo + 0.25 < hi) { const m = (lo + hi) / 2; if (hit(cx + dx * m, cy + dy * m)) lo = m; else hi = m; }
+      return lo;
+    };
+    const L = walk(-1, 0), R = walk(1, 0), U = walk(0, -1), D = walk(0, 1);
+    return {
+      w: Math.round(((L + R) / zoom) * 100) / 100,
+      h: Math.round(((U + D) / zoom) * 100) / 100,
+      x: Math.round(((cx - L) / zoom) * 100) / 100,
+      y: Math.round(((cy - U) / zoom) * 100) / 100,
+    };
+  };
+  const boxes = (sel) => [...document.querySelectorAll(sel)].map((el, i) => ({ sel, i, ...extents(el, sel) }));
+  const all = [
+    ...boxes('#coverArm, #coverTx'),
+    ...boxes('#leverArm, #leverTx'),
+    ...boxes('.enc .knob'),
+    ...boxes('.trap'),
+    ...boxes('.kp-key'),
+    ...boxes('.lock-btn'),
+    ...boxes('#btnReplay'),
+    ...boxes('#jacks .plug'),
+    ...boxes('.joy-dir'),
+    ...boxes('#joyCap'),
+  ];
+  const skipOv = (a, b) => {
+    const s = a.sel + ' ' + b.sel;
+    // capot fermé recouvre son levier ; directions du joystick autour du capuchon
+    if (/coverArm/.test(s) && /leverArm/.test(s)) return true;
+    if (/coverTx/.test(s) && /leverTx/.test(s)) return true;
+    if (a.sel.includes('joy-dir') && b.sel.includes('joyCap') || b.sel.includes('joy-dir') && a.sel.includes('joyCap')) return true;
+    if (a.sel === b.sel && a.sel.includes('joy-dir')) return true;
+    return false;
+  };
+  const overlap = [];
+  for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
+    const a = all[i], b = all[j];
+    if (skipOv(a, b)) continue;
+    const ax2 = a.x + a.w, ay2 = a.y + a.h, bx2 = b.x + b.w, by2 = b.y + b.h;
+    const iw = Math.max(0, Math.min(ax2, bx2) - Math.max(a.x, b.x));
+    const ih = Math.max(0, Math.min(ay2, by2) - Math.max(a.y, b.y));
+    if (iw > 1.5 && ih > 1.5) overlap.push({ a: `${a.sel}#${a.i}`, b: `${b.sel}#${b.i}`, iw: +iw.toFixed(2), ih: +ih.toFixed(2) });
+  }
+  const view = `${innerWidth}×${innerHeight}`;
+  const silk = (() => { const el = document.querySelector('.mod-enc > .silk'); if (!el) return null; const cs = getComputedStyle(el); return { text: (el.textContent || '').trim(), font: parseFloat(cs.fontSize) || 0, overflow: el.scrollWidth - el.clientWidth, clip: cs.overflow }; })();
+  return { view, zoom, all, overlap, silk };
+}
+
+async function checkHits(p, rec, step, { coversClosed = false, leversOpen = false } = {}) {
+  const r = await D(p, hitProbeFn);
+  const note = [];
+  const pick = (pred) => r.all.filter(pred);
+  const fail = [];
+  const report = (name, items, { minW = 44, minH = 44 } = {}) => {
+    if (!items.length) { fail.push(`${name} : aucun`); return; }
+    const bad = items.filter((x) => x.w + 0.25 < minW || x.h + 0.25 < minH);
+    if (bad.length) fail.push(`${name} ${bad.map((x) => `${x.w}×${x.h}`).join(', ')} < ${minW}×${minH}`);
+    else note.push(`${name} ${items.map((x) => `${x.w}×${x.h}`).join(', ')}`);
+  };
+  if (coversClosed) report('capots', pick((x) => /coverArm|coverTx/.test(x.sel)));
+  if (leversOpen) report('leviers', pick((x) => /leverArm|leverTx/.test(x.sel) && x.h >= 20));
+  report('molettes', pick((x) => x.sel.includes('.enc .knob')));
+  report('trappes', pick((x) => x.sel === '.trap'));
+  // clavier / serrures : pièces plus proches que 44 px, zone = milieu de l'écart
+  const keys = pick((x) => x.sel === '.kp-key');
+  const locks = pick((x) => x.sel === '.lock-btn');
+  const packedOk = (items, minPitchW, minPitchH, label) => {
+    const bad = items.filter((x) => x.w + 0.25 < minPitchW || x.h + 0.25 < minPitchH);
+    if (!items.length) fail.push(`${label} : aucun`);
+    else if (bad.length) fail.push(`${label} ${bad.map((x) => `${x.w}×${x.h}`).join(', ')} (min. écart ${minPitchW}×${minPitchH})`);
+    else note.push(`${label} ${items[0].w}×${items[0].h} (×${items.length}, max. sans chevauchement)`);
+  };
+  const landV = /915×412|800×/.test(r.view) || r.view.startsWith('915');
+  packedOk(keys, landV ? 40 : 36, landV ? 35 : 44, 'clavier');
+  packedOk(locks, landV ? 39 : 35, 44, 'serrures');
+  report('Réécouter', pick((x) => x.sel.includes('btnReplay')));
+  if (r.overlap.length) fail.push(`chevauchement ${JSON.stringify(r.overlap.slice(0, 4))}`);
+  if (r.silk && (r.silk.overflow > 1 || r.silk.font < 10)) fail.push(`sérigraphie molettes ${JSON.stringify(r.silk)}`);
+  else if (r.silk) note.push(`sérigraphie « ${r.silk.text} » ${r.silk.font} px, débord ${r.silk.overflow}`);
+  const ok = fail.length === 0;
+  rec(ok, step, step, ok ? `cibles ${r.view} zoom ${r.zoom}  ${note.join(' · ')}` : `cibles ${r.view} ${fail.join(' | ')}`);
+  return ok;
 }
 
 async function playOne(b, seed, opts) {
@@ -711,6 +811,7 @@ async function playOne(b, seed, opts) {
     return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, s };
   }
   if (!(await hud(0, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  if (!(await checkHits(p, rec, 0, { coversClosed: true }))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   await p.tap('#coverArm'); await W(p, 120);
   const tArm = await tNow();
   await p.tap('#leverArm');
@@ -726,6 +827,16 @@ async function playOne(b, seed, opts) {
     return ok;
   };
   if (!(await cydLetters(1))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  // levier ARM ouvert (capot relevé) ; TRANSMIT encore fermé : on ouvre son capot le temps de mesurer, puis on referme
+  await p.tap('#coverTx'); await W(p, 80);
+  if (!(await checkHits(p, rec, 1, { leversOpen: true }))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  const view0 = p.viewportSize();
+  await p.setViewportSize({ width: 915, height: 412 }); await W(p, 250);
+  if (!(await checkHits(p, rec, 1, { leversOpen: true }))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  await p.setViewportSize(view0); await W(p, 250);
+  await p.tap('#coverTx'); await W(p, 80);
+  await p.waitForFunction(() => (document.querySelector('#cyd2Big')?.textContent || '').trim().length === 5, { timeout: 4000 }).catch(() => {});
+
   const answers = await D(p, () => {
     const r = __entiteDebug.run, RING = __entiteDebug.RING;
     return {
@@ -793,6 +904,7 @@ async function playOne(b, seed, opts) {
   // attendre une lecture complète du tour r (n-ième lecture) et vérifier les impulsions
   const checkPlay = async (r, minPlays, label) => {
     const w = await waitSimon(p, (s) => s.round === r && s.phase === 'input' && s.plays >= minPlays, 40000);
+    if (w.s && w.s.wd) return { ok: false, why: `${label} : filet de lecture déclenché (${w.s.wd}×) trace=` + JSON.stringify(await D(p, () => (window.__simonTrace || []).slice(-30))) };
     if (!w.s || w.timeout || w.gone) return { ok: false, why: `${label} : pas de saisie au tour ${r + 1} ${JSON.stringify(w)}` };
     const want = SM.seq.slice(0, SM.start + r);
     const pulses = await pulsesSince(p, w.s.t0);
@@ -866,6 +978,7 @@ async function playOne(b, seed, opts) {
       const okI = !!wp.s && si2.ignored === ig0 + 1 && si2.input === 0 && (await errorsNow()) === e0 + 1;
       const cw = await checkPlay(1, pl + 1, 'après erreur');
       sx.wrong = okW && cw.ok; sx.ignored = okI;
+      if (!(okW && cw.ok)) cw.why = (cw.why || '') + ' trace=' + JSON.stringify(await D(p, () => (window.__simonTrace || []).slice(-30)).catch(() => null));
       rec(okW && cw.ok, 3, 3, okW && cw.ok ? `mauvaise prise ${(SM.seq[0] + 1) % 5 + 1} : −${SIMON.PENALTY_S} s, le tour ${len} se rejoue` : `mauvaise prise ${JSON.stringify({ st, si, rem0, rem1, why: cw.why })}`);
       rec(okI, 3, 3, okI ? 'toucher pendant la lecture : ignoré' : `toucher pendant la lecture compté ${JSON.stringify({ wp, si2 })}`);
       extras.wrong.push({ step: 3, ok: okW && cw.ok && okI });
@@ -976,18 +1089,20 @@ async function playOne(b, seed, opts) {
   if (!(await expectAdvance(11, 12, `code ${answers.code2}`, t11))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   if (!(await hud(12, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
-  // ---- 12 levier rouge
-  await p.tap('#coverTx'); await W(p, 120);
+  // ---- 12 levier rouge (le capot a pu rester ouvert après la mesure des cibles à l'étape 1)
+  const txOpen = await D(p, () => !!__entiteDebug.state.coverTx);
+  if (txOpen) { await p.tap('#coverTx'); await W(p, 200); }
+  await p.tap('#coverTx'); await W(p, 150);
   const t12 = await tNow();
   await p.tap('#leverTx');
   const tWin = Date.now();
   let end = await snap(p);
-  while (Date.now() - tWin < 6000 && !(end.phase === 'win' && end.endVisible)) {
+  while (Date.now() - tWin < 12000 && !(end.phase === 'win' && end.endVisible)) {
     await W(p, 80);
     end = await snap(p);
   }
   const win = end.phase === 'win' && end.endVisible && /désamorcée/i.test(end.endTitle || '');
-  if (!win) rec(false, 12, 'fin', JSON.stringify(end));
+  if (!win) rec(false, 12, 'fin', JSON.stringify(end) + ' trace=' + JSON.stringify(await D(p, () => (window.__simonTrace || []).slice(-12)).catch(() => null)));
   else {
     const tGood = await D(p, () => Math.round(__entiteDebug.state.lastGoodAt || 0));
     const v = await assertVoiceMoved(p, runInfo, 12, 'fin', tGood || t12);

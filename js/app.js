@@ -8,17 +8,17 @@
 // Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 // v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 2, variantes d'énigmes
 // tirées par étape (deux parties de suite ne se ressemblent pas : signature de la partie précédente dans localStorage).
-import { createEye } from './eye.js?v=0.3.0';
-import { EYE, deepMerge } from './eye-config.js?v=0.3.0';
-import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS, NENC, SIMON, STICK_COLORS, STICK_NAMES, simonTiming, beatMs, scannerFrame } from './game.js?v=0.3.0';
-import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.3.0';
-import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable, preloadJingle, playJingle, stopJingle, jingleStats } from './audio.js?v=0.3.0';
-import { sfx } from './sfx.js?v=0.3.0';
-import { preloadAll } from './preload.js?v=0.3.0';
-import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.3.0';
-import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.3.0';
+import { createEye } from './eye.js?v=0.3.1';
+import { EYE, deepMerge } from './eye-config.js?v=0.3.1';
+import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS, NENC, SIMON, STICK_COLORS, STICK_NAMES, simonTiming, beatMs, scannerFrame } from './game.js?v=0.3.1';
+import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.3.1';
+import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable, preloadJingle, playJingle, stopJingle, jingleStats } from './audio.js?v=0.3.1';
+import { sfx } from './sfx.js?v=0.3.1';
+import { preloadAll } from './preload.js?v=0.3.1';
+import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.3.1';
+import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.3.1';
 
-const VERSION = '0.3.0';
+const VERSION = '0.3.1';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -452,9 +452,10 @@ function cydBigState() {
 function drawCydBig() {
   const el = $('#cyd2Big'), cy = $('.cyd2'); if (!el || !cy) return;
   const st = cydBigState(), key = `${st.mode}|${st.text}|${st.lie ? 1 : 0}`;
-  if (el.dataset.key === key) return;
+  const painted = el.dataset.key === key && cy.classList.contains('big') === !!st.mode && (el.textContent || '').trim() === (st.text || '');
+  cy.classList.toggle('big', !!st.mode); cy.dataset.big = st.mode || '';
+  if (painted) return;
   el.dataset.key = key;
-  cy.classList.toggle('big', !!st.mode); cy.dataset.big = st.mode;
   el.classList.toggle('lie', !!st.lie);
   el.textContent = '';
   if (st.mode === 'letters') for (const ch of st.text) { const s = document.createElement('span'); s.textContent = ch; el.append(s); }
@@ -679,6 +680,7 @@ function fitPlayfield() {
   fm.style.setProperty('--hit-min', `${(44.25 / z).toFixed(3)}px`);
   requestAnimationFrame(() => {
     fitLock = false;
+    drawCydBig();
     if (next !== prev) {
       drawCables(true);
       if (g.phase === 'play' && (g.step === 5 || g.step === 9)) drawCyd2();
@@ -828,6 +830,7 @@ function txFlip() {
 // ---------- fin ----------
 function endGame(win) {
   if (g.ended) return;
+  simonTrace('endGame', { win });
   g.ended = true; g.running = false; g.result = win ? 'win' : 'boom'; g.phase = win ? 'win' : 'boom'; g.endT = performance.now();
   g.pressure.forEach(clearTimeout); clearDecoys(); g.sabotage = false; clearVoice();
   showObjective(); highlight(); hintUi();
@@ -835,13 +838,18 @@ function endGame(win) {
   $('#cyd1').classList.remove('liar');
   if (win) { stopMusic('fade'); sfx.win(); playJingle(); eye?.setMood('defused'); buzz([90, 90, 90]); voice('outcome_victoire', { now: true }); }
   else { stopMusic('cut'); sfx.boom(); batt?.dip('boom'); eye?.setMood('boom'); buzz([500, 120, 300, 120, 700]); voice('outcome_boom', { now: true }); document.body.classList.add('boom'); }
-  const used = TIME_S - Math.max(0, g.remaining), mm = Math.floor(used / 60), ss = Math.floor(used % 60);
-  setTimeout(() => {
-    $('#endKicker').textContent = win ? 'Entité confinée' : 'Détonation';
-    $('#endTitle').textContent = win ? 'Mallette désamorcée' : 'Prévisible.';
-    $('#endSub').textContent = `${mm} min ${String(ss).padStart(2, '0')} s · ${g.errors} erreur${g.errors > 1 ? 's' : ''} · graine ${run.seed}`;
-    $('#end').hidden = false; $('#btnAgain').focus();
-  }, win ? 2200 : 1600);
+  g.endDelay = win ? 2200 : 1600; g.endShown = false;
+  setTimeout(showEnd, g.endDelay);
+}
+// écran de fin : idempotent, appelé par le minuteur et, en filet, par la boucle d'animation (un minuteur retardé ne bloque plus la fin)
+function showEnd() {
+  if (!g.ended || g.endShown) return;
+  g.endShown = true;
+  const win = g.result === 'win', used = TIME_S - Math.max(0, g.remaining), mm = Math.floor(used / 60), ss = Math.floor(used % 60);
+  $('#endKicker').textContent = win ? 'Entité confinée' : 'Détonation';
+  $('#endTitle').textContent = win ? 'Mallette désamorcée' : 'Prévisible.';
+  $('#endSub').textContent = `${mm} min ${String(ss).padStart(2, '0')} s · ${g.errors} erreur${g.errors > 1 ? 's' : ''} · graine ${run.seed}`;
+  $('#end').hidden = false; $('#btnAgain').focus(); simonTrace('end-shown', { late: performance.now() - g.endT > g.endDelay + 400 });
 }
 
 // ================= gestes =================
@@ -933,9 +941,9 @@ function wire() {
 
   // trappes SG90
   $('#traps').addEventListener('click', (e) => {
-    const door = e.target.closest('.trap-door'); if (!door) return;
+    const t = e.target.closest('.trap'); if (!t) return;
     input();
-    const t = door.closest('.trap'), i = +t.dataset.i;
+    const i = +t.dataset.i;
     const shake = () => { t.classList.add('wiggle'); setTimeout(() => t.classList.remove('wiggle'), 400); };
     if (g.step !== 2 || g.trapOpen[i]) { sfx.wall(); shake(); return; }
     if (i === run.trap) { openTrap(i, 'ok'); good(3); }
@@ -1022,6 +1030,7 @@ function simonAfter(p) {
   Promise.race([Promise.resolve(p), new Promise((r) => setTimeout(() => r('délai'), 20000))]).then((v) => { const ok = S.gen === gen && g.simon === S && simonActive(); simonTrace('after-then', { gen, now: S.gen, ok, v, act: simonActive() }); if (ok) simonPlay(); });
 }
 function simonPlay() {
+  simonTrace('play', { gen: g.simon?.gen, ph: g.simon?.phase });
   const S = g.simon, base = simonTiming(run.tier, S.round);
   S.tm = { step: base.step * SIMON_SPEED, gap: base.gap * SIMON_SPEED, real: base };
   S.phase = 'play'; S.t0 = performance.now(); S.input = []; S.plays++; S.played = [];
@@ -1030,6 +1039,7 @@ function simonPlay() {
   S.rounds[S.round].plays++;
   seq.forEach((k, i) => setTimeout(() => { if (S.gen === gen && S.phase === 'play') { S.played.push(k); sfx.simon(STICK_NAMES[k]); } }, i * per));
   setTimeout(() => {
+    simonTrace('play-end', { gen, now: S.gen, ph: S.phase, act: simonActive(), run: g.running, st: g.step, gp: g.phase });
     if (S.gen !== gen || S.phase !== 'play' || !simonActive()) return;
     S.phase = 'input'; S.deadline = performance.now() + run.simon.first;
     // l'Entité taquine une fois, pendant la saisie seulement (jamais une fausse série)
@@ -1055,10 +1065,11 @@ function simonTouch(s) {
   setTimeout(() => { const ok = S.gen === gen && simonActive(); simonTrace('advance-timer', { gen, now: S.gen, ok, act: simonActive(), ph: g.phase, st: g.step, run: g.running }); if (ok) simonPlay(); }, 700);
 }
 function simonFail(s) {
+  simonTrace('fail', { s, gen: g.simon?.gen, ph: g.simon?.phase });
   const S = g.simon; S.errors++; S.flash = { s, t0: performance.now(), kind: 'err' };
   S.phase = 'wait'; S.input = []; const gen = ++S.gen;
   bad(SIMON.PENALTY_S);
-  setTimeout(() => { if (S.gen === gen && simonActive()) simonPlay(); }, 1400);
+  setTimeout(() => { const ok = S.gen === gen && simonActive(); simonTrace('fail-timer', { gen, now: S.gen, ok, act: simonActive(), ph: S.phase }); if (ok) simonPlay(); }, 1400);
 }
 // image des 40 LED pendant l'étape 3
 function simonLeds(now) {
@@ -1149,6 +1160,7 @@ let eye = null;
 const spkEl = document.getElementById('face-mallette');
 function loop(now) {
   requestAnimationFrame(loop);
+  if (g.ended && !g.endShown && now - g.endT > g.endDelay + 250) showEnd();
   battTick(now);
   // CYD 2 : le labyrinthe (étapes 5 et 9) pulse à ~30 i/s ; hors labyrinthe le n° est en HTML, pas d'animation ECG
   if (now - (loop.cydT || 0) > 32 && g.phase === 'play' && (g.step === 5 || g.step === 9) && !$('#app').hidden) { loop.cydT = now; drawCyd2(); }
@@ -1168,7 +1180,7 @@ function loop(now) {
     }
     if (g.remaining <= 0) { showTime(0); endGame(false); return; }
     // indice 1 automatique après 45 s sans progrès sur l'étape (gratuit)
-    if (g.hint === 0 && now - g.progressT > AUTO_HINT_MS) giveHint(1, true);
+    if (g.hint === 0 && g.step !== 3 && now - g.progressT > AUTO_HINT_MS) giveHint(1, true);
     // hésitation : 15 s sans geste → le temps accélère jusqu'au prochain geste
     if (!g.hesitating && now - g.lastInput > 15000) { g.hesitating = true; g.rate = 1.6; document.body.classList.add('hesitate'); voice('taunt_hesite', { now: true }); }
     // sabotage du joystick (étape 9) : fenêtres de 5,5 s, axes inversés, œil rouge
@@ -1179,7 +1191,14 @@ function loop(now) {
     if (!g.lieUntil && eye && !g.ended) eye.setMood(g.remaining <= 30 ? 'angry' : 'watching');
     setMusicIntensity(Math.pow(Math.min(1, Math.max(0, 1 - g.remaining / TIME_S)), 1.8));
     // Simon : trop lent entre deux touchers (ou pour le premier) = faux, on rejoue le tour
-    if (g.step === 3 && g.simon?.phase === 'input' && now > g.simon.deadline) { g.simon.timeouts++; simonFail(null); }
+    const S = g.simon;
+    if (g.step === 3 && S) {
+      if (S.phase === 'play' && S.tm && S.t0 && now - S.t0 > S.len * (beatMs(S.tm) + S.tm.gap) + 80) {
+        simonTrace('watchdog', { gen: S.gen, ph: S.phase, plays: S.plays }); S.wd = (S.wd || 0) + 1;
+        S.phase = 'input'; S.deadline = now + run.simon.first;
+      }
+      if (S.phase === 'input' && now > S.deadline) { S.timeouts++; simonFail(null); }
+    }
   }
   // 5 barrettes WS2812B (40 LED). Étape 3 : Simon à chaque image (K2000 à 36 ms) ; sinon ~12 i/s.
   const simonNow = g.phase === 'play' && g.step === 3;

@@ -702,3 +702,29 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
 .cyd2.big[data-big="simon"] .cyd2-big { font-size: 14px; letter-spacing: .04em; white-space: nowrap; }
 @media (orientation: portrait) and (min-height: 820px) and (max-width: 999px) { .cyd2.big[data-big="simon"] .cyd2-big { font-size: 15px; } }
 @media (min-width: 1000px) and (min-height: 600px) { .cyd2.big[data-big="simon"] .cyd2-big { font-size: 18px; } }
+
+/* ---------- v0.3.1 : cibles de toucher ≥ 44×44 CSS px (zoom 1), sans déplacer ni agrandir les pièces ---------- */
+/* Zone invisible (::after) centrée sur la pièce. Entre deux voisins, on s'arrête au milieu de l'écart (pas de chevauchement). */
+.trap, .traps, .enc, .enc-row.zig, .knob, .keypad, .lock, .key-row, .gt-body, .mod-keys { overflow: visible; }
+.knob::after, .gt-cover::after, .gt-lever::after, .trap-door::after, .kp-key::after, .mod-keys .lock-btn::after {
+  content: ""; position: absolute; pointer-events: auto; background: none; border: 0;
+}
+/* molettes : déjà 46 px en portrait ; en paysage 42×42, écart vertical 2 px → exactement 44 */
+.knob { position: relative; }
+.knob::after { left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); z-index: 3; }
+/* capots fermés : 42 px de large, on ajoute 1 px de chaque côté. Capot ouvert : pas de pad (on vise le levier). */
+.gt-cover::after { left: 50%; top: 50%; width: 44px; height: max(44px, 100%); transform: translate(-50%, -50%); }
+.gtoggle.open .gt-cover::after { display: none; }
+/* leviers : 44×42 en paysage, +1 px haut et bas */
+.gt-lever::after { left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
+/* trappes : hauteur 36 px en paysage ; le dessin reste 36, le toucher descend/monte jusqu'à 44 */
+.trap { overflow: visible; }
+.trap-door::after { left: 50%; top: 50%; width: calc(100% + 8px); height: max(44px, calc(100% + 8px)); transform: translate(-50%, -50%); z-index: 2; }
+/* clavier : pas 3 px, on prend 1,5 px de chaque côté (les centres sont à moins de 44 px : 37 / 41). On ne chevauche pas. */
+.kp-key { position: relative; }
+.kp-key::after { inset: -1.5px; }
+/* serrures : écart 4 px → largeur = pièce + 4 ; le TM1637 est 4 px au-dessus, donc le pad de 44 de haut commence 4 px au-dessus du bouton (le reste en bas) */
+.mod-keys .lock-btn { position: relative; overflow: visible; }
+.mod-keys .lock-btn::after { left: 50%; top: -4px; width: calc(100% + 4px); height: 44px; transform: translateX(-50%); }
+/* sérigraphie molettes : tenait pas (205 px de texte dans 162, coupée à « TOURN… ») */
+.mod-enc > .silk { white-space: normal; overflow: visible; text-overflow: unset; font-size: 10px; line-height: 1.15; text-align: center; max-width: 100%; letter-spacing: .02em; }
