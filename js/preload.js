@@ -2,7 +2,7 @@
 // % = octets reçus / octets attendus. Les octets attendus viennent de Content-Length dès que l'en-tête arrive
 // (sinon d'une estimation par fichier). Les polices comptent pour leur taille connue, d'un bloc quand elles sont prêtes.
 // Les fichiers téléchargés sont gardés ici (une promesse par URL) : audio.js les reprend, sans second téléchargement.
-import { loadManifest, MANIFEST_URL, fileOf } from './voice-manifest.js?v=0.2.6a';
+import { loadManifest, MANIFEST_URL, fileOf } from './voice-manifest.js?v=0.3.0';
 
 export const MUSIC_URL = 'audio/tension.mp3';
 const FONTS = [

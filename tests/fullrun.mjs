@@ -6,10 +6,15 @@
 // la saisie se fait par de vrais taps/clics, comme un joueur.
 //
 // Chaque partie vérifie aussi :
-//   - Réécouter à l'étape 3 : même séquence de DEL que la première fois
-//   - un indice (étape 3, niveaux 1–2) rejoue aussi les DEL (une fois par variante de séquence)
+//   - v0.3 étape 3 = Simon : chaque tour, les barrettes jouent (K2000, ≤ 4 LED à la fois) exactement la série
+//     attendue ; on la reproduit en touchant les prises ; tours 2→5 (moyen) / 3→6 (difficile), plus rapide en difficile
+//   - Réécouter (et l'indice 1 une partie sur cinq) rejoue le même tour, sans pénalité
+//   - une mauvaise prise : −8 s, l'étape ne recule pas, le tour se rejoue ; toucher pendant la lecture ne compte pas
+//   - une barrette répétée deux fois de suite est acceptée ; un toucher par glisser (la fiche revient) compte
+//   - trop lent (1re graine de chaque palier) : faux, le tour se rejoue
+//   - étape 2 : 5 barrettes = 10 moitiés de 4 LED, comptes distincts ; étapes 1 et 8 : les 5 lettres courantes sur le CYD 2
 //   - un indice sur une autre étape n'empêche pas d'avancer
-//   - à chaque étape code (3, 6, 11) : un faux code puis le bon, et l'étape n'avance qu'après le bon
+//   - aux étapes code (6, 11) : un faux code puis le bon, et l'étape n'avance qu'après le bon
 //   - à chaque réussite : l'index d'étape avance et l'id de voix passe à la réussite + l'objectif suivant
 //
 // Usage :
@@ -37,8 +42,8 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS } from '../js/game.js?v=0.2.6a';
-import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.2.6a';
+import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.3.0';
+import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.3.0';
 
 const require = createRequire(import.meta.url);
 function loadChromium() {
@@ -58,10 +63,10 @@ const chromium = loadChromium();
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const VIEW = { width: 412, height: 915 };
 
-// 20 moyen + 20 difficile, jeu couvrant inclus (0, 9, 28 / 26, 142). Liste fixe pour CI reproductible.
+// 20 moyen + 20 difficile (v0.3 : 26 variantes, la séquence clavier n'existe plus). Liste fixe pour CI reproductible.
 const QA_FIXED = {
   moyen:     [0, 7, 8, 9, 12, 14, 15, 18, 19, 21, 23, 24, 27, 28, 29, 32, 35, 39, 45, 46],
-  difficile: [1, 2, 3, 4, 5, 6, 10, 11, 13, 16, 17, 20, 22, 25, 26, 30, 31, 33, 34, 142],
+  difficile: [1, 2, 3, 4, 5, 6, 10, 11, 13, 16, 17, 20, 22, 25, 26, 30, 31, 33, 34, 36],
 };
 const QA_RANDOM_PER_TIER = 2;
 
@@ -223,7 +228,7 @@ function plannedCoverage(seedList) {
   return by;
 }
 
-// Échec immédiat si la liste fixe --qa / CI ne garantit pas les 29 variantes (union).
+// Échec immédiat si la liste fixe --qa / CI ne garantit pas toutes les variantes (union).
 function assertFixedListCovers() {
   const fixed = [...QA_FIXED.moyen, ...QA_FIXED.difficile];
   const need = neededVariants();
@@ -235,7 +240,7 @@ function assertFixedListCovers() {
     console.log(`  ${key.padEnd(20)}${ss.length ? 'graines ' + ss.join(', ') : 'MANQUE'}`);
   }
   if (missing.length) {
-    console.error(`FULLRUN FAIL  QA_FIXED ne couvre pas 29/29 : ${missing.join(', ')}`);
+    console.error(`FULLRUN FAIL  QA_FIXED ne couvre pas ${need.size - missing.length}/${need.size} : ${missing.join(', ')}`);
     process.exit(1);
   }
   console.log(`liste fixe          ${need.size}/${need.size} variantes garanties`);
@@ -338,7 +343,7 @@ async function assertVoiceMoved(p, run, from, to, t0) {
 }
 
 async function rotateTo(p, letters) {
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < NENC; i++) {
     for (let guard = 0; guard < 28; guard++) {
       const cur = await D(p, (k) => {
         const t = document.querySelectorAll('.enc .knob')[k]?.getAttribute('aria-valuetext') || '';
@@ -442,52 +447,51 @@ async function doMaze(p, { waitSab = false } = {}) {
   return false;
 }
 
-async function recordCyanSeq(p, msOrOpts = 22000) {
-  const opts = typeof msOrOpts === 'number' ? { ms: msOrOpts } : (msOrOpts || {});
-  const ms = opts.ms ?? 22000;
-  const since = opts.since ?? 0;
-  const tWait = Date.now();
-  let show = null;
-  while (Date.now() - tWait < ms) {
-    show = await D(p, (since) => {
-      const pack = (s, live) => s && !s.fake && s.t0 > since
-        ? { seq: s.seq.slice(), t0: s.t0, on: s.on, gap: s.gap, now: performance.now(), live } : null;
-      const live = pack(typeof __entiteDebug !== 'undefined' ? __entiteDebug.seqShow : null, true);
-      if (live) return live;
-      return pack(window.__lastRealSeq, false);
-    }, since);
-    if (show) break;
-    await W(p, 30);
-  }
-  if (!show) return [];
-  const endAt = show.t0 + show.seq.length * (show.on + show.gap) + 40;
-  const tEnd = Date.now();
-  while (Date.now() - tEnd < 8000) {
-    const now = await D(p, () => performance.now());
-    if (now >= endAt) break;
-    await W(p, Math.min(50, Math.max(10, endAt - now)));
-  }
-  // Journal rempli dans la page (rAF). On compacte les doublons consécutifs
-  // (un frame « off » pendant l'allumage ne doit pas recréer la même DEL).
-  const ev = await D(p, ({ t0, endAt }) => (window.__cyanSeqLog || [])
-    .filter((e) => e.t >= t0 - 16 && e.t < endAt)
-    .map((e) => ({ t: Math.round(e.t - t0), led: e.led, leds: e.leds, groupOk: e.groupOk !== false })), { t0: show.t0, endAt });
-  const compact = [];
-  for (const e of ev) {
-    if (!compact.length || compact[compact.length - 1].led !== e.led) compact.push(e);
-    else if (!e.groupOk) compact[compact.length - 1].groupOk = false;
-  }
-  return compact;
-}
-
-async function waitSeqIdle(p, ms = 8000) {
-  const t0 = Date.now();
+// ---- Simon (v0.3) : lecture des barrettes côté page (journal rAF __stickLog), touchers par vrais taps
+const simonInfo = (p) => D(p, () => {
+  const S = __entiteDebug.simon; if (!S) return null;
+  return { phase: S.phase, round: S.round, len: S.len, plays: S.plays, errors: S.errors, timeouts: S.timeouts, ignored: S.ignored, t0: S.t0, input: S.input.length, played: (S.played || []).slice(), rounds: S.rounds.map((r) => ({ ...r })), speed: __entiteDebug.simonSpeed };
+});
+async function waitSimon(p, pred, ms = 30000) {
+  const t0 = Date.now(); let s = null;
   while (Date.now() - t0 < ms) {
-    const show = await D(p, () => __entiteDebug.seqShow);
-    if (!show) return true;
-    await W(p, 60);
+    s = await simonInfo(p);
+    const st = await D(p, () => __entiteDebug.state.step);
+    if (st !== 3) return { gone: true, s };
+    if (s && pred(s)) return { s };
+    await W(p, 25);
   }
-  return false;
+  return { timeout: true, s };
+}
+// impulsions jouées depuis t0 (une impulsion = un segment allumé d'une seule barrette, entre deux noirs)
+async function pulsesSince(p, t0, t1) {
+  return D(p, ({ t0, t1 }) => {
+    const log = (window.__stickLog || []).filter((e) => e.t >= t0 - 1 && (t1 == null || e.t <= t1));
+    const out = []; let prevOff = true;
+    for (const e of log) {
+      if (e.lit.length === 0) { prevOff = true; continue; }
+      if (e.lit.length === 1 && prevOff) out.push({ s: e.lit[0], maxOn: e.maxOn, t: Math.round(e.t - t0) });
+      else if (out.length && e.lit.length === 1 && out[out.length - 1].s === e.lit[0]) out[out.length - 1].maxOn = Math.max(out[out.length - 1].maxOn, e.maxOn);
+      else if (e.lit.length > 1) out.push({ s: -1, lit: e.lit, t: Math.round(e.t - t0) });
+      prevOff = false;
+    }
+    return out;
+  }, { t0, t1 });
+}
+async function touchJack(p, s) { await p.tap(`#jacks .jack[data-s="${s}"] .plug`); }
+// toucher Simon par glisser-déposer : une fiche (câble c) posée sur la prise s puis relâchée ; elle doit revenir dans sa prise
+async function dragToJack(p, s) {
+  const c = await D(p, () => __entiteDebug.state.cables.findIndex((k) => k.socket != null));
+  const from = await p.locator(`#ports .port-btn[data-c="${c}"]`).boundingBox();
+  const to = await p.locator(`#jacks .jack[data-s="${s}"] .plug`).boundingBox();
+  const before = await D(p, () => __entiteDebug.state.cables.map((k) => k.socket));
+  await p.mouse.move(from.x + from.width / 2, from.y + from.height / 2); await p.mouse.down();
+  const fx = from.x + from.width / 2, fy = from.y + from.height / 2, tx = to.x + to.width / 2, ty = to.y + to.height / 2;
+  for (let k = 1; k <= 8; k++) await p.mouse.move(fx + (tx - fx) * k / 8, fy + (ty - fy) * k / 8);
+  await p.mouse.up();
+  await W(p, 40);
+  const after = await D(p, () => __entiteDebug.state.cables.map((k) => k.socket));
+  return { c, same: before.join() === after.join() };
 }
 
 async function readCyd2Hud(p) {
@@ -568,32 +572,21 @@ async function playOne(b, seed, opts) {
     viewport: VIEW, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block',
   });
   await ctx.addInitScript(() => { try { localStorage.setItem('entite-tuto-vu', '1'); } catch {} });
-  // Journal des DEL cyan côté page : résiste à un evaluate occupé pendant une fenêtre d'allumage.
+  // Journal des barrettes côté page (v0.3) : quelle(s) barrette(s) allumée(s), et combien de LED au plus (K2000 ≤ 4).
   await ctx.addInitScript(() => {
-    window.__cyanSeqLog = [];
-    window.__lastRealSeq = null;
+    window.__stickLog = [];
+    let prev = '';
     const tick = () => {
       try {
-        const s = window.__entiteDebug?.seqShow;
-        if (s && !s.fake && (!window.__lastRealSeq || window.__lastRealSeq.t0 !== s.t0)) {
-          window.__lastRealSeq = { seq: s.seq.slice(), t0: s.t0, on: s.on, gap: s.gap };
-        }
-        const bar = document.querySelector('#bar');
-        if (bar) {
-          const all = [...bar.querySelectorAll('i')];
-          const lit = all.map((e, i) => (e.classList.contains('on') && e.style.getPropertyValue('--c').trim() === '#62d6ff' ? i : -1)).filter((i) => i >= 0);
-          const positions = [...new Set(lit.map((i) => Math.floor(i / 4) + 1))];
-          const log = window.__cyanSeqLog;
-          const last = log[log.length - 1];
-          if (positions.length === 1) {
-            const pos = positions[0], a = (pos - 1) * 4;
-            const want = [a, a + 1, a + 2, a + 3];
-            const groupOk = want.every((i) => lit.includes(i)) && lit.length === 4;
-            const leds = want.map((i) => i + 1);
-            if (!last || last.led !== pos || last.off) log.push({ t: performance.now(), led: pos, leds, groupOk, off: false });
-            else if (!groupOk) last.groupOk = false;
-          } else if (lit.length === 0 && last && !last.off) last.off = true;
-          else if (positions.length > 1 && last && !last.off) last.groupOk = false;
+        const sticks = document.querySelectorAll('#jacks .stick');
+        if (sticks.length && window.__entiteDebug?.state?.step === 3) {
+          const lit = [], on = [];
+          sticks.forEach((st, i) => { if (st.dataset.lit === '1') { lit.push(i); on.push(st.querySelectorAll('i.on').length); } });
+          const key = lit.join(',');
+          const maxOn = on.length ? Math.max(...on) : 0;
+          const log = window.__stickLog;
+          if (key !== prev) { prev = key; log.push({ t: performance.now(), lit, maxOn, phase: window.__entiteDebug.simon?.phase || '' }); }
+          else if (log.length) log[log.length - 1].maxOn = Math.max(log[log.length - 1].maxOn, maxOn);
         }
       } catch { /* debug pas encore prêt */ }
       requestAnimationFrame(tick);
@@ -631,7 +624,7 @@ async function playOne(b, seed, opts) {
   p.on('console', (m) => { if (m.type() === 'error') errs.push('console:' + m.text()); });
   p.on('pageerror', (e) => errs.push('page:' + e.message));
 
-  const url = `${base}?debug=1&seed=${seed}&voix=rapide&notuto=1`;
+  const url = `${base}?debug=1&seed=${seed}&voix=rapide&notuto=1${opts.realSimon ? '' : '&simon=rapide'}`;
   await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await p.waitForSelector('#btnStart:not([disabled])', { timeout: 45000 });
   await p.waitForSelector('#boot', { state: 'hidden' });
@@ -645,7 +638,7 @@ async function playOne(b, seed, opts) {
     return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs };
   }
 
-  const extras = { replay: null, hintSeq: null, hintOther: null, wrong: [], voice: 0, hud: 0 };
+  const extras = { replay: null, hintSeq: null, hintOther: null, wrong: [], voice: 0, hud: 0, simon: null };
 
   const LANDSCAPE = { width: 915, height: 412 };
   const setView = async (size) => {
@@ -658,7 +651,7 @@ async function playOne(b, seed, opts) {
     const info = await readCyd2Hud(p);
     const land = (info.view || '').startsWith('915');
     let ok = !info.plate && !info.lidReplay && info.inCyd
-      && info.serialText === info.want && /^[A-Z][0-9][A-Z][0-9]-[A-Z][0-9][A-Z][0-9]$/.test(info.serialText)
+      && info.serialText === info.want && /^[A-Z][0-9][A-Z][0-9]-[A-Z][0-9][A-Z][0-9][A-Z]$/.test(info.serialText)
       && info.serialVisible && info.btnVisible && info.battVisible
       && info.btnW >= 44 && info.btnH >= 44
       && /RÉÉCOUTER|RÉECOUTER/i.test(info.btnLabel)
@@ -724,14 +717,23 @@ async function playOne(b, seed, opts) {
   if (!(await expectAdvance(0, 1, 'armement', tArm))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs }; }
   if (!(await hud(1, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
+  // v0.3 : le CYD 2 montre les 5 lettres COURANTES des molettes (pas la réponse)
+  const cydLetters = async (step) => {
+    const r = await D(p, () => ({ knobs: [...document.querySelectorAll('.enc .knob')].map((k) => /lettre (\w)/.exec(k.getAttribute('aria-valuetext') || '')?.[1] || '').join(''),
+      shown: (document.querySelector('#cyd2Big')?.textContent || '').trim(), mode: document.querySelector('.cyd2')?.dataset.big, n: document.querySelectorAll('.enc .knob').length }));
+    const ok = r.n === NENC && r.mode === 'letters' && r.shown === r.knobs && r.shown.length === NENC;
+    rec(ok, step, step, ok ? `CYD 2 lettres courantes ${r.shown} (5 molettes)` : `CYD 2 lettres ${JSON.stringify(r)}`);
+    return ok;
+  };
+  if (!(await cydLetters(1))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   const answers = await D(p, () => {
     const r = __entiteDebug.run, RING = __entiteDebug.RING;
     return {
       enc1: r.enc1.map((i) => RING[i]),
       enc2: r.enc2.map((i) => RING[i]),
       trap: r.trap,
-      seq: r.seq.slice(),
-      seqCode: r.seqCode,
+      simon: { ...r.simon, seq: r.simon.seq.slice() },
+      bar: r.bar.slice(), counts: r.counts.slice(),
       code1: r.code1,
       code2: r.code2,
       patch1: r.patch1.req,
@@ -759,50 +761,150 @@ async function playOne(b, seed, opts) {
   // ---- 2 trappe
   // Journal rAF dans la page : on ne lit la 1re séquence qu'après l'assertion de voix,
   // pour ne pas concurrencer les evaluate (sinon la 1re DEL peut être lue à 0).
+  {
+    // l'œil rouge (mensonge) fait grésiller les LED : on lit les barrettes hors mensonge (plusieurs essais)
+    let hv = [];
+    for (let k = 0; k < 24; k++) {
+      await p.waitForFunction(() => performance.now() > (__entiteDebug.state.lieUntil || 0) + 150, null, { timeout: 8000 }).catch(() => {});
+      const snap = await D(p, () => { const g = __entiteDebug.state; const clean = performance.now() > (g.lieUntil || 0) + 150; const v = [...document.querySelectorAll('#jacks .stick')].flatMap((st) => { const L = [...st.querySelectorAll('i')]; return [L.slice(0, 4), L.slice(4)].map((h) => { const c = h.map((e) => (e.classList.contains('on') ? e.style.getPropertyValue('--c').trim() : '')); return c.every((x) => x && x === c[0]) ? c[0] : '?'; }); }); return { clean, v }; });
+      hv = snap.v;
+      if (snap.clean && !hv.includes('?')) break;
+      await p.waitForTimeout(250);
+    }
+    const want = await D(p, () => { const LEDc = { rouge: '#ff3b30', vert: '#36f08a', bleu: '#3d8bff' }; return __entiteDebug.run.bar.map((c) => LEDc[c]); });
+    const counts = Object.values(hv.reduce((m, c) => ((m[c] = (m[c] || 0) + 1), m), {})).sort((a, b) => b - a);
+    const ok = hv.length === 10 && hv.join() === want.join() && counts.length === 3 && new Set(counts).size === 3 && counts.join() === answers.counts.join();
+    rec(ok, 2, 2, ok ? `5 barrettes, 10 moitiés, comptes ${counts.join('/')}` : `barrettes étape 2 ${JSON.stringify({ hv, want, counts })}`);
+    if (!ok) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  }
   const t2 = await tNow();
-  const tBeforeSeq = await D(p, () => performance.now());
   await p.tap(`.trap[data-i="${answers.trap}"] .trap-door`);
   if (!(await expectAdvance(2, 3, `trappe ${answers.trap + 1}`, t2))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   if (!(await hud(3, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
-  // ---- 3 barre + clavier : 1re séquence, Réécouter, éventuellement indice, faux code puis bon
-  const wantSeq = answers.seq;
-  const first = await recordCyanSeq(p, { since: tBeforeSeq, ms: 22000 });
-  const firstLeds = first.map((e) => e.led);
-  const firstGroups = first.length > 0 && first.every((e) => e.groupOk && Array.isArray(e.leds) && e.leds.length === 4 && e.leds[0] === 4 * e.led - 3 && e.leds[3] === 4 * e.led);
-  const firstOk = firstLeds.join() === wantSeq.join() && firstGroups;
-  rec(firstOk, 3, 3, firstOk ? `1re séquence ${firstLeds.join('-')} (groupes 32 LED)` : `1re séquence ${firstLeds.join('-') || '∅'} ≠ ${wantSeq.join('-')}  groupes=${JSON.stringify(first.map((e) => ({ pos: e.led, leds: e.leds, ok: e.groupOk })))}`);
-  if (!firstOk) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
-  await waitSeqIdle(p, 4000);
-
-  const tBeforeReplay = await D(p, () => performance.now());
-  await p.locator('#btnReplay').click({ force: true });
-  const replay = await recordCyanSeq(p, { since: tBeforeReplay, ms: 22000 });
-  const replayLeds = replay.map((e) => e.led);
-  const replayGroups = replay.length > 0 && replay.every((e) => e.groupOk && Array.isArray(e.leds) && e.leds.length === 4 && e.leds[0] === 4 * e.led - 3 && e.leds[3] === 4 * e.led);
-  const replayOk = replayLeds.join() === wantSeq.join() && replayGroups;
-  const replayInfo = replayOk ? `Réécouter ${replayLeds.join('-')}` : `Réécouter ${replayLeds.join('-') || '∅'} ≠ ${wantSeq.join('-')}  ${JSON.stringify(await D(p, () => ({ lastClue: __entiteDebug.state.lastClue, seqShow: __entiteDebug.seqShow, log: __entiteDebug.voiceLog.slice(-5).map((v) => v.ids[0]), replayDis: document.querySelector('#btnReplay')?.disabled })))}`;
-  rec(replayOk, 3, 3, replayInfo);
-  extras.replay = { ok: replayOk, first: firstLeds, replay: replayLeds, want: wantSeq };
-  if (!replayOk) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
-  await waitSeqIdle(p, 4000);
-
-  if (opts.hintSeq) {
-    await p.tap('#btnHint');
-    await W(p, 300);
-    const still = await snap(p);
-    const hOk = still.step === 3 && still.hint >= 1;
-    rec(hOk, 3, 3, hOk ? 'indice en cours, réussite pendant la voix' : `indice pas pris ${JSON.stringify(still)}`);
-    extras.hintSeq = { ok: hOk, midPlay: true };
-    if (!hOk) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  // ---- 3 Simon : chaque tour, vérifier la série jouée (K2000), puis la reproduire aux prises
+  const SM = answers.simon, rounds = SM.target - SM.start + 1;
+  const sOk = SM.start === (runInfo.tier === 'moyen' ? 2 : 3) && SM.target === (runInfo.tier === 'moyen' ? 5 : 6) && SM.seq.length === SM.target && SM.seq.every((k) => k >= 0 && k < 5);
+  rec(sOk, 3, 3, sOk ? `Simon ${runInfo.tier} : tours ${SM.start}→${SM.target}, série ${SM.seq.map((k) => k + 1).join('-')}` : `Simon mal tiré ${JSON.stringify(SM)}`);
+  if (!sOk) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  const kbd = await D(p, () => { const before = __entiteDebug.state.errors; return { before }; });
+  const simonFail = async (why) => { await fail(3, 3, why); await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; };
+  const sx = { rounds: 0, replay: false, hint: false, wrong: false, ignored: false, timeout: false, drag: false, repeat: false, timing: [] };
+  // attendre une lecture complète du tour r (n-ième lecture) et vérifier les impulsions
+  const checkPlay = async (r, minPlays, label) => {
+    const w = await waitSimon(p, (s) => s.round === r && s.phase === 'input' && s.plays >= minPlays, 40000);
+    if (!w.s || w.timeout || w.gone) return { ok: false, why: `${label} : pas de saisie au tour ${r + 1} ${JSON.stringify(w)}` };
+    const want = SM.seq.slice(0, SM.start + r);
+    const pulses = await pulsesSince(p, w.s.t0);
+    const got = pulses.map((e) => e.s);
+    const k2000 = pulses.every((e) => e.s >= 0 && e.maxOn >= 1 && e.maxOn <= SIMON.TAIL + 1);
+    // série jouée par l'app (journal des temps) = exacte ; ce qu'on voit sur les barrettes (journal rAF) = la même série,
+    // une impulsion peut manquer si le navigateur saute des images (machine chargée), jamais une barrette en trop
+    const played = w.s.played || [];
+    const subseq = got.length > 0 && (() => { let q = 0; for (const k of got) { while (q < want.length && want[q] !== k) q++; if (q === want.length) return false; q++; } return true; })();
+    const seen = got.length >= Math.max(1, want.length - 1);
+    if (got.join() !== want.join()) sx.missedPulses = (sx.missedPulses || 0) + (want.length - got.length);
+    const ok = played.join() === want.join() && subseq && seen && k2000;
+    return { ok, s: w.s, why: ok ? '' : `${label} : app ${played.map((k) => k + 1).join('-') || '∅'}, vu ${got.map((k) => k + 1).join('-') || '∅'} ≠ ${want.map((k) => k + 1).join('-')}  ${JSON.stringify(pulses)}` };
+  };
+  const errorsNow = () => D(p, () => __entiteDebug.state.errors);
+  const remainingNow = () => D(p, () => __entiteDebug.state.remaining);
+  for (let r = 0; r < rounds; r++) {
+    let cp = await checkPlay(r, 1, `tour ${r + 1}`);
+    if (!cp.ok) { const tr = await D(p, () => (window.__simonTrace || []).slice(-25)); return simonFail(cp.why + ' trace=' + JSON.stringify(tr)); }
+    const len = SM.start + r;
+    // texte du CYD 2
+    const cyd = await D(p, () => (document.querySelector('#cyd2Big')?.textContent || '').trim());
+    if (cyd !== `SIMON ${r + 1}/${rounds}`) return simonFail(`CYD 2 « ${cyd} » ≠ SIMON ${r + 1}/${rounds}`);
+    sx.timing.push(cp.s.rounds[r]);
+    if (r === 0) {
+      // Réécouter pendant la saisie : même série, sans pénalité
+      const e0 = await errorsNow(), plays0 = cp.s.plays;
+      await p.locator('#btnReplay').click({ force: true });
+      const cr = await checkPlay(0, plays0 + 1, 'Réécouter');
+      const e1 = await errorsNow();
+      sx.replay = cr.ok && e1 === e0;
+      rec(sx.replay, 3, 3, sx.replay ? `Réécouter : même série ${SM.seq.slice(0, len).map((k) => k + 1).join('-')}, sans pénalité` : `${cr.why} erreurs ${e0}→${e1}`);
+      extras.replay = { ok: sx.replay };
+      if (!sx.replay) return simonFail('Réécouter Simon');
+      cp = cr;
+      if (opts.hintSeq) {
+        const e2 = await errorsNow(), pl = cr.s.plays;
+        await p.tap('#btnHint');
+        const ch = await checkPlay(0, pl + 1, 'indice 1');
+        const hs = await snap(p);
+        sx.hint = ch.ok && hs.hint >= 1 && hs.errors === e2;
+        rec(sx.hint, 3, 3, sx.hint ? 'indice 1 : le tour se rejoue, sans pénalité' : `${ch.why} ${JSON.stringify(hs)}`);
+        extras.hintSeq = { ok: sx.hint };
+        if (!sx.hint) return simonFail('indice Simon');
+        cp = ch;
+      }
+      if (opts.simonTimeout) {
+        // trop lent pour le 1er toucher : faux, −8 s, le tour se rejoue
+        const e3 = await errorsNow(), pl = cp.s.plays;
+        const wt = await waitSimon(p, (s) => s.timeouts >= 1, SM.first + 4000);
+        const ct = await checkPlay(0, pl + 1, 'après délai');
+        const e4 = await errorsNow();
+        sx.timeout = !!wt.s && !wt.timeout && ct.ok && e4 === e3 + 1;
+        rec(sx.timeout, 3, 3, sx.timeout ? `trop lent (${SM.first / 1000} s) : faux, le tour 1 se rejoue` : `délai Simon ${JSON.stringify({ wt, why: ct.why, e3, e4 })}`);
+        if (!sx.timeout) return simonFail('délai Simon');
+        cp = ct;
+      }
+    }
+    if (r === 1) {
+      // mauvaise prise : −8 s, on rejoue le tour (pas de retour à 2), puis toucher pendant la lecture = ignoré
+      const e0 = await errorsNow(), rem0 = await remainingNow(), pl = cp.s.plays;
+      await touchJack(p, (SM.seq[0] + 1) % 5);
+      await W(p, 80);
+      const st = await snap(p), si = await simonInfo(p), rem1 = await remainingNow();
+      const okW = st.step === 3 && st.errors === e0 + 1 && si.round === 1 && si.len === len && rem0 - rem1 >= SIMON.PENALTY_S - 0.5;
+      // pendant la relecture, toucher la bonne prise ne compte pas
+      const wp = await waitSimon(p, (s) => s.phase === 'play' && s.plays > pl, 6000);
+      const ig0 = wp.s?.ignored ?? 0;
+      if (wp.s) await touchJack(p, SM.seq[0]);
+      const si2 = await simonInfo(p);
+      const okI = !!wp.s && si2.ignored === ig0 + 1 && si2.input === 0 && (await errorsNow()) === e0 + 1;
+      const cw = await checkPlay(1, pl + 1, 'après erreur');
+      sx.wrong = okW && cw.ok; sx.ignored = okI;
+      rec(okW && cw.ok, 3, 3, okW && cw.ok ? `mauvaise prise ${(SM.seq[0] + 1) % 5 + 1} : −${SIMON.PENALTY_S} s, le tour ${len} se rejoue` : `mauvaise prise ${JSON.stringify({ st, si, rem0, rem1, why: cw.why })}`);
+      rec(okI, 3, 3, okI ? 'toucher pendant la lecture : ignoré' : `toucher pendant la lecture compté ${JSON.stringify({ wp, si2 })}`);
+      extras.wrong.push({ step: 3, ok: okW && cw.ok && okI });
+      if (!(okW && cw.ok && okI)) return simonFail('erreur Simon');
+      cp = cw;
+    }
+    // reproduire la série : vraies touches (et un glisser au dernier tour, une partie sur trois)
+    const want = SM.seq.slice(0, len);
+    const tRight = await tNow();
+    for (let i = 0; i < want.length; i++) {
+      if (r === rounds - 1 && i === 0 && opts.simonDrag) {
+        const d = await dragToJack(p, want[i]);
+        sx.drag = d.same;
+        if (!d.same) return simonFail(`glisser : la fiche n'est pas revenue ${JSON.stringify(d)}`);
+      } else await touchJack(p, want[i]);
+      if (i > 0 && want[i] === want[i - 1]) sx.repeat = true;
+      await W(p, 60);
+    }
+    if (r < rounds - 1) {
+      const nx = await waitSimon(p, (s) => s.round === r + 1, 6000);
+      if (!nx.s || nx.timeout) return simonFail(`tour ${r + 1} réussi mais pas de tour ${r + 2} ${JSON.stringify(nx)}`);
+      sx.rounds++;
+    } else {
+      sx.rounds++;
+      extras.simon = sx;
+      if (!(await expectAdvance(3, 4, `Simon ${rounds} tours (${SM.seq.map((k) => k + 1).join('-')})`, tRight))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+    }
   }
-
-  const w3 = await wrongThenRight(p, answers.seqCode, 3);
-  extras.wrong.push({ step: 3, ...w3 });
-  rec(w3.ok, 3, 3, w3.ok ? `faux ${w3.bad} puis bon ${w3.want}` : w3.why);
-  if (!w3.ok) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
-  const t3 = w3.tRight ?? await tNow();
-  if (!(await expectAdvance(3, 4, `code ${answers.seqCode}`, t3))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  {
+    // durées : moyen constantes (36 / 200 ms), difficile ×0,88 par tour, planchers 20 / 120 ms
+    const tm = sx.timing.map((x) => `${x.step}/${x.gap}`);
+    const okT = sx.timing.every((x, i) => {
+      if (runInfo.tier === 'moyen') return x.step === SIMON.STEP_MS && x.gap === SIMON.GAP_MS;
+      const f = Math.pow(SIMON.SPEEDUP, i);
+      return x.step === Math.max(SIMON.STEP_MIN, Math.round(SIMON.STEP_MS * f)) && x.gap === Math.max(SIMON.GAP_MIN, Math.round(SIMON.GAP_MS * f)) && (i === 0 || x.step <= sx.timing[i - 1].step);
+    });
+    rec(okT, 3, 3, okT ? `durées K2000 par tour ${tm.join(' ')} ms${opts.realSimon ? ' (vitesse réelle)' : ''}${sx.repeat ? ', barrette répétée acceptée' : ''}${sx.drag ? ', glisser compté (fiche revenue)' : ''}` : `durées ${tm.join(' ')}`);
+    if (!okT) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  }
   if (!(await hud(4, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
   // ---- 4 baie
@@ -847,6 +949,7 @@ async function playOne(b, seed, opts) {
   if (!(await hud(8, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
   // ---- 8 encodeurs (mot)
+  if (!(await cydLetters(8))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   const t8 = await tNow();
   await rotateTo(p, answers.enc2);
   if (!(await expectAdvance(8, 9, `lettres ${answers.enc2.join('')}`, t8))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
@@ -890,6 +993,13 @@ async function playOne(b, seed, opts) {
     const v = await assertVoiceMoved(p, runInfo, 12, 'fin', tGood || t12);
     rec(v.ok, 12, 'fin', v.ok ? `${end.endTitle}  voix ${v.heads}` : v.why);
     if (v.ok) extras.voice = (extras.voice || 0) + 1;
+    // jingle de victoire : lancé une fois, pas en boucle, sans erreur de chargement
+    let jg = null; const tj = Date.now();
+    while (Date.now() - tj < 8000) { jg = await D(p, () => __entiteDebug.jingle()); if (jg.lances >= 1 || jg.erreur) break; await W(p, 100); }
+    await W(p, 1500); jg = await D(p, () => __entiteDebug.jingle());
+    const jok = jg.demandes === 1 && jg.lances === 1 && jg.charge && !jg.erreur;
+    rec(jok, 12, 'fin', jok ? 'jingle de victoire joué une fois (audio/victoire.mp3)' : `jingle ${JSON.stringify(jg)}`);
+    extras.jingle = jok;
   }
 
   const consoleOk = errs.length === 0;
@@ -940,16 +1050,20 @@ const b = await chromium.launch(launchOptions());
 const results = [];
 const cover = new Map(); // variant -> [seeds]
 const tierHits = { moyen: 0, difficile: 0 };
-const seqHinted = new Set();
 let allOk = true;
+const firstOfTier = new Set();
 try {
   for (const [i, seed] of seeds.entries()) {
     const info = makeRun(seed);
-    const hintSeq = !seqHinted.has(info.v.seq);
+    const first = !firstOfTier.has(info.tier); firstOfTier.add(info.tier);
+    const hintSeq = first || i % 5 === 0;
     const hintOther = i % 2 === 0;
+    const realSimon = first;                 // 1re graine de chaque palier : Simon à vitesse réelle
+    const simonTimeout = first;              // … et un toucher trop lent
+    const simonDrag = i % 3 === 0;
     const waitSab = info.tier === 'difficile' && !results.some((r) => r.extras && r.tier === 'difficile');
-    console.log(`\n=== graine ${seed} (${info.tier})  sig=${info.sig}  Réécouter=oui  indice-séq=${hintSeq ? 'oui' : 'non'}  indice-autre=${hintOther ? 'oui' : 'non'}  sab=${waitSab ? 'attendre' : 'si arrive'} ===`);
-    const r = await playOne(b, seed, { hintSeq, hintOther, waitSab });
+    console.log(`\n=== graine ${seed} (${info.tier})  sig=${info.sig}  Réécouter=oui  indice-Simon=${hintSeq ? 'oui' : 'non'}  indice-autre=${hintOther ? 'oui' : 'non'}  Simon=${realSimon ? 'vitesse réelle + délai' : 'rapide'}${simonDrag ? ' + glisser' : ''}  sab=${waitSab ? 'attendre' : 'si arrive'} ===`);
+    const r = await playOne(b, seed, { hintSeq, hintOther, waitSab, realSimon, simonTimeout, simonDrag });
     results.push(r);
     if (r.ok) {
       for (const k of SLOTS) {
@@ -958,7 +1072,6 @@ try {
         cover.get(key).push(seed);
       }
       tierHits[r.tier]++;
-      if (r.extras?.hintSeq?.ok) seqHinted.add(r.v.seq);
     } else allOk = false;
   }
 } finally {
@@ -987,7 +1100,7 @@ const nReplay = results.filter((r) => r.extras?.replay?.ok).length;
 const nHintSeq = results.filter((r) => r.extras?.hintSeq?.ok).length;
 const nHintOther = results.filter((r) => r.extras?.hintOther?.ok).length;
 const nWrong = results.reduce((n, r) => n + (r.extras?.wrong?.filter((w) => w.ok).length || 0), 0);
-const nWrongWant = results.length * 3;
+const nWrongWant = results.length * 3; // Simon (mauvaise prise + toucher ignoré) + codes 6 et 11
 const nAdv = results.reduce((n, r) => n + (r.log?.filter((x) => x.ok && String(x.from) !== String(x.to) || (x.ok && x.to === 'fin')).length || 0), 0);
 
 console.log('\n=== résumé ===');
@@ -997,17 +1110,20 @@ for (const r of results) {
   console.log(`${r.ok ? 'PASS' : 'FAIL'}  graine ${r.seed} (${r.tier})  ${n}/${tot} vérifs  version ${r.ver}  console ${r.errs.length}`);
 }
 console.log(`parties              ${nPass}/${results.length} réussies`);
-console.log(`Réécouter (DEL)      ${nReplay}/${results.length}`);
+console.log(`Réécouter (Simon)    ${nReplay}/${results.length}`);
+const nSimon = results.filter((r) => r.extras?.simon?.rounds).length;
+console.log(`jingle victoire      ${results.filter((r) => r.extras?.jingle).length}/${results.length} (une fois par victoire)`);
+console.log(`Simon complet        ${nSimon}/${results.length}  (délai ${results.filter((r) => r.extras?.simon?.timeout).length}, glisser ${results.filter((r) => r.extras?.simon?.drag).length}, barrette répétée ${results.filter((r) => r.extras?.simon?.repeat).length}, toucher ignoré ${results.filter((r) => r.extras?.simon?.ignored).length})`);
 const nHud = results.reduce((n, r) => n + (r.extras?.hud || 0), 0);
 console.log(`CYD 2 n° + RÉÉCOUTER ${nHud} vérifs (plaque absente, ≥ 44 px, visible y compris labyrinthe)`);
-console.log(`indices étape 3      ${nHintSeq} (cible : une fois par variante de séquence)`);
+console.log(`indices étape 3      ${nHintSeq} (Simon rejoué, sans pénalité)`);
 console.log(`indices autre étape  ${nHintOther}`);
-console.log(`faux puis bon code   ${nWrong}/${nWrongWant} (étapes 3, 6, 11)`);
+console.log(`faux puis bon        ${nWrong}/${nWrongWant} (Simon étape 3, codes 6 et 11)`);
 console.log(`voix après réussite  ${results.reduce((n, r) => n + (r.extras?.voice || 0), 0)} (étape + id de voix en ≤ 1,5 s, sans voix de l'étape d'avant)`);
 console.log(`couverture           ${coverOk ? 'COMPLETE' : 'INCOMPLETE'}  (${cover.size}/${need.size} variantes, paliers moyen=${tierHits.moyen} difficile=${tierHits.difficile})`);
 
 // Couverture = union de toutes les parties du run, pas de chaque graine isolée.
-// --qa / jeu couvrant par défaut / --require-coverage : 29/29 exigé (FAIL sinon).
+// --qa / jeu couvrant par défaut / --require-coverage : couverture complète exigée (FAIL sinon).
 // Run ad hoc (--seeds …) : WARN seulement, sauf si --require-coverage.
 const requireCover = ARGS.requireCoverage || !ARGS.explicitSeeds;
 if (!allOk || (requireCover && !coverOk)) {
@@ -1016,7 +1132,7 @@ if (!allOk || (requireCover && !coverOk)) {
   process.exit(1);
 }
 if (!requireCover && !coverOk) {
-  console.log(`WARN  couverture ${cover.size}/${need.size} (union du run) — incomplet, pas un échec. Exiger 29/29 avec --require-coverage.`);
+  console.log(`WARN  couverture ${cover.size}/${need.size} (union du run) — incomplet, pas un échec. Exiger la couverture complète avec --require-coverage.`);
   if (missing.length) console.log(`WARN  manquent : ${missing.join(', ')}`);
 }
 console.log('FULLRUN PASS');

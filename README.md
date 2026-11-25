@@ -9,9 +9,41 @@ Lien : https://passcool17.github.io/entite-mallette/
 Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/entite-mallette-v015/
 (dépôt passcool17/entite-mallette-v015, cache séparé `entite-mallette-v015-0.1.5`).
 
+Archive figée de la v0.2.6a (commit 7d2ea7b) : https://passcool17.github.io/entite-mallette-v026a/
+(dépôt passcool17/entite-mallette-v026a, cache séparé `entite-mallette-v026a-0.2.6a`).
+
+## Version 0.3.0 (24 nov. 2026) — « version 3 »
+
+État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.3.0`, imports `?v=0.3.0`).
+Conception : `qa/entite-mallette/v0.3/DESIGN-v0.3.md` ; matériel : [`HARDWARE.md`](HARDWARE.md).
+
+- **Étape 3 = Simon** : la barre unique de 32 LED disparaît. Le couvercle a **5 barrettes** de 8 LED en zigzag, une
+  prise banane sous chacune (noir → pulse violet, bleu, vert, rouge, jaune). Une barrette joue un **effet K2000** dans la
+  couleur de son câble ; on reproduit la série en touchant les prises (ou en y glissant un câble, qui revient). La série
+  s’allonge : moyen 2→5, difficile 3→6 (plus rapide à chaque tour). Mauvaise prise ou trop lent : −8 s, le tour se rejoue.
+  Réécouter et l’indice 1 rejouent le tour sans pénalité. Les étapes 4 et 10 (baie banane) utilisent les mêmes prises.
+- **Étape 2 (trappe)** : lue sur les 5 barrettes, 10 moitiés colorées (comptes 5/3/2, 6/3/1 ou 5/4/1).
+- **5 molettes KY-040** en zigzag ; mots français de **5 lettres** (lettres A–V de la bague, sans K ni Q) ; n° de série à
+  5 lettres (`LCLC-LCLCL`, ex. `U3S9-D1J7M`). Les chiffres se tapent seulement au clavier. Aux étapes 1 et 8 le CYD 2
+  affiche en grand les lettres **courantes** des molettes (jamais la réponse).
+- **Chrono TM1637 rouge** (7 segments, `MM:SS`) au-dessus des 3 serrures ; plus d’OLED, plus de poche à notes.
+- **Base** : trappes A B C en haut ; molettes à gauche, clavier, leviers ARM (bleu) / TRANSMIT (rouge) à droite du clavier
+  (capots vers le haut) ; en bas TM1637 + serrures, CYD 2, joystick + KCD1 (12 mm). Haut-parleurs horizontaux dans les coins
+  du haut du couvercle, porte-fusible dans la base.
+- **Difficulté** tirée au hasard (moyen / difficile) ; 26 variantes (sans la séquence cyan).
+- **Jingle de victoire** (Suno « victoire v2 », choisi par Pascal, 14,8 s) : `audio/victoire.mp3` réencodé en 112 kb/s
+  (208 Ko). Joué **une fois** à la victoire, par le bus effets (bouton son et volume respectés). Chargé en arrière-plan
+  20 s après l’armement (ou à la victoire), jamais dans le chargement critique ; mis en cache par le service worker
+  (`entite-mallette-v0.3.0`) au premier chargement. Le test complet vérifie qu’il part une seule fois.
+- **Voix** : 6 nouvelles répliques Simon et 19 réécrites sont dites en synthèse en attendant les mp3
+  ([`voix/A-ENREGISTRER-v0.3.md`](voix/A-ENREGISTRER-v0.3.md)) ; 8 répliques de la séquence sont retirées.
+- **CI** : la v0.2.6a échouait en CI (Chromium de Playwright, polices de repli) : le paysage débordait de 4 px en largeur.
+  `.app` / `.case` coupent maintenant tout débordement horizontal et la mise à l’échelle du plateau corrige aussi la largeur.
+- Debug (`?debug=1`) : `&simon=rapide` accélère la lecture du Simon (×0,25) pour les tests.
+
 ## Version 0.2.6a (24 nov. 2026)
 
-État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.2.6a`, imports `?v=0.2.6a`).
+État : publiée (commit `7d2ea7b`), remplacée par la 0.3.0 ; figée sur https://passcool17.github.io/entite-mallette-v026a/.
 
 - **v0.2.6a, cible tactile réelle et labyrinthe** : le bouton RÉÉCOUTER du CYD 2 mesure au moins 44 px *à l’écran*
   après le zoom `fitPlayfield` (`getBoundingClientRect`, portrait 412×915 et paysage 915×412). Aux étapes 5 et 9,
@@ -211,7 +243,7 @@ Le jeu démarre directement mallette ouverte.
 Levier à capot : toucher le capot pour le lever, puis toucher le levier pour le basculer.
 Basculer le levier rouge avant l’étape 12 coûte −8 s et 1 erreur (le levier retombe) ; l’Entité pousse à le faire.
 
-### Mise en page
+### Mise en page (v0.2.1 ; pour la v0.3, voir plus haut et HARDWARE.md)
 
 La mallette tient entière dans l’écran, sans défiler, sans chevauchement :
 
@@ -239,20 +271,21 @@ accélère le tic-tac si tu hésites (15 s sans geste : chrono ×1,6), et pousse
 
 Armement : lever le capot bleu puis basculer le levier ARM. Le chrono part.
 
-1. Encodeurs (fragment 1) · 2. Trappe · 3. Séquence lumineuse sur la barre, retapée au clavier (fragment 2) ·
+1. Molettes (fragment 1) · 2. Trappe (5 barrettes) · 3. Simon sur les barrettes et les prises (fragment 2) ·
 4. Fiches banane (fragment 3) · 5. Labyrinthe (fragment 4) · 6. Code 1 au clavier — une trappe libère les clés ·
-7. Serrures à clé (I, II, III), dans le bon ordre · 8. Cryptex : mot de 4 lettres épelé · 9. Labyrinthe saboté (axes inversés par moments) ·
+7. Serrures à clé (I, II, III), dans le bon ordre · 8. Cryptex : mot de 5 lettres épelé · 9. Labyrinthe saboté (axes inversés par moments) ·
 10. Câbles, couche 2 · 11. Code 2 · 12. Lever le capot rouge et basculer le levier TRANSMIT.
 
 Erreur : −5 s ou −8 s et +3,2 % d’échec. Avertissements à 30 s et 10 s ; à zéro, la mallette saute.
-Deux paliers cachés (moyen-difficile, difficile) tirés ~50/50 ; les règles changent selon le palier
+Deux paliers cachés (moyen, difficile) tirés ~50/50 ; les règles changent selon le palier
 (ordre inversé, fréquence rare, etc.) et se déduisent de ce qui est dicté et du n° de série.
 
 ### Paramètres d’URL
 
 - `?seed=N` : partie reproductible (même palier, même série, mêmes réponses).
 - `?debug=1` : expose `window.__entiteDebug` (run, state, face, voiceLog, voiceStats, musicStats,
-  ttsAvailable, forceSabotage(on), idle(ms), cables(), oled()) pour les tests.
+  ttsAvailable, forceSabotage(on), idle(ms), cables(), simon, simonTouch(n), cydBig()) pour les tests.
+  `&simon=rapide` (avec `debug=1`) accélère la lecture du Simon ; `&voix=rapide` raccourcit la synthèse.
 
 ## Voix : `voix/manifest.json`
 
@@ -272,8 +305,9 @@ Une phrase du jeu est une réplique seule ou une suite d’ids (ex. `clue_code1`
 Si toutes les répliques d’une suite ont `mp3Ready: true`, les mp3 sont joués (repli sur la synthèse en cas d’échec) ;
 sinon la phrase est dite directement par la synthèse vocale. Aucun mp3 non prêt n’est demandé (0 erreur 404).
 
-Aujourd’hui les 172 répliques sont prêtes (voix ElevenLabs, pass de clarté v0.2.5g ; `intro` 43669 octets,
-`depart` 66656 octets). Les URL portent `?v=0.2.6a`. Pour remplacer une voix : enregistrer `voix/<id>.mp3`
+En v0.3.0, 178 répliques au manifeste : les mp3 ElevenLabs (pass de clarté v0.2.5g ; `intro` 43669 octets,
+`depart` 66656 octets) sauf 25 répliques v0.3 en synthèse (6 nouvelles, 19 réécrites, voir `voix/A-ENREGISTRER-v0.3.md`)
+et 8 retirées. Les URL portent `?v=0.3.0`. Pour remplacer une voix : enregistrer `voix/<id>.mp3`
 avec le texte exact, garder `mp3Ready` à `true` et `source` à `elevenlabs`, puis monter la version du
 service worker. Les fichiers numérotés `dfplayerTrack` se copient tels quels sur la carte SD du DFPlayer
 (`0001.mp3`, …).
@@ -288,12 +322,12 @@ jamais publiés.
 - `js/game.js` : tirage d’une partie (graine mulberry32, paliers, réponses, mensonges, labyrinthes).
 - `js/panel-config.js` : cotes Lykus HC-3010 (extérieur 335×260×130, intérieur 300×200×120, base 83, couvercle 32,
   panneau 273×169 en deux moitiés 136,5×169) et implantation des pièces : tout dans le couvercle (`lid`) ou la base (`base`),
-  2 haut-parleurs `SPK-L` / `SPK-R` de part et d’autre du CYD 1 centré, aucune pièce sur la coque.
+  2 haut-parleurs `SPK-L` / `SPK-R` horizontaux dans les coins du haut, 5 barrettes en zigzag + 5 prises, base « version 3 » (voir HARDWARE.md), aucune pièce sur la coque.
 - `js/audio.js`, `js/voice-manifest.js`, `js/sfx.js`, `js/eye.js`, `js/preload.js` : voix, sons, œil, préchargement.
 - `audio/tension.mp3` (192827 octets) : musique de tension.
 - `js/guide.js` : objectifs, modules actifs, indices (v0.2.5 : bandeau étape 10 = consigne dictée). `js/battery.js` : modèle de batterie 3S (v0.2.4).
-- `sw.js` : service worker, cache `entite-mallette-v0.2.6a` (manifeste des voix inclus). À l’activation, les anciens
-  caches `entite-mallette-*` (dont `entite-mallette-v0.2.2`, `entite-mallette-v0.2.1`, `entite-mallette-v0.2.0-r2`, `entite-mallette-v0.2.0` et `entite-mallette-v0.1.5-base`) sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`).
+- `sw.js` : service worker, cache `entite-mallette-v0.3.0` (manifeste des voix inclus). À l’activation, les anciens
+  caches `entite-mallette-*` (dont `entite-mallette-v0.2.2`, `entite-mallette-v0.2.1`, `entite-mallette-v0.2.0-r2`, `entite-mallette-v0.2.0` et `entite-mallette-v0.1.5-base`) sont supprimés, sauf ceux des archives (`entite-mallette-v015-*`, `entite-mallette-v016-*`, `entite-mallette-v026a-*`).
 
 ## Tests
 

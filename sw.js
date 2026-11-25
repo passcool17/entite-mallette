@@ -1,5 +1,5 @@
 // sw.js : service worker versionné, écrit à la main. Changer VERSION à chaque publication.
-const VERSION = '0.2.6a';
+const VERSION = '0.3.0';
 const CACHE = `entite-mallette-v${VERSION}`;
 const MEDIA = ['./audio/tension.mp3', `./voix/intro.mp3?v=${VERSION}`, `./voix/depart.mp3?v=${VERSION}`, './fonts/chakra-petch-latin-500-normal.woff2', './fonts/chakra-petch-latin-700-normal.woff2', './fonts/jetbrains-mono-latin-500-normal.woff2'];
 const ASSETS = [
@@ -23,8 +23,8 @@ self.addEventListener('message', (e) => { if (e.data === 'SKIP_WAITING') self.sk
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
     const keys = await caches.keys();
-    // anciens caches de l'app principale seulement ; jamais les archives v0.1.5 / v0.1.6 (même origine)
-    await Promise.all(keys.filter((k) => k.startsWith('entite-mallette-') && !k.startsWith('entite-mallette-v015-') && !k.startsWith('entite-mallette-v016-') && k !== CACHE).map((k) => caches.delete(k)));
+    // anciens caches de l'app principale seulement ; jamais les archives v0.1.5 / v0.1.6 / v0.2.6a (même origine)
+    await Promise.all(keys.filter((k) => k.startsWith('entite-mallette-') && !k.startsWith('entite-mallette-v015-') && !k.startsWith('entite-mallette-v016-') && !k.startsWith('entite-mallette-v026a-') && k !== CACHE).map((k) => caches.delete(k)));
     await self.clients.claim();
   })());
 });
@@ -39,7 +39,7 @@ self.addEventListener('fetch', (e) => {
       .catch(() => caches.match('./index.html')));
     return;
   }
-  // médias lourds, polices, icônes : cache d'abord
+  // médias lourds, polices, icônes : cache d'abord (audio/victoire.mp3?v=VERSION y entre au premier chargement, sans précache)
   e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
     if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
     return res;

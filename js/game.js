@@ -1,4 +1,5 @@
-// game.js : tirage d'une partie v0.2.4 (logique pure, sans DOM). Même graine = même partie.
+// game.js : tirage d'une partie v0.3 (logique pure, sans DOM). Même graine = même partie.
+// v0.3 : 5 molettes (mots de 5 lettres), n° de série à 5 lettres, étape 3 = Simon sur 5 barrettes, trappe sur 10 demi-barrettes.
 // Paliers cachés ~50/50 : 'moyen' et 'difficile' (choix de Pascal : moyen à difficile, au hasard). Pas de mode facile.
 // Tout se déduit de la mallette elle-même (plaque du n° de série, écrans, barre DEL) : aucun manuel externe.
 
@@ -14,15 +15,42 @@ const SERIAL_LETTERS = 'ABCDEFGHJLMNPRSTUV';     // lettres de l'anneau sans I n
 // Anneau cryptex des KY-040 : 20 crans = 1 tour = 20 lettres (sans K, Q, W, X, Y, Z)
 export const RING = 'ABCDEFGHIJLMNOPRSTUV';
 export const DETENTS = 20;
-// Mots de 4 lettres français, toutes leurs lettres sur l'anneau
-export const WORDS = ['NORD', 'CODE', 'LUNE', 'STOP', 'MARS', 'PORT', 'VENT', 'NUIT', 'CAGE', 'BLEU', 'NOIR', 'SOIR', 'TOUR', 'FILS', 'GARE', 'ROUE', 'PILE', 'DOSE', 'LAME', 'MURS', 'SAPE', 'FOUR'];
+export const NENC = 5;               // v0.3 : 5 molettes KY-040 en zigzag
+// Mots de 5 lettres français, toutes leurs lettres sur l'anneau (jamais K, Q, W, X, Y, Z)
+export const WORDS = ['SIGNE', 'PORTE', 'CABLE', 'ROUGE', 'LAMPE', 'CODES', 'VERRE', 'TIGRE', 'SABLE', 'ORAGE', 'PLUME', 'RADIO', 'BOMBE', 'SONDE', 'PANNE', 'FUSIL', 'NUAGE', 'OMBRE', 'GLACE', 'TEMPS', 'VAGUE', 'PIANO', 'FLEUR', 'ROBOT', 'ACIER', 'AGENT', 'TABLE', 'LIGNE', 'FORGE', 'PISTE', 'ARBRE', 'CORDE', 'TRAIN', 'PHARE'];
+// Simon (étape 3) : 5 barrettes de 8 LED, une couleur par barrette (barrette 1 = câble noir, pulse violet)
+export const STICK_COLORS = ['#B44AFF', '#2B7CFF', '#22C55E', '#E53935', '#F5C518'];
+export const STICK_NAMES = ['violet', 'bleu', 'vert', 'rouge', 'jaune'];
+// constantes K2000 partagées avec le micrologiciel (DESIGN-v0.3, annexe C)
+export const SIMON = {
+  LEDS: 8, STICKS: 5, STEP_MS: 36, TAIL: 3, LEVELS: [255, 140, 56, 16], SWEEPS: 2, GAP_MS: 200,
+  INPUT_STEP_MS: 24, ERROR_ON_MS: 140, ERROR_OFF_MS: 100, ERROR_FLASHES: 2, ERROR_LEVEL: 160,
+  SPEEDUP: 0.88, STEP_MIN: 20, GAP_MIN: 120, PENALTY_S: 8,
+  moyen:     { start: 2, target: 5, first: 8000, between: 2500, speedup: false },
+  difficile: { start: 3, target: 6, first: 6000, between: 2000, speedup: true },
+};
+// timing d'un tour (round = index 0..) : en difficile, ×0,88 par tour réussi, avec planchers
+export function simonTiming(tier, round) {
+  const P = SIMON[tier] || SIMON.moyen, f = P.speedup ? Math.pow(SIMON.SPEEDUP, round) : 1;
+  return { step: Math.max(SIMON.STEP_MIN, Math.round(SIMON.STEP_MS * f)), gap: Math.max(SIMON.GAP_MIN, Math.round(SIMON.GAP_MS * f)) };
+}
+// durée d'un « temps » (aller-retour K2000) puis pause noire
+export const beatMs = (tm) => SIMON.SWEEPS * SIMON.LEDS * tm.step;
+// image K2000 d'une barrette au temps t (ms depuis le début du temps) : 8 niveaux 0..255. Seule la barrette active est non nulle.
+export function scannerFrame(t, tm, sweeps = SIMON.SWEEPS) {
+  const out = new Array(SIMON.LEDS).fill(0);
+  const k = Math.floor(t / tm.step); if (k < 0 || k >= sweeps * SIMON.LEDS) return out;
+  const sweep = Math.floor(k / SIMON.LEDS), i = k % SIMON.LEDS, fwd = sweep % 2 === 0, head = fwd ? i : SIMON.LEDS - 1 - i;
+  for (let d = 0; d <= SIMON.TAIL; d++) { const p = fwd ? head - d : head + d; if (p >= 0 && p < SIMON.LEDS) out[p] = SIMON.LEVELS[d]; }
+  return out;
+}
 
 // Étapes : face où elle se joue + titre court (bandeau d'état).
 export const STEPS = [
   null,
   { face: 'base',   part: 'enc',    title: 'Signal 1 · encodeurs' },
   { face: 'base',   part: 'traps',  title: 'Trappe' },
-  { face: 'base',   part: 'bar',    title: 'Séquence lumineuse' },
+  { face: 'lid',    part: 'simon',  title: 'Simon · barrettes et prises' },
   { face: 'base',   part: 'wires',  title: 'Baie banane · brancher' },
   { face: 'base',   part: 'cyd2',   title: 'Verrou de signal' },
   { face: 'base',   part: 'keypad', title: 'Code 1' },
@@ -41,7 +69,6 @@ export const STEPS = [
 export const POOLS = {
   enc1:   { moyen: ['ordre', 'envers'],          difficile: ['envers', 'suivante', 'paires'] },
   trap:   { moyen: ['frequente', 'gauche'],      difficile: ['rare', 'moyenne'] },
-  seq:    { moyen: ['ordre', 'envers'],          difficile: ['envers', 'plus1'] },
   patch1: { moyen: ['route', 'echange', 'debranche'], difficile: ['route', 'echange', 'serie'] },
   code1:  { moyen: ['ordre', 'envers'],          difficile: ['envers', 'plus1'] },
   keys:   { moyen: ['legere', 'lourde'],         difficile: ['lourde', 'legere'] },
@@ -70,22 +97,23 @@ export function makeRun(seed) {
   const hard = tier === 'difficile';
   const v = {}; for (const k of SLOTS) v[k] = pick(POOLS[k][tier]);
 
-  // ---- n° de série : L C L C - L C L C — 4 lettres de l'anneau (toutes différentes, sans I ni O) pour les
-  // encodeurs, 4 chiffres tous différents. Les rotatifs ne servent QU'AUX lettres, le clavier aux chiffres.
+  // ---- n° de série v0.3 : L C L C - L C L C L — 5 lettres de l'anneau (toutes différentes, sans I ni O) pour les
+  // 5 encodeurs, 4 chiffres tous différents. Les rotatifs ne servent QU'AUX lettres, le clavier aux chiffres.
   const digits = shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).slice(0, 4);
-  const sLetters = shuffle(SERIAL_LETTERS.split('')).slice(0, 4);
-  const serial = `${sLetters[0]}${digits[0]}${sLetters[1]}${digits[1]}-${sLetters[2]}${digits[2]}${sLetters[3]}${digits[3]}`;
+  const sLetters = shuffle(SERIAL_LETTERS.split('')).slice(0, NENC);
+  const serial = `${sLetters[0]}${digits[0]}${sLetters[1]}${digits[1]}-${sLetters[2]}${digits[2]}${sLetters[3]}${digits[3]}${sLetters[4]}`;
   const lot = 100 + int(900); // leurre sur la plaque
   const cues = {};
 
   // ---- 1. encodeurs (anneau A-V) : lettres du n° — ordre / envers / lettre suivante sur l'anneau / échangées par paires
   const L = sLetters;
-  const encLetters = { ordre: L.slice(), envers: L.slice().reverse(), suivante: L.map(nextOnRing), paires: [L[1], L[0], L[3], L[2]] }[v.enc1];
+  const encLetters = { ordre: L.slice(), envers: L.slice().reverse(), suivante: L.map(nextOnRing), paires: [L[1], L[0], L[3], L[2], L[4]] }[v.enc1];
   const enc1 = encLetters.map((ch) => RING.indexOf(ch));
   cues[1] = [`clue_enc1_${v.enc1}`];
 
-  // ---- 2. trappe : barre WS2812B de 8 DEL, comptes 4/3/1 ou 5/2/1 (3 couleurs, comptes toujours distincts)
-  const counts = pick([[4, 3, 1], [5, 2, 1]]);
+  // ---- 2. trappe (v0.3) : 5 barrettes × 2 moitiés de 4 LED = 10 segments ; comptes toujours distincts
+  // (3/2/1 sur 5 barrettes est impossible : 3+2+1 = 6). bar[0] = moitié gauche de la barrette 1.
+  const counts = pick([[5, 3, 2], [6, 3, 1], [5, 4, 1]]);
   const order = shuffle(TRAP_COLORS);                      // order[0] = la plus présente … order[2] = la plus rare
   let bar = []; order.forEach((c, i) => { for (let k = 0; k < counts[i]; k++) bar.push(c); });
   bar = shuffle(bar);
@@ -94,11 +122,11 @@ export function makeRun(seed) {
   const trap = trapColors.indexOf(trapColor);              // index 0..2
   cues[2] = [`clue_trappe_${v.trap}`];
 
-  // ---- 3. séquence lumineuse : 4 DEL (positions 1..8) s'allument ; on tape au clavier 4x4 leurs positions
-  // dans l'ordre / à l'envers / chacune plus un (2..9). Rien n'est écrit : il faut regarder et retenir.
-  const seq = shuffle([1, 2, 3, 4, 5, 6, 7, 8]).slice(0, 4);
-  const seqCode = (v.seq === 'envers' ? seq.slice().reverse() : v.seq === 'plus1' ? seq.map((d) => d + 1) : seq).join('');
-  cues[3] = [`clue_sequence_${v.seq}`];
+  // ---- 3. Simon (v0.3) : série de barrettes 0..4 (répétitions permises, même de suite). On la reproduit en touchant
+  // les prises sous les barrettes. Moyen : tours de 2 à 5 ; difficile : 3 à 6, plus rapide à chaque tour.
+  const sp = SIMON[tier];
+  const simon = { seq: Array.from({ length: sp.target }, () => int(5)), start: sp.start, target: sp.target, first: sp.first, between: sp.between };
+  cues[3] = ['clue_simon', 'clue_simon_noir'];
 
   // ---- 4 et 10. baie banane 5x5 : 5 câbles ancrés sur la base (ports 0..4, couleurs toutes différentes),
   // chacun se branche dans N'IMPORTE LAQUELLE des 5 prises (0..4 = prises 1..5). Départ : câble c → prise c.
@@ -149,9 +177,9 @@ export function makeRun(seed) {
     if (tgt) { const others = [0, 1, 2, 3, 4].filter((c) => c !== tgt[0]); return { cable: others[int(4)], socket: tgt[1] }; }
     const c = ent[0][0]; let s = int(4); if (s >= c) s++; return { cable: c, socket: s };
   };
-  const decoys = { wire1: wrongPlug(patch1), wire2: wrongPlug(patch2), seq: (seq[0] % 8) + 1, frags: frags.map((f) => (f + 1 + int(9)) % 10), keys: keyOrder.slice().reverse() };
+  const decoys = { wire1: wrongPlug(patch1), wire2: wrongPlug(patch2), frags: frags.map((f) => (f + 1 + int(9)) % 10), keys: keyOrder.slice().reverse() };
 
-  // ---- 8. cryptex : 4 encodeurs (anneau de 20) ; l'Entité épelle un mot (ordre / à l'envers / « lettre suivante »)
+  // ---- 8. cryptex : 5 encodeurs (anneau de 20) ; l'Entité épelle un mot (ordre / à l'envers / « lettre suivante »)
   const word = pick(WORDS);
   const encWord = v.word === 'suivante' ? word.split('').map(nextOnRing).join('') : word;
   const enc2 = encWord.split('').map((ch) => RING.indexOf(ch));
@@ -161,7 +189,7 @@ export function makeRun(seed) {
   const sig = [tier, ...SLOTS.map((k) => v[k])].join('|');
   return {
     seed: seed >>> 0, tier, v, sig, serial, lot, digits, letters: sLetters, encLetters,
-    enc1, enc2, word, encWord, spell, bar, counts, order, trapColors, trap, seq, seqCode,
+    enc1, enc2, word, encWord, spell, bar, counts, order, trapColors, trap, simon,
     wires, patch1, patch2, maze1, maze2, frags, code1, code2, keyOrder, lies, cues,
     decoys,
   };

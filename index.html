@@ -40,19 +40,19 @@
     @keyframes b-scan { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
     @media (prefers-reduced-motion: reduce) { .b-eye i { animation-duration: 30s; } .b-scan { animation-duration: 3s; } .b-eye b { animation: none; } }
   </style>
-  <link rel="stylesheet" href="css/app.css?v=0.2.6a" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="css/app.css?v=0.2.6a"></noscript>
-  <link rel="modulepreload" href="js/eye.js?v=0.2.6a">
-  <link rel="modulepreload" href="js/eye-config.js?v=0.2.6a">
-  <link rel="modulepreload" href="js/game.js?v=0.2.6a">
-  <link rel="modulepreload" href="js/audio.js?v=0.2.6a">
-  <link rel="modulepreload" href="js/sfx.js?v=0.2.6a">
-  <link rel="modulepreload" href="js/voice-manifest.js?v=0.2.6a">
-  <link rel="modulepreload" href="js/preload.js?v=0.2.6a">
-  <link rel="modulepreload" href="js/panel-config.js?v=0.2.6a">
-  <link rel="modulepreload" href="js/battery.js?v=0.2.6a">
-  <link rel="modulepreload" href="js/guide.js?v=0.2.6a">
-  <script type="module" src="js/app.js?v=0.2.6a"></script>
+  <link rel="stylesheet" href="css/app.css?v=0.3.0" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="css/app.css?v=0.3.0"></noscript>
+  <link rel="modulepreload" href="js/eye.js?v=0.3.0">
+  <link rel="modulepreload" href="js/eye-config.js?v=0.3.0">
+  <link rel="modulepreload" href="js/game.js?v=0.3.0">
+  <link rel="modulepreload" href="js/audio.js?v=0.3.0">
+  <link rel="modulepreload" href="js/sfx.js?v=0.3.0">
+  <link rel="modulepreload" href="js/voice-manifest.js?v=0.3.0">
+  <link rel="modulepreload" href="js/preload.js?v=0.3.0">
+  <link rel="modulepreload" href="js/panel-config.js?v=0.3.0">
+  <link rel="modulepreload" href="js/battery.js?v=0.3.0">
+  <link rel="modulepreload" href="js/guide.js?v=0.3.0">
+  <script type="module" src="js/app.js?v=0.3.0"></script>
 </head>
 <body>
   <div id="boot" aria-live="polite">
@@ -85,12 +85,12 @@
         $('bootActions').hidden = false; $('bootSkip').hidden = !canSkip;
       };
       // Réessayer (code bloqué) : désinscrit le service worker de CETTE app et vide ses anciens caches (jamais les archives
-      // entite-mallette-v015- / v016-), puis recharge. app.js remplace ce bouton par sa propre reprise une fois chargé.
+      // entite-mallette-v015- / v016- / v026a-), puis recharge. app.js remplace ce bouton par sa propre reprise une fois chargé.
       B.purge = function () {
         var dir = location.pathname.replace(/[^/]*$/, ''), jobs = [];
         try {
           if (navigator.serviceWorker) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.filter(function (r) { return new URL(r.scope).pathname === dir; }).map(function (r) { return r.unregister(); })); }));
-          if (window.caches) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k.indexOf('entite-mallette-') === 0 && k.indexOf('entite-mallette-v015-') !== 0 && k.indexOf('entite-mallette-v016-') !== 0; }).map(function (k) { return caches.delete(k); })); }));
+          if (window.caches) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k.indexOf('entite-mallette-') === 0 && k.indexOf('entite-mallette-v015-') !== 0 && k.indexOf('entite-mallette-v016-') !== 0 && k.indexOf('entite-mallette-v026a-') !== 0; }).map(function (k) { return caches.delete(k); })); }));
         } catch (e) { /* rien à purger */ }
         return Promise.all(jobs).catch(function () {});
       };
@@ -156,6 +156,7 @@
         <div class="lid shell" aria-label="Couvercle intérieur">
           <div class="lid-panel panel">
             <span class="bolt tl"></span><span class="bolt tr"></span><span class="bolt bl"></span><span class="bolt br"></span>
+            <!-- v0.3 : HP rectangulaires 70×30 à l'horizontale dans les coins du haut, l'œil au centre -->
             <div class="lid-hero">
               <div class="spk spk-l" aria-hidden="true"><span class="spk-cone"></span><span class="silk">SPK-L · 3 W</span></div>
               <div class="cyd cyd1" id="cyd1">
@@ -164,27 +165,31 @@
               </div>
               <div class="spk spk-r" aria-hidden="true"><span class="spk-cone"></span><span class="silk">SPK-R · 3 W</span></div>
             </div>
-            <div class="ws" aria-label="Barre lumineuse WS2812B, 32 LED en 8 groupes de 4"><div class="ws-nums" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div><div class="ws-leds ws-bar" id="bar" role="img" aria-label="Barre lumineuse éteinte"><span class="ws-group" data-p="1"><i data-led="1"></i><i data-led="2"></i><i data-led="3"></i><i data-led="4"></i></span><span class="ws-group" data-p="2"><i data-led="5"></i><i data-led="6"></i><i data-led="7"></i><i data-led="8"></i></span><span class="ws-group" data-p="3"><i data-led="9"></i><i data-led="10"></i><i data-led="11"></i><i data-led="12"></i></span><span class="ws-group" data-p="4"><i data-led="13"></i><i data-led="14"></i><i data-led="15"></i><i data-led="16"></i></span><span class="ws-group" data-p="5"><i data-led="17"></i><i data-led="18"></i><i data-led="19"></i><i data-led="20"></i></span><span class="ws-group" data-p="6"><i data-led="21"></i><i data-led="22"></i><i data-led="23"></i><i data-led="24"></i></span><span class="ws-group" data-p="7"><i data-led="25"></i><i data-led="26"></i><i data-led="27"></i><i data-led="28"></i></span><span class="ws-group" data-p="8"><i data-led="29"></i><i data-led="30"></i><i data-led="31"></i><i data-led="32"></i></span></div><span class="silk">WS2812B · 32 LED</span></div>
-            <div class="lid-ctrls">
-              <button class="pocket" id="btnPocket" type="button" aria-haspopup="dialog"><span class="pocket-card" aria-hidden="true"></span><span class="silk">POCHETTE</span></button>
-            </div>
-            <div class="patchbay"><div class="jacks" id="jacks" role="group" aria-label="Baie banane : cinq prises, n'importe quel câble dans n'importe quelle prise"></div><span class="silk">KEADIC · 5 DOUILLES</span></div>
+            <!-- v0.3 : 5 barrettes WS2812B (8 LED) en zigzag, une prise sous chacune : baie 5×5 (étapes 4, 10) et Simon (étape 3) -->
+            <div class="patchbay"><div class="jacks" id="jacks" role="group" aria-label="Cinq barrettes lumineuses et leurs prises : n'importe quel câble dans n'importe quelle prise ; à l'étape 3, toucher les prises dans l'ordre des barrettes"></div><span class="silk">WS2812B 5 × 8 · KEADIC · 5 DOUILLES</span></div>
           </div>
         </div>
         <div class="base shell" aria-label="Base">
           <div class="base-panel panel">
             <span class="bolt tl"></span><span class="bolt tr"></span><span class="bolt bl"></span><span class="bolt br"></span>
             <div class="ports" id="ports" role="group" aria-label="Cinq câbles banane ancrés sur la base"></div>
-            <div class="col col-a">
-            <div class="mod mod-enc">
-              <div class="enc-head">
-                <div class="tm tm-small" aria-hidden="true"><span class="tm-digits" id="tm2">8:00</span></div>
-                <div class="oled" id="oled" aria-live="off"><canvas id="oledCanvas" width="128" height="64" aria-hidden="true"></canvas><span class="sr-only" id="oledText"></span></div>
+            <!-- v0.3 (plan retenu 19 h 41) : haut = trappes A B C + 5 molettes en zigzag | clavier 4×4 | ARM / TRANSMIT -->
+            <div class="b3-top">
+              <div class="b3-left">
+                <div class="mod mod-traps">
+                  <div class="traps" id="traps"></div>
+                  <span class="silk">SG90 · TRAPPES</span>
+                </div>
+                <div class="mod mod-enc">
+                  <div class="enc-row zig" id="encRow"></div>
+                  <span class="silk">KY-040 ×5 · 20 CRANS · TOURNE · CLIQUE</span>
+                </div>
               </div>
-              <div class="enc-row" id="encRow"></div>
-              <span class="silk">KY-040 ×4 · 20 CRANS · TOURNE · CLIQUE</span>
-            </div>
-            <div class="mod mod-toggles" role="group" aria-label="Interrupteurs à capot">
+              <div class="mod mod-keypad">
+                <div class="keypad" id="keypad" role="group" aria-label="Clavier 4×4 : chiffres"></div>
+                <span class="silk">CLAVIER 4×4 · CHIFFRES</span>
+              </div>
+              <div class="mod mod-toggles" role="group" aria-label="Interrupteurs à capot">
               <div class="gtoggle blue" id="gtArm">
                 <div class="gt-body">
                   <span class="gt-led" aria-hidden="true"></span>
@@ -201,37 +206,32 @@
                 </div>
                 <span class="silk">TRANSMIT</span>
               </div>
+              </div>
             </div>
-            </div>
-            <div class="col col-b">
-            <div class="mod mod-keypad">
-              <div class="keypad" id="keypad" role="group" aria-label="Clavier 4×4"></div>
-              <span class="silk">CLAVIER MEMBRANE 4×4</span>
-            </div>
-            <div class="mod mod-traps">
-              <div class="traps" id="traps"></div>
-              <span class="silk">SG90 · TRAPPES</span>
-            </div>
-            </div>
-            <div class="col col-c">
-            <div class="mod mod-signal">
-              <div class="cyd cyd2"><span class="pcb-tag" aria-hidden="true">CYD 2</span><div class="screen"><canvas id="cyd2" width="240" height="180" role="img" aria-label="Écran 2 : numéro de série"></canvas><div class="cyd2-hud" id="cyd2Hud"><div class="cyd2-serial" id="serialReadout"><span class="cyd2-slabel">N° SÉRIE</span><span class="cyd2-snum" id="serial">———-———</span><span class="cyd2-slot" id="lot">LOT ———</span></div><button class="cyd2-replay" id="btnReplay" type="button" aria-label="Réécouter la dernière consigne" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/></svg><span>RÉÉCOUTER</span></button></div><div class="batt" id="batt" role="img" aria-label="Batterie"><span class="batt-ico" aria-hidden="true"><i></i></span><span class="batt-txt" aria-hidden="true"><b id="battPct">— %</b><small id="battV">— V</small></span></div></div></div>
-              <div class="joy" id="joy" role="group" aria-label="Joystick">
+            <!-- bas = chrono TM1637 rouge au-dessus des serrures | CYD 2 | joystick + interrupteur KCD1 (12 mm) -->
+            <div class="b3-bot">
+              <div class="mod mod-keys">
+                <div class="tm tm1637" aria-hidden="true"><span class="tm-ghost">88:88</span><span class="tm-digits" id="tm2">08:00</span></div>
+                <div class="key-row" id="keyRow" role="group" aria-label="Serrures à clé Gebildet">
+                <div class="lock key" data-key="0"><button class="lock-btn" type="button" aria-pressed="false" aria-label="Serrure I" disabled><span class="lock-face"><span class="lock-slot"></span></span></button><span class="dots" aria-hidden="true"><i class="dr"></i><i class="dg"></i></span><span class="silk">I</span></div>
+                <div class="lock key" data-key="1"><button class="lock-btn" type="button" aria-pressed="false" aria-label="Serrure II" disabled><span class="lock-face"><span class="lock-slot"></span></span></button><span class="dots" aria-hidden="true"><i class="dr"></i><i class="dg"></i></span><span class="silk">II</span></div>
+                <div class="lock key" data-key="2"><button class="lock-btn" type="button" aria-pressed="false" aria-label="Serrure III" disabled><span class="lock-face"><span class="lock-slot"></span></span></button><span class="dots" aria-hidden="true"><i class="dr"></i><i class="dg"></i></span><span class="silk">III</span></div>
+              </div>
+                <span class="silk">TM1637 · GEBILDET</span>
+              </div>
+              <div class="mod mod-signal">
+                <div class="cyd cyd2"><span class="pcb-tag" aria-hidden="true">CYD 2</span><div class="screen"><canvas id="cyd2" width="240" height="180" role="img" aria-label="Écran 2 : numéro de série"></canvas><div class="cyd2-hud" id="cyd2Hud"><div class="cyd2-serial" id="serialReadout"><span class="cyd2-slabel">N° SÉRIE</span><span class="cyd2-snum" id="serial">————-—————</span><span class="cyd2-slot" id="lot">LOT ———</span></div><div class="cyd2-big" id="cyd2Big" aria-live="off"></div><button class="cyd2-replay" id="btnReplay" type="button" aria-label="Réécouter la dernière consigne" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/></svg><span>RÉÉCOUTER</span></button></div><div class="batt" id="batt" role="img" aria-label="Batterie"><span class="batt-ico" aria-hidden="true"><i></i></span><span class="batt-txt" aria-hidden="true"><b id="battPct">— %</b><small id="battV">— V</small></span></div></div></div>
+              </div>
+              <div class="mod mod-joy">
+                <div class="joy" id="joy" role="group" aria-label="Joystick">
                 <div class="joy-well"><span class="joy-cap" id="joyCap"></span></div>
                 <button class="joy-dir up" type="button" data-dir="up" aria-label="Haut"></button>
                 <button class="joy-dir right" type="button" data-dir="right" aria-label="Droite"></button>
                 <button class="joy-dir down" type="button" data-dir="down" aria-label="Bas"></button>
                 <button class="joy-dir left" type="button" data-dir="left" aria-label="Gauche"></button>
               </div>
-            </div>
-            <div class="mod mod-keys">
-              <div class="key-row" id="keyRow" role="group" aria-label="Serrures à clé Gebildet">
-                <div class="lock key" data-key="0"><button class="lock-btn" type="button" aria-pressed="false" aria-label="Serrure I" disabled><span class="lock-face"><span class="lock-slot"></span></span></button><span class="dots" aria-hidden="true"><i class="dr"></i><i class="dg"></i></span><span class="silk">I</span></div>
-                <div class="lock key" data-key="1"><button class="lock-btn" type="button" aria-pressed="false" aria-label="Serrure II" disabled><span class="lock-face"><span class="lock-slot"></span></span></button><span class="dots" aria-hidden="true"><i class="dr"></i><i class="dg"></i></span><span class="silk">II</span></div>
-                <div class="lock key" data-key="2"><button class="lock-btn" type="button" aria-pressed="false" aria-label="Serrure III" disabled><span class="lock-face"><span class="lock-slot"></span></span></button><span class="dots" aria-hidden="true"><i class="dr"></i><i class="dg"></i></span><span class="silk">III</span></div>
+                <div class="kcd1" aria-hidden="true"><span class="kcd1-rocker"><i></i></span><span class="silk">KCD1</span></div>
               </div>
-              <span class="silk">GEBILDET · SERRURES</span>
-            </div>
             </div>
           </div>
         </div>
@@ -240,21 +240,6 @@
     </main>
     <button class="scroll-pill" id="scrollPill" type="button" aria-label="Défiler vers les commandes du bas" hidden>↓ COMMANDES</button>
   </div>
-
-  <dialog class="pocket-dlg" id="pocketDlg" aria-labelledby="pocketTitle">
-    <form method="dialog" class="note-card">
-      <h2 id="pocketTitle">Note tactique</h2>
-      <ul>
-        <li>Elle dicte tout. Écoute, retiens.</li>
-        <li>Œil rouge : elle ment. Ignore.</li>
-        <li>Le n° de série s’affiche sur l’écran du bas.</li>
-        <li>La barre lumineuse parle aussi.</li>
-        <li>Une consigne ratée : Réécouter, sur l’écran du bas.</li>
-        <li>Capot rouge : seulement à la toute fin.</li>
-      </ul>
-      <button class="btn-ghost" value="ok">Ranger</button>
-    </form>
-  </dialog>
 
   <div class="tuto" id="tuto" hidden role="dialog" aria-modal="true" aria-labelledby="tutoTitle">
     <div class="tuto-card">

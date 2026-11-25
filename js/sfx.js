@@ -1,5 +1,5 @@
 // sfx.js : effets procéduraux WebAudio (aucun fichier). Branchés sur le bus d'effets d'audio.js (donc coupés par le bouton son).
-import { bus } from './audio.js?v=0.2.6a';
+import { bus } from './audio.js?v=0.3.0';
 
 let noiseBuf = null;
 function ctx() { return bus(); }
@@ -30,7 +30,7 @@ function noise(dur, { vol = 0.3, at = 0, lp = 1200, hp = 0, q = 0.7 } = {}) {
   if (hp) { const h = ac.createBiquadFilter(); h.type = 'highpass'; h.frequency.value = hp; node = node.connect(h); }
   node.connect(g).connect(out); src.start(t, Math.random()); src.stop(t + dur + 0.05);
 }
-const SIMON = { rouge: 330, vert: 415, bleu: 523, ambre: 622 };
+const SIMON = { rouge: 330, vert: 415, bleu: 523, ambre: 622, violet: 262, jaune: 698 }; // v0.3 : Simon sur 5 barrettes (violet = câble noir)
 
 export const sfx = {
   tick(urgent) { tone(urgent ? 1900 : 1250, 0.03, { type: 'square', vol: urgent ? 0.08 : 0.04 }); },

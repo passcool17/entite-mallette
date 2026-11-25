@@ -1,7 +1,7 @@
 // audio.js (v0.2.5) : graphe WebAudio unique (voix / musique / effets, limiteur, L/R), musique de tension, voix de l'Entité (manifeste voix/manifest.json : mp3 si prêt, sinon synthèse française),
 // routée dans un AnalyserNode pour animer l'œil.
-import { loadManifest, sentence, fileOf, cue } from './voice-manifest.js?v=0.2.6a';
-import { takePreloaded, MUSIC_URL } from './preload.js?v=0.2.6a';
+import { loadManifest, sentence, fileOf, cue } from './voice-manifest.js?v=0.3.0';
+import { takePreloaded, MUSIC_URL } from './preload.js?v=0.3.0';
 
 let ac = null, master, limiter, sfxBus, voiceBus, analyser, data, muted = false, volume = 0.9;
 let musicBus, musicDuck, musicLP, music = null, musicBuf = null, musicLoad = null;
@@ -319,3 +319,32 @@ export function stopMusic(kind = 'fade', silent = false) {
   try { m.src?.stop(end); m.pulse.o.stop(end); m.pulse.o2.stop(end); m.pulse.lfo.stop(end); } catch { /* déjà arrêté */ }
   if (!silent) musicStats.etat = kind === 'fade' ? 'fondu' : 'coupee';
 }
+
+// ---------- jingle de victoire (v0.3, Suno « victoire v2 », 14,8 s, 112 kb/s) ----------
+// Chargé tard (pendant la partie, jamais au démarrage), joué une fois par victoire, par le bus effets
+// → master : le bouton son et le volume s'appliquent. Le contexte audio est déjà débloqué par le geste d'armement.
+export const JINGLE_URL = 'audio/victoire.mp3?v=0.3.0';
+export const jingleStats = { demandes: 0, lances: 0, charge: false, erreur: '', t: 0 };
+let jingleBuf = null, jingleLoad = null, jingleSrc = null;
+export function preloadJingle() {
+  if (jingleLoad) return jingleLoad;
+  jingleLoad = fetch(JINGLE_URL).then((r) => { if (!r.ok) throw new Error(`jingle ${r.status}`); return r.arrayBuffer(); })
+    .then((ab) => (ac ? ac.decodeAudioData(ab) : null))
+    .then((buf) => { jingleBuf = buf; jingleStats.charge = !!buf; return buf; })
+    .catch((e) => { jingleStats.erreur = String(e?.message || e); jingleLoad = null; return null; });
+  return jingleLoad;
+}
+export function playJingle() {
+  jingleStats.demandes++; jingleStats.t = performance.now();
+  const go = (buf) => {
+    if (!buf || !ac) return;
+    if (ac.state === 'suspended') ac.resume();
+    try { jingleSrc?.stop(); } catch { /* déjà fini */ }
+    const g = ac.createGain(); g.gain.value = 0.8; g.connect(sfxBus);
+    const s = ac.createBufferSource(); s.buffer = buf; s.connect(g); s.start(); jingleSrc = s; jingleStats.lances++;
+    s.onended = () => { if (jingleSrc === s) jingleSrc = null; };
+  };
+  if (jingleBuf) go(jingleBuf); else preloadJingle().then(go);
+}
+export function stopJingle() { try { jingleSrc?.stop(); } catch { /* rien */ } jingleSrc = null; }
+

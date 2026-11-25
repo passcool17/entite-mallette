@@ -1,5 +1,5 @@
 {
- "version": "0.2.6a",
+ "version": "0.3.0",
  "note": "Voix de l'Entité. Chaque réplique = un id ou une suite d'ids. mp3Ready true : voix/<id>.mp3 est joué (repli synthèse française si échec). mp3Ready false : synthèse française directe, aucun fichier demandé. Pour remplacer une voix : déposer voix/<id>.mp3 puis mettre mp3Ready à true, sans toucher au code. dfplayerTrack = nom du fichier sur la microSD du DFPlayer Mini (dossier mp3/0001.mp3…).",
  "cues": [
   {
@@ -170,8 +170,10 @@
    "dfplayerTrack": "0020",
    "category": "clue",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Signal un. Tourne les quatre encodeurs rotatifs sur les quatre lettres du numéro de série, dans l'ordre. Puis clique."
+   "mp3Ready": false,
+   "text": "Signal un. Tourne les cinq encodeurs rotatifs sur les cinq lettres du numéro de série, dans l'ordre. Puis clique.",
+   "textAvant": "Signal un. Tourne les quatre encodeurs rotatifs sur les quatre lettres du numéro de série, dans l'ordre. Puis clique.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "clue_enc1_envers",
@@ -179,8 +181,10 @@
    "dfplayerTrack": "0021",
    "category": "clue",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Signal un. Tourne les quatre encodeurs rotatifs sur les quatre lettres du numéro de série, en partant de la fin. Puis clique."
+   "mp3Ready": false,
+   "text": "Signal un. Tourne les cinq encodeurs rotatifs sur les cinq lettres du numéro de série, en partant de la fin. Puis clique.",
+   "textAvant": "Signal un. Tourne les quatre encodeurs rotatifs sur les quatre lettres du numéro de série, en partant de la fin. Puis clique.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "clue_trappe_frequente",
@@ -188,8 +192,10 @@
    "dfplayerTrack": "0022",
    "category": "clue",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Regarde la barre lumineuse. Ouvre la trappe de la couleur la plus présente."
+   "mp3Ready": false,
+   "text": "Regarde les cinq barrettes. Ouvre la trappe de la couleur la plus présente.",
+   "textAvant": "Regarde la barre lumineuse. Ouvre la trappe de la couleur la plus présente.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "clue_trappe_rare",
@@ -197,8 +203,10 @@
    "dfplayerTrack": "0023",
    "category": "clue",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Regarde la barre lumineuse. Ouvre la trappe de la couleur la plus rare."
+   "mp3Ready": false,
+   "text": "Regarde les cinq barrettes. Ouvre la trappe de la couleur la plus rare.",
+   "textAvant": "Regarde la barre lumineuse. Ouvre la trappe de la couleur la plus rare.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "clue_sequence_ordre",
@@ -207,7 +215,8 @@
    "category": "clue",
    "source": "elevenlabs",
    "mp3Ready": true,
-   "text": "Regarde la barre lumineuse. Retiens les lumières qui s'allument. Tape leurs positions au clavier, dans l'ordre."
+   "text": "Regarde la barre lumineuse. Retiens les lumières qui s'allument. Tape leurs positions au clavier, dans l'ordre.",
+   "retiree": "v0.3 (plus jouée : étape 3 = Simon)"
   },
   {
    "id": "clue_sequence_envers",
@@ -216,7 +225,8 @@
    "category": "clue",
    "source": "elevenlabs",
    "mp3Ready": true,
-   "text": "Regarde la barre lumineuse. Retiens les lumières qui s'allument. Tape leurs positions au clavier, à l'envers."
+   "text": "Regarde la barre lumineuse. Retiens les lumières qui s'allument. Tape leurs positions au clavier, à l'envers.",
+   "retiree": "v0.3 (plus jouée : étape 3 = Simon)"
   },
   {
    "id": "clue_patch_route",
@@ -287,8 +297,10 @@
    "dfplayerTrack": "0033",
    "category": "clue",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Signal deux. Les quatre encodeurs tournent sur vingt lettres. Compose le mot que j'épelle, puis clique un encodeur."
+   "mp3Ready": false,
+   "text": "Signal deux. Les cinq encodeurs tournent sur vingt lettres. Compose le mot que j'épelle, puis clique un encodeur.",
+   "textAvant": "Signal deux. Les quatre encodeurs tournent sur vingt lettres. Compose le mot que j'épelle, puis clique un encodeur.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "clue_mot_envers",
@@ -296,8 +308,10 @@
    "dfplayerTrack": "0034",
    "category": "clue",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Signal deux. Les quatre encodeurs tournent sur vingt lettres. J'épelle le mot à l'envers : compose-le à l'endroit, puis clique un encodeur."
+   "mp3Ready": false,
+   "text": "Signal deux. Les cinq encodeurs tournent sur vingt lettres. J'épelle le mot à l'envers : compose-le à l'endroit, puis clique un encodeur.",
+   "textAvant": "Signal deux. Les quatre encodeurs tournent sur vingt lettres. J'épelle le mot à l'envers : compose-le à l'endroit, puis clique un encodeur.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "patch_laisse",
@@ -818,8 +832,10 @@
    "dfplayerTrack": "0092",
    "category": "clue",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Signal un. Les quatre lettres du numéro de série, échangées deux par deux : la deuxième, la première, la quatrième, la troisième. Tourne les encodeurs, puis clique."
+   "mp3Ready": false,
+   "text": "Signal un. Les cinq lettres du numéro de série, échangées deux par deux : la deuxième, la première, la quatrième, la troisième, et la cinquième reste à sa place. Tourne les encodeurs, puis clique.",
+   "textAvant": "Signal un. Les quatre lettres du numéro de série, échangées deux par deux : la deuxième, la première, la quatrième, la troisième. Tourne les encodeurs, puis clique.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "clue_trappe_gauche",
@@ -827,8 +843,10 @@
    "dfplayerTrack": "0093",
    "category": "clue",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Regarde la barre lumineuse. Ouvre la trappe de la couleur de la première lumière, tout à gauche."
+   "mp3Ready": false,
+   "text": "Regarde les cinq barrettes. Ouvre la trappe de la couleur de la barrette tout à gauche, la numéro un.",
+   "textAvant": "Regarde la barre lumineuse. Ouvre la trappe de la couleur de la première lumière, tout à gauche.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "clue_trappe_moyenne",
@@ -836,8 +854,10 @@
    "dfplayerTrack": "0094",
    "category": "clue",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Regarde la barre lumineuse. Ouvre la trappe de la couleur qui n'est ni la plus présente, ni la plus rare."
+   "mp3Ready": false,
+   "text": "Regarde les cinq barrettes. Ouvre la trappe de la couleur qui n'est ni la plus présente, ni la plus rare.",
+   "textAvant": "Regarde la barre lumineuse. Ouvre la trappe de la couleur qui n'est ni la plus présente, ni la plus rare.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "clue_sequence_plus1",
@@ -846,7 +866,8 @@
    "category": "clue",
    "source": "elevenlabs",
    "mp3Ready": true,
-   "text": "Regarde la barre lumineuse. Retiens les lumières qui s'allument. Tape chaque position plus un, dans l'ordre."
+   "text": "Regarde la barre lumineuse. Retiens les lumières qui s'allument. Tape chaque position plus un, dans l'ordre.",
+   "retiree": "v0.3 (plus jouée : étape 3 = Simon)"
   },
   {
    "id": "clue_patch_echange",
@@ -998,8 +1019,10 @@
    "dfplayerTrack": "0112",
    "category": "objective",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Molettes : forme quatre lettres, puis clique."
+   "mp3Ready": false,
+   "text": "Molettes : forme cinq lettres, puis clique.",
+   "textAvant": "Molettes : forme quatre lettres, puis clique.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "obj_trappe",
@@ -1017,7 +1040,8 @@
    "category": "objective",
    "source": "elevenlabs",
    "mp3Ready": true,
-   "text": "Observe la barre, puis tape au clavier."
+   "text": "Observe la barre, puis tape au clavier.",
+   "retiree": "v0.3 (plus jouée : étape 3 = Simon)"
   },
   {
    "id": "obj_cables",
@@ -1106,8 +1130,10 @@
    "dfplayerTrack": "0124",
    "category": "hint",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Indice : regarde la plaque du numéro de série, dans le couvercle. Ce sont ses lettres qu'il faut."
+   "mp3Ready": false,
+   "text": "Indice : regarde le numéro de série, sur l'écran du bas. Ce sont ses cinq lettres qu'il faut.",
+   "textAvant": "Indice : regarde la plaque du numéro de série, dans le couvercle. Ce sont ses lettres qu'il faut.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "hint1_barre",
@@ -1115,8 +1141,10 @@
    "dfplayerTrack": "0125",
    "category": "hint",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Indice : compte les couleurs sur la barre lumineuse, puis compare avec le liseré de chaque trappe."
+   "mp3Ready": false,
+   "text": "Indice : chaque barrette a deux moitiés. Compte les moitiés de chaque couleur, puis compare avec le liseré de chaque trappe.",
+   "textAvant": "Indice : compte les couleurs sur la barre lumineuse, puis compare avec le liseré de chaque trappe.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "hint1_sequence",
@@ -1125,7 +1153,8 @@
    "category": "hint",
    "source": "elevenlabs",
    "mp3Ready": true,
-   "text": "Indice : appuie sur Réécouter, puis regarde la barre. Chaque lumière a une position, de un à huit, depuis la gauche."
+   "text": "Indice : appuie sur Réécouter, puis regarde la barre. Chaque lumière a une position, de un à huit, depuis la gauche.",
+   "retiree": "v0.3 (plus jouée : étape 3 = Simon)"
   },
   {
    "id": "hint1_cables",
@@ -1169,8 +1198,10 @@
    "dfplayerTrack": "0131",
    "category": "hint",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Indice : appuie sur Réécouter pour entendre le mot épelé. L'écran OLED montre la lettre de chaque molette."
+   "mp3Ready": false,
+   "text": "Indice : appuie sur Réécouter pour entendre le mot épelé. L'écran du bas montre la lettre de chaque molette.",
+   "textAvant": "Indice : appuie sur Réécouter pour entendre le mot épelé. L'écran OLED montre la lettre de chaque molette.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "hint1_transmit",
@@ -1214,8 +1245,10 @@
    "dfplayerTrack": "0136",
    "category": "hint",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Les quatre lettres de la plaque, de gauche à droite : la première sur la molette un, et ainsi de suite."
+   "mp3Ready": false,
+   "text": "Les cinq lettres du numéro de série, de gauche à droite : la première sur la molette un, et ainsi de suite.",
+   "textAvant": "Les quatre lettres de la plaque, de gauche à droite : la première sur la molette un, et ainsi de suite.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "hint2_enc1_envers",
@@ -1241,8 +1274,10 @@
    "dfplayerTrack": "0139",
    "category": "hint",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Lettres de la plaque : la deuxième sur la molette un, la première sur la deux, la quatrième sur la trois, la troisième sur la quatre."
+   "mp3Ready": false,
+   "text": "Lettres du numéro de série : la deuxième sur la molette un, la première sur la deux, la quatrième sur la trois, la troisième sur la quatre, la cinquième sur la cinq.",
+   "textAvant": "Lettres de la plaque : la deuxième sur la molette un, la première sur la deux, la quatrième sur la trois, la troisième sur la quatre.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "hint2_trappe_frequente",
@@ -1250,8 +1285,10 @@
    "dfplayerTrack": "0140",
    "category": "hint",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "La couleur qui revient le plus souvent sur les huit lumières."
+   "mp3Ready": false,
+   "text": "La couleur qui revient le plus souvent parmi les cinq barrettes.",
+   "textAvant": "La couleur qui revient le plus souvent sur les huit lumières.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "hint2_trappe_rare",
@@ -1259,8 +1296,10 @@
    "dfplayerTrack": "0141",
    "category": "hint",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "La couleur qui n'apparaît qu'une seule fois sur la barre."
+   "mp3Ready": false,
+   "text": "La couleur qu'on voit le moins souvent sur les cinq barrettes.",
+   "textAvant": "La couleur qui n'apparaît qu'une seule fois sur la barre.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "hint2_trappe_moyenne",
@@ -1268,8 +1307,10 @@
    "dfplayerTrack": "0142",
    "category": "hint",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Trois couleurs sur la barre : ni celle qui revient le plus, ni celle qui n'apparaît qu'une fois."
+   "mp3Ready": false,
+   "text": "Trois couleurs : ni celle qu'on voit le plus, ni celle qu'on voit le moins.",
+   "textAvant": "Trois couleurs sur la barre : ni celle qui revient le plus, ni celle qui n'apparaît qu'une fois.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "hint2_trappe_gauche",
@@ -1277,8 +1318,10 @@
    "dfplayerTrack": "0143",
    "category": "hint",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Regarde seulement la toute première lumière, à gauche de la barre."
+   "mp3Ready": false,
+   "text": "Regarde seulement le bout gauche de la barrette numéro un.",
+   "textAvant": "Regarde seulement la toute première lumière, à gauche de la barre.",
+   "aEnregistrer": "v0.3 réécriture"
   },
   {
    "id": "hint2_sequence_ordre",
@@ -1287,7 +1330,8 @@
    "category": "hint",
    "source": "elevenlabs",
    "mp3Ready": true,
-   "text": "Tape la position de chaque lumière, dans l'ordre où elles s'allument. Un, c'est tout à gauche."
+   "text": "Tape la position de chaque lumière, dans l'ordre où elles s'allument. Un, c'est tout à gauche.",
+   "retiree": "v0.3 (plus jouée : étape 3 = Simon)"
   },
   {
    "id": "hint2_sequence_envers",
@@ -1296,7 +1340,8 @@
    "category": "hint",
    "source": "elevenlabs",
    "mp3Ready": true,
-   "text": "Tape les positions en commençant par la dernière lumière allumée."
+   "text": "Tape les positions en commençant par la dernière lumière allumée.",
+   "retiree": "v0.3 (plus jouée : étape 3 = Simon)"
   },
   {
    "id": "hint2_sequence_plus1",
@@ -1305,7 +1350,8 @@
    "category": "hint",
    "source": "elevenlabs",
    "mp3Ready": true,
-   "text": "Pour chaque lumière, tape sa position plus un : la lumière quatre devient cinq."
+   "text": "Pour chaque lumière, tape sa position plus un : la lumière quatre devient cinq.",
+   "retiree": "v0.3 (plus jouée : étape 3 = Simon)"
   },
   {
    "id": "hint2_patch_route",
@@ -1549,6 +1595,66 @@
    "source": "elevenlabs",
    "mp3Ready": true,
    "text": "vers la droite."
+  },
+  {
+   "id": "obj_simon",
+   "file": "voix/obj_simon.mp3",
+   "dfplayerTrack": "0174",
+   "category": "objective",
+   "source": "synthese",
+   "mp3Ready": false,
+   "text": "Regarde les barrettes, puis touche les prises dans le même ordre.",
+   "aEnregistrer": "v0.3 nouvelle"
+  },
+  {
+   "id": "clue_simon",
+   "file": "voix/clue_simon.mp3",
+   "dfplayerTrack": "0175",
+   "category": "clue",
+   "source": "synthese",
+   "mp3Ready": false,
+   "text": "Observe les barrettes. Reproduis la séquence, prise par prise. Elle s'allonge à chaque fois.",
+   "aEnregistrer": "v0.3 nouvelle"
+  },
+  {
+   "id": "clue_simon_noir",
+   "file": "voix/clue_simon_noir.mp3",
+   "dfplayerTrack": "0176",
+   "category": "clue",
+   "source": "synthese",
+   "mp3Ready": false,
+   "text": "Le câble noir pulse en violet.",
+   "aEnregistrer": "v0.3 nouvelle"
+  },
+  {
+   "id": "hint1_simon",
+   "file": "voix/hint1_simon.mp3",
+   "dfplayerTrack": "0177",
+   "category": "hint",
+   "source": "synthese",
+   "mp3Ready": false,
+   "text": "Indice : appuie sur Réécouter, sur l'écran du bas, puis regarde quelle barrette pulse. Touche sa prise, dans le même ordre.",
+   "aEnregistrer": "v0.3 nouvelle"
+  },
+  {
+   "id": "hint2_simon",
+   "file": "voix/hint2_simon.mp3",
+   "dfplayerTrack": "0178",
+   "category": "hint",
+   "source": "synthese",
+   "mp3Ready": false,
+   "text": "Chaque pulse, une prise, dans le même ordre. Si tu te trompes, je rejoue la série en cours. Réécouter aussi.",
+   "aEnregistrer": "v0.3 nouvelle"
+  },
+  {
+   "id": "hint3_simon",
+   "file": "voix/hint3_simon.mp3",
+   "dfplayerTrack": "0179",
+   "category": "hint",
+   "source": "synthese",
+   "mp3Ready": false,
+   "text": "Dernier indice. La première prise :",
+   "aEnregistrer": "v0.3 nouvelle"
   }
  ]
 }

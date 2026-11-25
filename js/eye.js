@@ -1,7 +1,7 @@
 // eye.js : rendu Canvas2D de l'œil de l'Entité.
 // Tout est pré-rendu en sprites au redimensionnement (points, tirets, iris, collerette, halo, blocs),
 // puis chaque image ne fait que des drawImage additifs : même logique que les sprites LovyanGFX du CYD.
-import { EYE, MOODS } from './eye-config.js?v=0.2.6a';
+import { EYE, MOODS } from './eye-config.js?v=0.3.0';
 
 const TAU = Math.PI * 2;
 const lerp = (a, b, t) => a + (b - a) * t;
