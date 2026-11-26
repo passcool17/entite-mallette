@@ -18,6 +18,11 @@ Archive figée de la v0.4.0 (commit d7c1ba2, plan v0.8, n° de série à lettres
 Archive figée de la v0.3.2 (commit 5e9d940, avant la refonte : trois trappes, trois serrures) : https://passcool17.github.io/entite-mallette-v032/
 (dépôt passcool17/entite-mallette-v032, cache séparé `entite-mallette-v032-0.3.2`).
 
+## Version 0.5.4 (26 nov. 2026) — moquerie après la consigne
+
+État : en ligne (cache `entite-mallette-v0.5.4`, imports `?v=0.5.4`). Correctif seulement : pas de changement de jeu.
+À l'étape 1, tourner les molettes (essai presque juste) lançait `taunt_cetait` au bout de 300 ms avec « maintenant », ce qui coupait `obj_mot_melange` quand la vraie voix (synthèse) durait plus longtemps que la voix simulée. Les moqueries passent par `pressure` et une réplique « maintenant » ne coupe plus une consigne en cours : elle s'ajoute après, 1,5 s après la fin de la voix.
+
 ## Version 0.5.3 (26 nov. 2026) — labyrinthe dans le noir, mur mobile, clavier bloqué
 
 État : en ligne (cache `entite-mallette-v0.5.3`, imports `?v=0.5.3`). Plan : `revision-jeux-proposition.md` §11, point 4.

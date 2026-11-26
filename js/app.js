@@ -8,17 +8,17 @@
 // Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 // v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 2, variantes d'énigmes
 // tirées par étape (deux parties de suite ne se ressemblent pas : signature de la partie précédente dans localStorage).
-import { createEye } from './eye.js?v=0.5.3';
-import { EYE, deepMerge } from './eye-config.js?v=0.5.3';
-import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS, NENC, SIMON, STICK_COLORS, STICK_NAMES, simonTiming, beatMs, scannerFrame, PATCH_CLOCK, CRYPTEX_REPLAY_COST_S, SERVO_SHAKE, TRAP_BARS, KEYS7, MAZE5, DARK9, KEYPAD_LOCK_MS, setWall } from './game.js?v=0.5.3';
-import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.5.3';
-import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable, setCueHook, isSpeaking, preloadJingle, playJingle, stopJingle, jingleStats } from './audio.js?v=0.5.3';
-import { sfx } from './sfx.js?v=0.5.3';
-import { preloadAll } from './preload.js?v=0.5.3';
-import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds, objectiveId } from './guide.js?v=0.5.3';
-import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.5.3';
+import { createEye } from './eye.js?v=0.5.4';
+import { EYE, deepMerge } from './eye-config.js?v=0.5.4';
+import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS, NENC, SIMON, STICK_COLORS, STICK_NAMES, simonTiming, beatMs, scannerFrame, PATCH_CLOCK, CRYPTEX_REPLAY_COST_S, SERVO_SHAKE, TRAP_BARS, KEYS7, MAZE5, DARK9, KEYPAD_LOCK_MS, setWall } from './game.js?v=0.5.4';
+import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.5.4';
+import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable, setCueHook, isSpeaking, preloadJingle, playJingle, stopJingle, jingleStats } from './audio.js?v=0.5.4';
+import { sfx } from './sfx.js?v=0.5.4';
+import { preloadAll } from './preload.js?v=0.5.4';
+import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds, objectiveId } from './guide.js?v=0.5.4';
+import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.5.4';
 
-const VERSION = '0.5.3';
+const VERSION = '0.5.4';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -78,9 +78,19 @@ function voice(ids, { lie = false, now = false, clue = false } = {}) {
     const it = { ids, lie, clue, resolve, requeued: false };
     if (now) {
       for (let i = vqItems.length - 1; i >= 0; i--) if (!vqItems[i].clue) { vqItems[i].resolve(false); vqItems.splice(i, 1); }
-      vqItems.unshift(it);
-      const c = vqCur;
-      if (c) { if (c.clue && c.ids.join() !== ids.join()) { c.requeued = true; vqItems.splice(1, 0, c); (g.cutLog = g.cutLog || []).push({ clue: c.ids[0], by: ids[0] }); } stopVoice(); }   // v0.5.3 : cutLog = consignes coupées par une autre réplique (test : jamais par une moquerie)
+      // v0.5.4 : une réplique « maintenant » (moquerie comprise) ne coupe jamais une AUTRE consigne / un objectif en cours ou déjà en file ; elle s'ajoute après.
+      // Réécouter (mêmes ids que la consigne en cours) doit l'interrompre et la relancer, comme avant.
+      const hold = !!(vqCur && vqCur.clue && vqCur.ids.join() !== ids.join());
+      const queued = vqItems.some((x) => x.clue && x.ids.join() !== ids.join());
+      if (hold || queued) {
+        const last = vqItems.reduce((n, x, i) => x.clue ? i : n, -1);
+        vqItems.splice(last + 1, 0, it);
+        if (vqCur && !vqCur.clue) stopVoice();
+      } else {
+        vqItems.unshift(it);
+        const c = vqCur;
+        if (c) { if (c.clue && c.ids.join() !== ids.join()) { c.requeued = true; vqItems.splice(1, 0, c); (g.cutLog = g.cutLog || []).push({ clue: c.ids[0], by: ids[0] }); } stopVoice(); }
+      }
     } else vqItems.push(it);
     pumpVoice();
   });
@@ -1062,7 +1072,8 @@ function turn(i, s) {
   if ((g.step === 1 || g.step === 8) && !g._encTaunted && g.enc[i] === curEncTarget()[i] && g.enc.filter((v, k) => v === curEncTarget()[k]).length >= 2) {
     g._encTaunted = true;
     const right = curEncTarget()[i], wrong = (right + 3 + Math.floor(Math.random() * 5)) % n, stepAt = g.step;
-    setTimeout(() => g.running && g.step === stepAt && voice(['taunt_cetait', letter(RING[wrong]), 'taunt_depeche'], { lie: true, now: true }), 300);
+    // v0.5.4 : même garde que les autres moqueries (pressure) — jamais pendant la consigne, 1,5 s après la voix
+    pressure(300, () => { if (g.running && g.step === stepAt) voice(['taunt_cetait', letter(RING[wrong]), 'taunt_depeche'], { lie: true, now: true }); });
   }
 }
 function pushEnc(i) {
@@ -1567,6 +1578,20 @@ function init() {
       voiceLog, voiceStats, musicStats, ttsAvailable,
       mazeGeom: () => g.mazeGeom, cutLog: () => (g.cutLog || []).slice(), darkInfo: () => ({ flashes: g.flashes, flashUntil: g.flashUntil || 0, flashLog: (g.flashLog || []).slice(), sabMs: DARK9[run.tier]?.sabMs }), swapDone: () => !!g.swapDone, swapNow() { swapWalls(); }, DARK9, MAZE5, KEYPAD_LOCK_MS,
       simonDog: () => { const S = g.simon; if (!S?.tm) return null; const end = S.t0 + S.len * (beatMs(S.tm) + S.tm.gap); return { margin: SIMON_WATCHDOG_MS, at150: simonWatchdogDue({ ...S, phase: 'play' }, end + 150), at300: simonWatchdogDue({ ...S, phase: 'play' }, end + 300), atMargin: simonWatchdogDue({ ...S, phase: 'play' }, end + SIMON_WATCHDOG_MS + 20), taunted: !!S.taunted, endAgain: simonEndPlay(S, S.gen), phase: S.phase }; },
+      cutGuard: () => {
+        const n0 = (g.cutLog || []).length;
+        const held = { ids: ['obj_mot_melange'], clue: true, lie: false, resolve() {}, requeued: false };
+        const saveCur = vqCur, saveBusy = vqBusy;
+        vqCur = held; vqBusy = true;
+        voice(['taunt_cetait', 'taunt_depeche'], { lie: true, now: true });
+        const cuts = (g.cutLog || []).slice(n0);
+        const heldOk = vqCur === held;
+        const q = vqItems.filter((x) => x.ids && x.ids[0] === 'taunt_cetait');
+        q.forEach((x) => x.resolve(false));
+        for (let i = vqItems.length - 1; i >= 0; i--) if (q.includes(vqItems[i])) vqItems.splice(i, 1);
+        vqCur = saveCur; vqBusy = saveBusy;
+        return { ok: cuts.length === 0 && heldOk && q.length === 1, cuts, held: heldOk, queued: q.length };
+      },
       lockInfo: () => ({ until: g.codeLockUntil || 0, left: Math.max(0, (g.codeLockUntil || 0) - performance.now()), n: g.lockLog || 0, blockedPresses: g.lockedPresses || 0 }),
       forceSabotage(on) { if (on) startSabotage(); else endSabotage(); },
       idle(ms) { g.lastInput = performance.now() - ms; g.quietAt = performance.now() - ms; },

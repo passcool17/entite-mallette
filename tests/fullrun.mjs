@@ -42,8 +42,8 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.5.3';
-import { OBJECTIVE, hintCues, objectiveId } from '../js/guide.js?v=0.5.3';
+import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.5.4';
+import { OBJECTIVE, hintCues, objectiveId } from '../js/guide.js?v=0.5.4';
 
 const require = createRequire(import.meta.url);
 function loadChromium() {
@@ -935,6 +935,10 @@ async function playOne(b, seed, opts) {
     const okN = e1.step === 1 && e1.e === e0.e + 1 && e1.strip === `−${pen} s` && e0.r - e1.r >= pen - 0.5 && (moy ? e1.score === '4/5' : e1.score === '');
     rec(okN, 1, 1, okN ? `mot mêlé presque juste : faux, −${pen} s${moy ? ', score 4/5' : ', sans score'}` : `mot mêlé essai raté ${JSON.stringify({ e0, e1, moy })}`);
     if (!okN) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+    // v0.5.4 : une moquerie (taunt_cetait) ne doit jamais couper une consigne en cours — elle s'ajoute après
+    const cg = await D(p, () => __entiteDebug.cutGuard());
+    rec(!!cg?.ok, 1, 1, cg?.ok ? 'moquerie en file derrière la consigne, consigne intacte' : `moquerie a coupé la consigne ${JSON.stringify(cg)}`);
+    if (!cg?.ok) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   }
   const t1 = await tNow();
   await rotateTo(p, answers.enc1);
@@ -1217,7 +1221,7 @@ async function playOne(b, seed, opts) {
   await p.waitForFunction(() => !document.querySelector('#btnReplay')?.disabled, null, { timeout: 8000 }).catch(() => {});
   const nVoix5 = await D(p, () => (__entiteDebug.voiceLog || []).length);
   await p.locator('#btnReplay').click({ force: true });
-  await W(p, 250);
+  await p.waitForFunction((n) => (__entiteDebug.voiceLog || []).slice(n).some((v) => (v.ids || []).some((id) => /verrou|clue_|obj_/.test(id))), nVoix5, { timeout: 8000 }).catch(() => {});
   const mazeReplay5 = await D(p, (n) => {
     const log = (__entiteDebug.voiceLog || []).slice(n);
     return log.some((v) => (v.ids || []).some((id) => /verrou|clue_|obj_/.test(id)));
