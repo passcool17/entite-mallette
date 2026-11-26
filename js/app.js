@@ -8,17 +8,17 @@
 // Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 // v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 2, variantes d'énigmes
 // tirées par étape (deux parties de suite ne se ressemblent pas : signature de la partie précédente dans localStorage).
-import { createEye } from './eye.js?v=0.4.0';
-import { EYE, deepMerge } from './eye-config.js?v=0.4.0';
-import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS, NENC, SIMON, STICK_COLORS, STICK_NAMES, simonTiming, beatMs, scannerFrame } from './game.js?v=0.4.0';
-import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.4.0';
-import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable, preloadJingle, playJingle, stopJingle, jingleStats } from './audio.js?v=0.4.0';
-import { sfx } from './sfx.js?v=0.4.0';
-import { preloadAll } from './preload.js?v=0.4.0';
-import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.4.0';
-import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.4.0';
+import { createEye } from './eye.js?v=0.5.0';
+import { EYE, deepMerge } from './eye-config.js?v=0.5.0';
+import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS, NENC, SIMON, STICK_COLORS, STICK_NAMES, simonTiming, beatMs, scannerFrame } from './game.js?v=0.5.0';
+import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.5.0';
+import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable, preloadJingle, playJingle, stopJingle, jingleStats } from './audio.js?v=0.5.0';
+import { sfx } from './sfx.js?v=0.5.0';
+import { preloadAll } from './preload.js?v=0.5.0';
+import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.5.0';
+import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.5.0';
 
-const VERSION = '0.4.0';
+const VERSION = '0.5.0';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -52,7 +52,7 @@ function resetState(remember = false) {
     phase: 'idle',               // idle → arm-toggle (capot bleu) → play → win | boom
     step: 0, running: false, ended: false, result: null,
     endAt: 0, remaining: TIME_S, rate: 1, lastTick: 0, lastSec: null,
-    prob: 99.7, errors: 0, lieUntil: 0, lies: 0,
+    prob: 99.7, errors: 0, lieUntil: 0, lies: 0, melScore: null,
     coverArm: false, coverTx: false, armed: false, txOn: false,
     enc: Array(NENC).fill(0), encRaw: Array(NENC).fill(0), encMode: 'alpha', trapOpen: [false, false], simon: null,
     cables: run.wires.map((color, i) => ({ color, socket: i })), sel: null, patchTok: 0, // câble c (port c de la base) → prise 0..4 ou null
@@ -440,7 +440,12 @@ function cydBigState() {
   if (g.step === 1 || g.step === 8) {
     const lie = performance.now() < g.lieUntil && g.decoy?.enc;
     const v = lie ? g.decoy.enc : g.enc, L = v.map((i) => RING[i]);
-    return { mode: 'letters', text: L.join(''), sr: `Molettes : ${L.join(' ')}`, lie: !!lie };
+    // v0.5.0 mot mêlé (étape 1) : ligne du haut = les 5 lettres MÉLANGÉES (l'énigme, jamais le mot) ; en moyen, après un
+    // essai raté, le nombre de lettres bien placées (un nombre, jamais lesquelles). Étape 8 : rien (le mot s'écoute).
+    const mel = g.step === 1 ? run.scramble : '';
+    const score = g.step === 1 && g.melScore != null ? `${g.melScore}/5` : '';
+    const sr = `Molettes : ${L.join(' ')}` + (mel ? `. Lettres mélangées : ${mel.split('').join(' ')}` : '') + (score ? `. ${g.melScore} sur 5 bien placées` : '');
+    return { mode: 'letters', text: L.join(''), sub: mel, score, sr, lie: !!lie };
   }
   if (g.step === 6 || g.step === 11) { const n = g.code.length; return { mode: 'code', text: '●'.repeat(n) + '–'.repeat(4 - n), sr: `Code : ${n} sur 4` }; }
   if (g.step === 3 && g.simon) {
@@ -451,7 +456,19 @@ function cydBigState() {
 }
 function drawCydBig() {
   const el = $('#cyd2Big'), cy = $('.cyd2'); if (!el || !cy) return;
-  const st = cydBigState(), key = `${st.mode}|${st.text}|${st.lie ? 1 : 0}`;
+  const st = cydBigState(), key = `${st.mode}|${st.text}|${st.lie ? 1 : 0}|${st.sub || ''}|${st.score || ''}`;
+  const sub = $('#cyd2Sub');
+  if (sub) {
+    const sk = `${st.sub || ''}|${st.score || ''}`;
+    if (sub.dataset.key !== sk) {
+      sub.dataset.key = sk; sub.textContent = '';
+      if (st.sub) {
+        const lab = document.createElement('b'); lab.textContent = 'MÊLÉ'; sub.append(lab);
+        const w = document.createElement('span'); w.className = 'mel'; w.textContent = st.sub; sub.append(w);
+        if (st.score) { const sc = document.createElement('span'); sc.className = 'score'; sc.textContent = st.score; sub.append(sc); }
+      }
+    }
+  }
   const painted = el.dataset.key === key && cy.classList.contains('big') === !!st.mode && (el.textContent || '').trim() === (st.text || '');
   cy.classList.toggle('big', !!st.mode); cy.dataset.big = st.mode || '';
   if (painted) return;
@@ -996,8 +1013,12 @@ function pushEnc(i) {
   if (kn) { kn.classList.remove('press'); void kn.offsetWidth; kn.classList.add('press'); setTimeout(() => kn.classList.remove('press'), 180); }
   if (g.step !== 1 && g.step !== 8) return;
   const ok = g.enc.every((v, k) => v === curEncTarget()[k]);
-  if (ok) { $$('.enc').forEach((e) => e.classList.add('locked')); setTimeout(() => $$('.enc').forEach((e) => e.classList.remove('locked')), 900); good(g.step === 1 ? 2 : 9, g.step === 1 ? 0 : null); }
-  else bad(5);
+  if (ok) { g.melScore = null; $$('.enc').forEach((e) => e.classList.add('locked')); setTimeout(() => $$('.enc').forEach((e) => e.classList.remove('locked')), 900); good(g.step === 1 ? 2 : 9, g.step === 1 ? 0 : null); }
+  else if (g.step === 1) {
+    // v0.5.0 mot mêlé : moyen = score « n/5 bien placées » et −5 s ; difficile = juste « faux » et −8 s
+    if (run.v.enc1 === 'theme') g.melScore = g.enc.filter((v, k) => v === run.enc1[k]).length;
+    drawCydBig(); bad(run.v.enc1 === 'theme' ? 5 : 8);
+  } else bad(5);
 }
 function openTrap(i, what) {
   g.trapOpen[i] = true; sfx.servo(); batt?.dip('trap');

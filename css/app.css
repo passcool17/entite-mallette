@@ -771,3 +771,23 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
   .b4-c1 .mod-keys .lock-face { width: 28px; height: 28px; }
   .b4-main { gap: 5px; }
 }
+
+/* ---------- v0.5.0 : mot mêlé sur le CYD 2 (étape 1) ----------
+   Ligne « MÊLÉ » = les 5 lettres mélangées (l'énigme, jamais le mot) + score « n/5 » en moyen après un essai raté.
+   Grande ligne = les lettres COURANTES des molettes. En portrait (CYD 2 étroit), RÉÉCOUTER passe sous les lettres. */
+.cyd2-sub { display: none; }
+.cyd2.big .cyd2-hud { grid-template-rows: auto auto minmax(0, 1fr); }
+.cyd2.big .cyd2-sub:not(:empty) { display: flex; grid-column: 1 / -1; grid-row: 2; justify-content: center; align-items: baseline; gap: 6px; min-width: 0;
+  font: 700 13px/1.1 var(--f-mono); color: #ffcf6b; text-shadow: 0 0 6px rgb(255 190 80 / .45); white-space: nowrap; }
+.cyd2-sub b { font: 700 8px/1 var(--f-mono); letter-spacing: .08em; color: rgb(255 207 107 / .75); }
+.cyd2-sub .mel { letter-spacing: .32em; margin-right: -.32em; }
+.cyd2-sub .score { font-size: 11px; padding: 0 4px; border: 1px solid rgb(255 207 107 / .6); border-radius: 3px; color: #fff3d6; }
+.cyd2.big .cyd2-big { grid-row: 3; }
+.cyd2.big .cyd2-replay { grid-row: 3; }
+@media (orientation: portrait) and (max-width: 999px) {
+  .cyd2.big .cyd2-hud { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; }
+  .cyd2.big .cyd2-big { grid-column: 1; grid-row: 3; font-size: 20px; }
+  .cyd2.big .cyd2-replay { grid-column: 1; grid-row: 4; width: 100%; justify-self: stretch; }
+  .cyd2.big .cyd2-sub:not(:empty) { font-size: 12px; gap: 4px; }
+  .cyd2-sub .mel { letter-spacing: .18em; margin-right: -.18em; }
+}

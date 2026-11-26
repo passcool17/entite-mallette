@@ -1,4 +1,6 @@
-// game.js : tirage d'une partie v0.4 (logique pure, sans DOM). Même graine = même partie.
+// game.js : tirage d'une partie v0.5 (logique pure, sans DOM). Même graine = même partie.
+// v0.5.0 (Pascal 22:24) : étape 1 = « Mot mêlé » (le CYD 2 montre 5 lettres mélangées, jamais le mot ; on forme le mot
+// sur E1–E5). Les molettes ne servent qu'à des MOTS de 5 lettres. Le n° de série est en CHIFFRES seulement (4 chiffres).
 // v0.4 (plan d'impression v0.8) : 2 trappes (A, B) et 2 serrures (I, II). Les barrettes gardent 3 couleurs ; les 2 trappes
 // montrent la couleur réponse et un leurre, donc les 4 variantes de trappe restent justes.
 // v0.3 : 5 molettes (mots de 5 lettres), n° de série à 5 lettres, étape 3 = Simon sur 5 barrettes, trappe sur 10 demi-barrettes.
@@ -13,12 +15,19 @@ export const TIME_S = 480;          // 8 min, comme la v0.1.5
 export const NSTEPS = 12;
 export const WIRE_COLORS = ['rouge', 'noir', 'jaune', 'vert', 'bleu']; // kit Keadic : 5 couleurs, une de chaque (jamais deux pareilles)
 export const TRAP_COLORS = ['rouge', 'vert', 'bleu'];
-const SERIAL_LETTERS = 'ABCDEFGHJLMNPRSTUV';     // lettres de l'anneau sans I ni O (confondus avec 1 et 0)
 // Anneau cryptex des KY-040 : 20 crans = 1 tour = 20 lettres (sans K, Q, W, X, Y, Z)
 export const RING = 'ABCDEFGHIJLMNOPRSTUV';
 export const DETENTS = 20;
 export const NENC = 5;               // 5 molettes KY-040 (v0.4 / plan v0.8 : en ligne E1–E5)
 // Mots de 5 lettres français, toutes leurs lettres sur l'anneau (jamais K, Q, W, X, Y, Z)
+// v0.5.0 : mots de l'étape 1 (mot mêlé), rangés par thème (dit à voix haute en moyen). Sans anagramme courante
+// (pas CORDE/DÉCOR, LAMPE/PALME, PHARE/HARPE, AGENT/GÉANT, PORTE/OPTER, SABLE/BLASÉ), pour qu'il n'y ait qu'une réponse.
+export const THEMES = {
+  objet:   ['CABLE', 'VERRE', 'FUSIL', 'PIANO', 'TABLE', 'PLUME'],
+  nature:  ['TIGRE', 'ORAGE', 'NUAGE', 'OMBRE', 'GLACE', 'VAGUE', 'FLEUR', 'ARBRE'],
+  machine: ['RADIO', 'BOMBE', 'SONDE', 'ROBOT', 'TRAIN'],
+};
+export const THEME_NAMES = Object.keys(THEMES);
 export const WORDS = ['SIGNE', 'PORTE', 'CABLE', 'ROUGE', 'LAMPE', 'CODES', 'VERRE', 'TIGRE', 'SABLE', 'ORAGE', 'PLUME', 'RADIO', 'BOMBE', 'SONDE', 'PANNE', 'FUSIL', 'NUAGE', 'OMBRE', 'GLACE', 'TEMPS', 'VAGUE', 'PIANO', 'FLEUR', 'ROBOT', 'ACIER', 'AGENT', 'TABLE', 'LIGNE', 'FORGE', 'PISTE', 'ARBRE', 'CORDE', 'TRAIN', 'PHARE'];
 // Simon (étape 3) : 5 barrettes de 8 LED, une couleur par barrette (barrette 1 = câble noir, pulse violet)
 export const STICK_COLORS = ['#B44AFF', '#2B7CFF', '#22C55E', '#E53935', '#F5C518'];
@@ -69,7 +78,7 @@ export const STEPS = [
 // Bassins de variantes par étape et par palier (moyen / difficile). Toutes se résolvent avec ce qui est sur la mallette
 // (plaque, barre DEL, anneau des encodeurs) et ce que l'Entité dicte. Rien n'est jamais écrit à l'écran.
 export const POOLS = {
-  enc1:   { moyen: ['ordre', 'envers'],          difficile: ['envers', 'suivante', 'paires'] },
+  enc1:   { moyen: ['theme'],                    difficile: ['nu'] },   // v0.5.0 mot mêlé : thème dit + score (moyen) ; rien (difficile)
   trap:   { moyen: ['frequente', 'gauche'],      difficile: ['rare', 'moyenne'] },
   patch1: { moyen: ['route', 'echange', 'debranche'], difficile: ['route', 'echange', 'serie'] },
   code1:  { moyen: ['ordre', 'envers'],          difficile: ['envers', 'plus1'] },
@@ -99,19 +108,27 @@ export function makeRun(seed) {
   const hard = tier === 'difficile';
   const v = {}; for (const k of SLOTS) v[k] = pick(POOLS[k][tier]);
 
-  // ---- n° de série v0.3 : L C L C - L C L C L — 5 lettres de l'anneau (toutes différentes, sans I ni O) pour les
-  // 5 encodeurs, 4 chiffres tous différents. Les rotatifs ne servent QU'AUX lettres, le clavier aux chiffres.
+  // ---- n° de série v0.5.0 : 4 chiffres tous différents, affichés « 47-19 » sur le CYD 2 (+ un lot leurre).
+  // Il sert aux serrures, au code 2 (décalé) et à la baie banane (rang d'un chiffre). Plus aucune lettre.
   const digits = shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).slice(0, 4);
-  const sLetters = shuffle(SERIAL_LETTERS.split('')).slice(0, NENC);
-  const serial = `${sLetters[0]}${digits[0]}${sLetters[1]}${digits[1]}-${sLetters[2]}${digits[2]}${sLetters[3]}${digits[3]}${sLetters[4]}`;
+  const serial = `${digits[0]}${digits[1]}-${digits[2]}${digits[3]}`;
   const lot = 100 + int(900); // leurre sur la plaque
   const cues = {};
 
-  // ---- 1. encodeurs (anneau A-V) : lettres du n° — ordre / envers / lettre suivante sur l'anneau / échangées par paires
-  const L = sLetters;
-  const encLetters = { ordre: L.slice(), envers: L.slice().reverse(), suivante: L.map(nextOnRing), paires: [L[1], L[0], L[3], L[2], L[4]] }[v.enc1];
+  // ---- 1. « Mot mêlé » : un mot à thème, ses 5 lettres mélangées sur le CYD 2 (l'énigme, jamais le mot).
+  // Mélange : le moins de lettres à leur place possible, et jamais le mot lui-même.
+  const theme = pick(THEME_NAMES);
+  const word1 = pick(THEMES[theme]);
+  let scramble = word1, best = 99;
+  for (let k = 0; k < 40; k++) {
+    const s = shuffle(word1.split('')).join('');
+    if (s === word1) continue;
+    const fixed = [...s].filter((ch, i) => ch === word1[i]).length;
+    if (fixed < best) { best = fixed; scramble = s; if (fixed === 0) break; }
+  }
+  const encLetters = word1.split('');
   const enc1 = encLetters.map((ch) => RING.indexOf(ch));
-  cues[1] = [`clue_enc1_${v.enc1}`];
+  cues[1] = v.enc1 === 'theme' ? ['clue_mot_melange', `theme_${theme}`] : ['clue_mot_melange'];
 
   // ---- 2. trappe (v0.3) : 5 barrettes × 2 moitiés de 4 LED = 10 segments ; comptes toujours distincts
   // (3/2/1 sur 5 barrettes est impossible : 3+2+1 = 6). bar[0] = moitié gauche de la barrette 1.
@@ -142,12 +159,12 @@ export function makeRun(seed) {
     if (kind === 'route') { const [A, N] = two(); return { kind, req: { [A]: N }, cues: ['clue_patch_route', cab(A), pr(N)] }; }
     if (kind === 'echange') { const [X, Y] = two(); return { kind, req: { [X]: Y, [Y]: X }, cues: [`${head}_echange`, cab(X), 'patch_et', cab(Y), 'patch_echange_fin'] }; }
     if (kind === 'debranche') { const [X, Y] = two(); return { kind, req: { [X]: null, [Y]: null }, cues: ['clue_patch_debranche', cab(X), 'patch_et', cab(Y), 'patch_laisse_deux'] }; }
-    // serie : prise = rang (1..4) d'une lettre parmi les 4 lettres du n° de série ; le câble ne part pas déjà de cette prise
+    // serie (v0.5.0) : prise = rang (1..4) d'un CHIFFRE parmi les 4 chiffres du n° de série ; le câble ne part pas déjà de cette prise
     const rank = int(4); let A = int(4); if (A >= rank) A++;
-    if (kind === 'serie' && layer === 1) return { kind, req: { [A]: rank }, cues: ['clue_patch_serie', cab(A), 'patch_rang', `lettre_${L[rank].toLowerCase()}`] };
-    // couche 2 « serie » : débranche B, puis A dans la prise au rang de la lettre
+    if (kind === 'serie' && layer === 1) return { kind, req: { [A]: rank }, cues: ['clue_patch_serie', cab(A), 'patch_rang_chiffre', `chiffre_${digits[rank]}`] };
+    // couche 2 « serie » : débranche B, puis A dans la prise au rang du chiffre
     let B = int(4); if (B >= A) B++; if (B === rank) B = [0, 1, 2, 3, 4].find((c) => c !== A && c !== rank);
-    if (kind === 'serie') return { kind, req: { [B]: null, [A]: rank }, cues: ['clue_patch2_serie', cab(B), 'patch_laisse', cab(A), 'patch_rang', `lettre_${L[rank].toLowerCase()}`] };
+    if (kind === 'serie') return { kind, req: { [B]: null, [A]: rank }, cues: ['clue_patch2_serie', cab(B), 'patch_laisse', cab(A), 'patch_rang_chiffre', `chiffre_${digits[rank]}`] };
     // double (v0.2.3) : débranche B et laisse-le débranché, puis C dans la prise M
     const [Bd, C] = two(); let M = int(4); if (M >= C) M++; if (M === Bd) M = [0, 1, 2, 3, 4].find((s) => s !== C && s !== Bd);
     return { kind, req: { [Bd]: null, [C]: M }, cues: ['clue_patch_double', cab(Bd), 'patch_laisse', cab(C), pr(M)] };
@@ -183,7 +200,7 @@ export function makeRun(seed) {
   const decoys = { wire1: wrongPlug(patch1), wire2: wrongPlug(patch2), frags: frags.map((f) => (f + 1 + int(9)) % 10), keys: keyOrder.slice().reverse() };
 
   // ---- 8. cryptex : 5 encodeurs (anneau de 20) ; l'Entité épelle un mot (ordre / à l'envers / « lettre suivante »)
-  const word = pick(WORDS);
+  const word = pick(WORDS.filter((w) => w !== word1));    // v0.5.0 : jamais le mot de l'étape 1
   const encWord = v.word === 'suivante' ? word.split('').map(nextOnRing).join('') : word;
   const enc2 = encWord.split('').map((ch) => RING.indexOf(ch));
   const spell = v.word === 'envers' ? word.split('').reverse().join('') : word;
@@ -191,7 +208,7 @@ export function makeRun(seed) {
   decoys.word = RING[(enc2[0] + 3 + int(15)) % DETENTS];
   const sig = [tier, ...SLOTS.map((k) => v[k])].join('|');
   return {
-    seed: seed >>> 0, tier, v, sig, serial, lot, digits, letters: sLetters, encLetters,
+    seed: seed >>> 0, tier, v, sig, serial, lot, digits, theme, word1, scramble, encLetters,
     enc1, enc2, word, encWord, spell, bar, counts, order, trapColors, trap, simon,
     wires, patch1, patch2, maze1, maze2, frags, code1, code2, keyOrder, lies, cues,
     decoys,

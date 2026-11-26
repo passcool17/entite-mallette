@@ -38,6 +38,23 @@ Fiches de 43 mm : il ne reste que ~5 mm entre les panneaux valise fermée, **dé
 | Prise DC 5,5 × 2,1 | paroi droite [258, 141, 273, 157] | recharge (chargeur 12,6 V) |
 | Porte-fusible | **à l’intérieur de la base** | aucun trou au panneau |
 
+## Jeux v0.5 : limites matériel (Électronique 25 nov. ~22 h 30 ; Impression 3D 22 h 33)
+
+Sources : `/workspace/mallette-entite/v0.5-jeux-reponses-materiel.md` et le plan v0.8 §13 (`preview_poche-cle-trappes-v0.8.png`).
+Le simulateur reste dans ces limites. **Aucun numéro de GPIO n’est figé** : le code du jeu n’en code aucun.
+
+- **Serrures I et II** (Gebildet E1020, 2 positions) : 1 contact sec par serrure, `INPUT_PULLUP`, repos = HIGH,
+  **clé tournée = LOW**. Lues sur le 2e ESP32-S3 N16R8 (ou 2 bits d’un MCP23017 0x20/0x21).
+- **Bouton SW du joystick KY-023** : actif bas, `INPUT_PULLUP`, lu sur le maître. Utilisé en v0.5 : étape 2 (gauche = A,
+  droite = B, appui = ouvrir) et étape 9 (appui = éclair du labyrinthe).
+- **Tremblement d’une trappe SG90 sur une erreur** : ±5 à 8°, **3 cycles au plus**, 80 à 120 ms par pas, **une seule porte
+  à la fois**, puis détacher ou tenir. Jamais pendant un son fort ni un flash de LED vif.
+- **Clé dans les trappes A et B** : la clé tient debout sur la tranche dans une fente verticale, **à gauche**, sous le
+  plancher du compartiment ; on ouvre la porte et on la prend par le haut. Mini-clé 35 × 15 × 2 : tout dans le module ;
+  clé typique 50 × 22 × 2,5 : avec un puits de 3 à 5 mm dans le capot. Pas de poche extérieure. Aucune pièce déplacée.
+- **N° de série (v0.5.0)** : 4 chiffres seulement (`47-19`) sur le CYD 2, plus un lot leurre. Les molettes ne servent
+  qu’à des mots de 5 lettres.
+
 Joint de la base droit à x = 115 (morceaux de 115 et 158 mm). Il n’y a **plus d’OLED** et plus de barre unique de 32 LED.
 
 ## Barrettes : chaîne et alimentation (40 WS2812B)

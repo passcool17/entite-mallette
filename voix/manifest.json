@@ -1,5 +1,5 @@
 {
- "version": "0.4.0",
+ "version": "0.5.0",
  "note": "Voix de l'Entité. Chaque réplique = un id ou une suite d'ids. mp3Ready true : voix/<id>.mp3 est joué (repli synthèse française si échec). mp3Ready false : synthèse française directe, aucun fichier demandé. Pour remplacer une voix : déposer voix/<id>.mp3 puis mettre mp3Ready à true, sans toucher au code. dfplayerTrack = nom du fichier sur la microSD du DFPlayer Mini (dossier mp3/0001.mp3…).",
  "cues": [
   {
@@ -1386,8 +1386,8 @@
    "dfplayerTrack": "0150",
    "category": "hint",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Lis les lettres de la plaque de série de gauche à droite : la première lettre, c'est la prise un, la deuxième, la prise deux, et ainsi de suite."
+   "mp3Ready": false,
+   "text": "Lis les chiffres du numéro de série de gauche à droite : le premier chiffre, c'est la prise un, le deuxième, la prise deux, et ainsi de suite."
   },
   {
    "id": "hint2_patch_double",
@@ -1655,6 +1655,78 @@
    "mp3Ready": true,
    "text": "Dernier indice. La première prise :",
    "aEnregistrer": "v0.3 nouvelle"
+  },
+  {
+   "id": "clue_mot_melange",
+   "file": "voix/clue_mot_melange.mp3",
+   "dfplayerTrack": "0180",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Signal un. Les lettres sont mélangées, sur l'écran du bas. Forme le mot sur les cinq molettes, puis clique."
+  },
+  {
+   "id": "theme_objet",
+   "file": "voix/theme_objet.mp3",
+   "dfplayerTrack": "0181",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "C'est un objet."
+  },
+  {
+   "id": "theme_nature",
+   "file": "voix/theme_nature.mp3",
+   "dfplayerTrack": "0182",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "C'est dans la nature."
+  },
+  {
+   "id": "theme_machine",
+   "file": "voix/theme_machine.mp3",
+   "dfplayerTrack": "0183",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "C'est une machine."
+  },
+  {
+   "id": "hint1_mot_melange",
+   "file": "voix/hint1_mot_melange.mp3",
+   "dfplayerTrack": "0184",
+   "category": "hint",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Indice : les cinq lettres sont sur l'écran du bas. Remets-les dans l'ordre pour faire un mot."
+  },
+  {
+   "id": "hint2_mot_melange",
+   "file": "voix/hint2_mot_melange.mp3",
+   "dfplayerTrack": "0185",
+   "category": "hint",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Un mot de cinq lettres. Chaque molette porte une lettre."
+  },
+  {
+   "id": "hint3_mot_melange",
+   "file": "voix/hint3_mot_melange.mp3",
+   "dfplayerTrack": "0186",
+   "category": "hint",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Dernier indice. La première lettre :"
+  },
+  {
+   "id": "patch_rang_chiffre",
+   "file": "voix/patch_rang_chiffre.mp3",
+   "dfplayerTrack": "0187",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "dans la prise qui porte le rang, sur le numéro de série, du chiffre"
   }
  ]
 }

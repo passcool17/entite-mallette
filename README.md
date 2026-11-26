@@ -12,12 +12,36 @@ Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/ent
 Archive figée de la v0.2.6a (commit 7d2ea7b) : https://passcool17.github.io/entite-mallette-v026a/
 (dépôt passcool17/entite-mallette-v026a, cache séparé `entite-mallette-v026a-0.2.6a`).
 
+Archive figée de la v0.4.0 (commit d7c1ba2, plan v0.8, n° de série à lettres sur les molettes) : https://passcool17.github.io/entite-mallette-v040/
+(dépôt passcool17/entite-mallette-v040, cache séparé `entite-mallette-v040-0.4.0`).
+
 Archive figée de la v0.3.2 (commit 5e9d940, avant la refonte : trois trappes, trois serrures) : https://passcool17.github.io/entite-mallette-v032/
 (dépôt passcool17/entite-mallette-v032, cache séparé `entite-mallette-v032-0.3.2`).
 
+## Version 0.5.0 (25 nov. 2026) — refonte des jeux, 1re étape : « Mot mêlé »
+
+État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.5.0`, imports `?v=0.5.0`).
+Plan : `revision-jeux-proposition.md` §11 (Pascal 22:24 : « go avec le plus tripan, on refait les jeux, voix de base »).
+
+- **Étape 1 = Mot mêlé** : le CYD 2 affiche une ligne « MÊLÉ » avec les 5 lettres **mélangées** d’un mot (aucune à sa place,
+  jamais le mot lui-même) ; on forme le mot sur E1–E5 et on clique une molette. La grande ligne garde les lettres
+  **courantes** des molettes. 19 mots à thème (objet, nature, machine), sans anagramme courante, lettres A–V.
+  Moyen : l’Entité dit le thème, et après un essai raté le CYD 2 montre « n/5 » (combien de lettres bien placées, jamais
+  lesquelles), −5 s. Difficile : pas de thème, pas de score, −8 s, mensonge de l’Entité sur une lettre.
+- Le mot de l’étape 1 est **toujours différent** du mot épelé de l’étape 8 (cryptex).
+- **N° de série en chiffres seulement** (`47-19`, 4 chiffres différents) : il sert aux serrures, au code 2 « décalé » et à la
+  baie banane « série » (prise = rang d’un **chiffre** du n°). Plus aucune lettre de série sur les molettes.
+- **Voix de base** : 8 répliques nouvelles ou réécrites sont dites par la synthèse de l’appareil (`mp3Ready: false`) :
+  `clue_mot_melange`, `theme_objet`, `theme_nature`, `theme_machine`, `hint1_mot_melange`, `hint2_mot_melange`,
+  `hint3_mot_melange`, `patch_rang_chiffre`, et `hint2_patch_serie` réécrite (chiffres). Voix n’enregistre qu’à la fin,
+  les lignes gardées. Les anciennes répliques `clue_enc1_*`, `hint1_plaque`, `hint2_enc1_*` ne sont plus utilisées.
+- Portrait : sur le CYD 2 étroit, RÉÉCOUTER passe sous les lettres (les 5 lettres ne sont plus coupées).
+- Le service worker garde aussi le cache de l’archive `entite-mallette-v040-`.
+- Limites matériel v0.5 (serrures, bouton du joystick, tremblement des trappes, clé dans les trappes) : [`HARDWARE.md`](HARDWARE.md).
+
 ## Version 0.4.0 (25 nov. 2026) — « comme la mallette qu’on va imprimer »
 
-État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.4.0`, imports `?v=0.4.0`).
+État : publiée (commit `d7c1ba2`), remplacée par la 0.5.0 ; archive figée https://passcool17.github.io/entite-mallette-v040/.
 Source : plan d’impression **v0.8** (Impression 3D · Bambu P1S, approuvé par Pascal le 25 nov. à 07:32 ; noms 20:28),
 cotes dans `js/panel-config.js` (`LAYOUT`) et [`HARDWARE.md`](HARDWARE.md).
 

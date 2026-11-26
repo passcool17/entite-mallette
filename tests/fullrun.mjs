@@ -42,8 +42,8 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.4.0';
-import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.4.0';
+import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.5.0';
+import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.5.0';
 
 const require = createRequire(import.meta.url);
 function loadChromium() {
@@ -672,6 +672,14 @@ async function playOne(b, seed, opts) {
     viewport: VIEW, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block',
   });
   await ctx.addInitScript(() => { try { localStorage.setItem('entite-tuto-vu', '1'); } catch {} });
+  // Diagnostic machine lente (v0.5.0) : retard des minuteries de la page (setInterval 100 ms) et longues tâches.
+  // Un retard > 3 s pendant Simon = minuteries gelées par le box (pas la logique du jeu). Rien n'est rejoué ni masqué.
+  await ctx.addInitScript(() => {
+    const lag = window.__timerLag = { max: 0, maxAt: 0, over3s: [], long: 0, longMax: 0 };
+    let last = performance.now();
+    setInterval(() => { const now = performance.now(), d = now - last - 100; last = now; if (d > lag.max) { lag.max = Math.round(d); lag.maxAt = Math.round(now); } if (d > 3000) lag.over3s.push([Math.round(now - d), Math.round(d)]); }, 100);
+    try { new PerformanceObserver((l) => { for (const e of l.getEntries()) { lag.long++; lag.longMax = Math.max(lag.longMax, Math.round(e.duration)); } }).observe({ type: 'longtask', buffered: true }); } catch { /* pas de longtask */ }
+  });
   // Journal des barrettes côté page (v0.3) : quelle(s) barrette(s) allumée(s), et combien de LED au plus (K2000 ≤ 4).
   await ctx.addInitScript(() => {
     window.__stickLog = [];
@@ -751,7 +759,7 @@ async function playOne(b, seed, opts) {
     const info = await readCyd2Hud(p);
     const land = (info.view || '').startsWith('915');
     let ok = !info.plate && !info.lidReplay && info.inCyd
-      && info.serialText === info.want && /^[A-Z][0-9][A-Z][0-9]-[A-Z][0-9][A-Z][0-9][A-Z]$/.test(info.serialText)
+      && info.serialText === info.want && /^[0-9]{2}-[0-9]{2}$/.test(info.serialText) && new Set(info.serialText.replace('-', '')).size === 4
       && info.serialVisible && info.btnVisible && info.battVisible
       && info.btnW >= 44 && info.btnH >= 44
       && /RÉÉCOUTER|RÉECOUTER/i.test(info.btnLabel)
@@ -841,6 +849,7 @@ async function playOne(b, seed, opts) {
     const r = __entiteDebug.run, RING = __entiteDebug.RING;
     return {
       enc1: r.enc1.map((i) => RING[i]),
+      word1: r.word1, scramble: r.scramble, theme: r.theme, word: r.word,
       enc2: r.enc2.map((i) => RING[i]),
       trap: r.trap,
       simon: { ...r.simon, seq: r.simon.seq.slice() },
@@ -880,6 +889,32 @@ async function playOne(b, seed, opts) {
     extras.hintOther = { step: 1, ok: hok };
     if (!hok) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   }
+  // v0.5.0 « mot mêlé » : le CYD 2 montre les 5 lettres MÉLANGÉES (anagramme du mot, jamais le mot), le mot n'est écrit
+  // nulle part (CYD 2, bandeau, aria), molettes = lettres A–V, mot 1 ≠ mot 8 ; un essai presque juste : moyen = score 4/5
+  // et −5 s ; difficile = pas de score et −8 s.
+  {
+    const srt = (w) => [...w].sort().join('');
+    // HUD lu élément par élément : « MÊLÉ LFUSI » + molettes « LRCHL » collés formeraient FUSIL, pas à l'écran
+    const mel = await D(p, () => ({ sub: (document.querySelector('#cyd2Sub .mel')?.textContent || '').trim(),
+      hud: [...(document.querySelector('#cyd2Hud')?.querySelectorAll('*') || [])].filter((e) => !e.children.length).map((e) => e.textContent.trim()).join(' | '), strip: (document.querySelector('#objText')?.textContent || '') + ' ' + (document.querySelector('.strip')?.textContent || ''),
+      aria: [...document.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label')).join(' | ') }));
+    const w = answers.word1;
+    const okMel = mel.sub.length === 5 && mel.sub !== w && srt(mel.sub) === srt(w) && mel.sub === answers.scramble
+      && !mel.hud.includes(w) && !mel.strip.includes(w) && !mel.aria.includes(w)
+      && /^[A-V]{5}$/.test(w) && answers.word !== w && answers.enc1.join('') === w;
+    rec(okMel, 1, 1, okMel ? `mot mêlé : ${mel.sub} affiché (thème ${answers.theme}), mot jamais écrit, mot 8 différent` : `mot mêlé ${JSON.stringify({ mel: mel.sub, w, word8: answers.word, thud: mel.hud.slice(0, 80) })}`);
+    if (!okMel) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+    const near = answers.enc1.slice(); near[4] = RING[(RING.indexOf(near[4]) + 1) % DETENTS];
+    const e0 = await D(p, () => ({ e: __entiteDebug.state.errors, r: __entiteDebug.state.remaining }));
+    await rotateTo(p, near); await W(p, 250);
+    const e1 = await D(p, () => ({ e: __entiteDebug.state.errors, r: __entiteDebug.state.remaining, step: __entiteDebug.state.step,
+      strip: (document.querySelector('#objText')?.textContent || '').trim(),
+      score: (document.querySelector('#cyd2Sub .score')?.textContent || '').trim() }));
+    const moy = answers.v.enc1 === 'theme', pen = moy ? 5 : 8;
+    const okN = e1.step === 1 && e1.e === e0.e + 1 && e1.strip === `−${pen} s` && e0.r - e1.r >= pen - 0.5 && (moy ? e1.score === '4/5' : e1.score === '');
+    rec(okN, 1, 1, okN ? `mot mêlé presque juste : faux, −${pen} s${moy ? ', score 4/5' : ', sans score'}` : `mot mêlé essai raté ${JSON.stringify({ e0, e1, moy })}`);
+    if (!okN) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  }
   const t1 = await tNow();
   await rotateTo(p, answers.enc1);
   if (!(await expectAdvance(1, 2, `lettres ${answers.enc1.join('')}`, t1))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
@@ -915,7 +950,7 @@ async function playOne(b, seed, opts) {
   rec(sOk, 3, 3, sOk ? `Simon ${runInfo.tier} : tours ${SM.start}→${SM.target}, série ${SM.seq.map((k) => k + 1).join('-')}` : `Simon mal tiré ${JSON.stringify(SM)}`);
   if (!sOk) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   const kbd = await D(p, () => { const before = __entiteDebug.state.errors; return { before }; });
-  const simonFail = async (why) => { await fail(3, 3, why); await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; };
+  const simonFail = async (why) => { const lg = await D(p, () => window.__timerLag).catch(() => null); await fail(3, 3, `${why}  minuteries=${JSON.stringify(lg)}`); await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; };
   const sx = { rounds: 0, replay: false, hint: false, wrong: false, ignored: false, timeout: false, drag: false, repeat: false, timing: [] };
   // attendre une lecture complète du tour r (n-ième lecture) et vérifier les impulsions
   const checkPlay = async (r, minPlays, label) => {
@@ -1004,7 +1039,9 @@ async function playOne(b, seed, opts) {
     // reproduire la série : vraies touches (et un glisser au dernier tour, une partie sur trois)
     const want = SM.seq.slice(0, len);
     const tRight = await tNow();
+    const touchT = [];   // horodatage page de chaque toucher (diagnostic machine lente)
     for (let i = 0; i < want.length; i++) {
+      touchT.push(Math.round(await tNow()));
       if (r === rounds - 1 && i === 0 && opts.simonDrag) {
         const d = await dragToJack(p, want[i]);
         sx.drag = d.same;
@@ -1015,7 +1052,7 @@ async function playOne(b, seed, opts) {
     }
     if (r < rounds - 1) {
       const nx = await waitSimon(p, (s) => s.round === r + 1, 6000);
-      if (!nx.s || nx.timeout) return simonFail(`tour ${r + 1} réussi mais pas de tour ${r + 2} ${JSON.stringify(nx)}`);
+      if (!nx.s || nx.timeout) return simonFail(`tour ${r + 1} réussi mais pas de tour ${r + 2} ${JSON.stringify(nx)} touches=${JSON.stringify(touchT)} trace=${JSON.stringify(await D(p, () => (window.__simonTrace || []).slice(-12)))}`);
       sx.rounds++;
     } else {
       sx.rounds++;

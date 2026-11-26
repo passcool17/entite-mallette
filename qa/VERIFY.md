@@ -93,23 +93,44 @@ La couverture se calcule sur **l’ensemble des parties du run**, pas graine par
 | Étape | Module | Attendu |
 |------:|--------|---------|
 | 0 | Armement | Ouvrir le capot (`#coverArm`) puis basculer le levier ARM (`#leverArm`). La partie passe à l’étape 1, voix `depart`. |
-| 1 | Molettes (5 × KY-040, zigzag) | Régler les 5 anneaux sur les lettres dictées (A–V sans K ni Q, jamais de chiffres ici) et valider au centre d’une molette. Le CYD 2 montre en grand les lettres **courantes** (jamais la réponse). |
-| 2 | Trappes A / B / C | Ouvrir la bonne trappe, d’après les 5 barrettes (10 moitiés de 4 LED, comptes toujours distincts : 5/3/2, 6/3/1 ou 5/4/1). |
+| 1 | Mot mêlé, molettes (5 × KY-040, en ligne) + CYD 2 | Le CYD 2 affiche « MÊLÉ » et 5 lettres mélangées (jamais le mot) ; régler E1–E5 sur le mot (A–V, jamais de chiffres) et valider au centre d’une molette. Moyen : thème dit, score « n/5 » après un essai raté, −5 s. Difficile : sans thème ni score, −8 s. Mot 1 ≠ mot 8. |
+| 2 | Trappes A / B | Ouvrir la bonne trappe, d’après les 5 barrettes (10 moitiés de 4 LED, comptes toujours distincts : 5/3/2, 6/3/1 ou 5/4/1). |
 | 3 | Simon : barrettes + prises (`#jacks`) | Une barrette à la fois joue un effet K2000 (≤ 4 LED allumées, couleur du câble ; noir → violet). Reproduire la série en touchant les prises (ou en y glissant un câble, qui revient). Moyen 2→5, difficile 3→6 (plus rapide à chaque tour). Mauvaise prise ou trop lent : −8 s, le tour se rejoue ; toucher pendant la lecture : ignoré. **Réécouter** (CYD 2, ≥ 44 px) et l’indice 1 rejouent le tour sans pénalité. Le CYD 2 affiche `SIMON r/4`. |
 | 4 | Baie banane (1re couche) | Vraie baie 5×5. Brancher selon la consigne dictée (pas de réponse écrite à l’écran). |
 | 5 | Labyrinthe, CYD 2 + joystick | Rejoindre le but. Le labyrinthe prend l’écran ; le n° de série reste visible en petit dans un coin (≥ 11 px en paysage), avec RÉÉCOUTER (≥ 44 px réels), sans chevaucher ni la jauge batterie ni la grille du labyrinthe (412×915 et 915×412). Le bouton reste utilisable. Pas de plaque rivetée sur le couvercle, pas d’ECG. |
 | 6 | Code 1, clavier 4×4 | Saisir le code. Faux code refusé ; le bon avance tout de suite (voix `taunt_fini` / suite). |
 | 7 | Clés I, II | Les presser dans l’ordre dicté. |
-| 8 | Encodeurs, mot (cryptex) | Mot de 4 lettres sur les anneaux (A–V), validation au centre. |
+| 8 | Encodeurs, mot (cryptex) | Mot de 5 lettres épelé sur les anneaux (A–V), validation au centre. |
 | 9 | Labyrinthe 2, CYD 2 | Rejoindre le but. Le joystick peut être inversé (sabotage). Comme à l’étape 5 : n° + RÉÉCOUTER visibles, sans chevaucher la grille. |
 | 10 | Baie banane (2e couche) | Même baie 5×5, deuxième consigne. Le bandeau reprend la consigne dictée. |
 | 11 | Code 2, clavier 4×4 | Saisir le code. Faux code refusé ; le bon avance. |
 | 12 | Levier TRANSMIT (rouge) | Basculer le levier rouge. Victoire : « Mallette désamorcée », voix `outcome_victoire`. |
 
-Hors labyrinthe, le CYD 2 affiche le n° de série (grand, format `LCLC-LCLC`) et RÉÉCOUTER, avec la jauge batterie en haut à droite (sans chevauchement). Plus de plaque rivetée, plus d’ECG.
+Hors labyrinthe, le CYD 2 affiche le n° de série (grand, 4 chiffres, format `47-19`) et RÉÉCOUTER, avec la jauge batterie en haut à droite (sans chevauchement). Plus de plaque rivetée, plus d’ECG.
 
 Règles permanentes : tout reste dans la mallette ; palier tiré au hasard entre moyen et difficile ; le joueur ne doit jamais rester coincé sans piste ; pas de codes à l’écran sans `?debug=1`.
 
 ## Captures
 
 Dossier typique : `/workspace/qa/entite-mallette/` (rapports) et `/workspace/qa/entite-mallette/v0.2.6-live/` (captures). 2 ou 3 images, 412×915, plus 915×412 seulement si la mise en page a changé. Pour la v0.2.6a : `maze-412x915.png` et `maze-915x412.png` (étape 5, n° et RÉÉCOUTER hors de la grille).
+
+## Full run v0.5.0 (26 nov. 2026) : échecs Simon dus au gel du box, preuve
+
+Deux full runs `--qa` sur le box partagé : `fullrun050.log` (g3, g16 difficile, étape 3) et `fullrun050b.log` (g23, g46 moyen,
+g30 difficile, étape 3 ; g10 = faux positif du test « mot mêlé », corrigé). Rejouées seules, toutes passent
+(`replay-3-16.log`, `replay-10-23-30-46.log` : FULLRUN PASS, console 0). Dossier : `/workspace/qa/entite-mallette/v0.5/`.
+
+Preuve (journal `__simonTrace` de l’app, `performance.now()` en ms) — minuteries en retard de plus de 3 s :
+
+| Graine | Événement → minuterie | Attendu | Retard |
+|---|---|---|---|
+| g23 moyen | advance 11339 → advance-timer 23134 | +700 | **+11 095 ms** |
+| g46 moyen | fail 12037 → fail-timer 23285 | +1400 | **+9 848 ms** |
+| g30 difficile | play 16349 → play-end 28701 (filet watchdog app à 28532) | ≈ +700 | **≈ +11 650 ms** |
+
+g3 (run 1) : aucun retard ; l’app a joué la bonne série, l’observateur rAF du test (mode `simon=rapide`) a raté des images.
+Cause : le box est mis en pause par moments (une attente de 400 s côté agent = +20 s d’horloge du box, puis saut de 7 min).
+Pas le jeu : étape 3 non modifiée en v0.5.0 ; aucune boucle de fond ajoutée (œil, câbles, LED identiques à v0.4.0) ;
+fps étapes 1 et 3, v0.4.0 contre v0.5.0 : 60 fps, p95 16,8 ms, identiques. `fullrun.mjs` joue une page à la fois.
+Pas de reprise automatique. Le test note désormais, dans chaque échec Simon, la trace de l’app, l’heure de chaque toucher
+et le retard des minuteries de la page (`minuteries=` : setInterval 100 ms, longues tâches).

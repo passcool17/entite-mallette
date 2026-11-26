@@ -40,19 +40,19 @@
     @keyframes b-scan { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
     @media (prefers-reduced-motion: reduce) { .b-eye i { animation-duration: 30s; } .b-scan { animation-duration: 3s; } .b-eye b { animation: none; } }
   </style>
-  <link rel="stylesheet" href="css/app.css?v=0.4.0" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="css/app.css?v=0.4.0"></noscript>
-  <link rel="modulepreload" href="js/eye.js?v=0.4.0">
-  <link rel="modulepreload" href="js/eye-config.js?v=0.4.0">
-  <link rel="modulepreload" href="js/game.js?v=0.4.0">
-  <link rel="modulepreload" href="js/audio.js?v=0.4.0">
-  <link rel="modulepreload" href="js/sfx.js?v=0.4.0">
-  <link rel="modulepreload" href="js/voice-manifest.js?v=0.4.0">
-  <link rel="modulepreload" href="js/preload.js?v=0.4.0">
-  <link rel="modulepreload" href="js/panel-config.js?v=0.4.0">
-  <link rel="modulepreload" href="js/battery.js?v=0.4.0">
-  <link rel="modulepreload" href="js/guide.js?v=0.4.0">
-  <script type="module" src="js/app.js?v=0.4.0"></script>
+  <link rel="stylesheet" href="css/app.css?v=0.5.0" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="css/app.css?v=0.5.0"></noscript>
+  <link rel="modulepreload" href="js/eye.js?v=0.5.0">
+  <link rel="modulepreload" href="js/eye-config.js?v=0.5.0">
+  <link rel="modulepreload" href="js/game.js?v=0.5.0">
+  <link rel="modulepreload" href="js/audio.js?v=0.5.0">
+  <link rel="modulepreload" href="js/sfx.js?v=0.5.0">
+  <link rel="modulepreload" href="js/voice-manifest.js?v=0.5.0">
+  <link rel="modulepreload" href="js/preload.js?v=0.5.0">
+  <link rel="modulepreload" href="js/panel-config.js?v=0.5.0">
+  <link rel="modulepreload" href="js/battery.js?v=0.5.0">
+  <link rel="modulepreload" href="js/guide.js?v=0.5.0">
+  <script type="module" src="js/app.js?v=0.5.0"></script>
 </head>
 <body>
   <div id="boot" aria-live="polite">
@@ -85,12 +85,12 @@
         $('bootActions').hidden = false; $('bootSkip').hidden = !canSkip;
       };
       // Réessayer (code bloqué) : désinscrit le service worker de CETTE app et vide ses anciens caches (jamais les archives
-      // entite-mallette-v015- / v016- / v026a- / v032-), puis recharge. app.js remplace ce bouton par sa propre reprise une fois chargé.
+      // entite-mallette-v015- / v016- / v026a- / v032- / v040-), puis recharge. app.js remplace ce bouton par sa propre reprise une fois chargé.
       B.purge = function () {
         var dir = location.pathname.replace(/[^/]*$/, ''), jobs = [];
         try {
           if (navigator.serviceWorker) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.filter(function (r) { return new URL(r.scope).pathname === dir; }).map(function (r) { return r.unregister(); })); }));
-          if (window.caches) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k.indexOf('entite-mallette-') === 0 && k.indexOf('entite-mallette-v015-') !== 0 && k.indexOf('entite-mallette-v016-') !== 0 && k.indexOf('entite-mallette-v026a-') !== 0 && k.indexOf('entite-mallette-v032-') !== 0; }).map(function (k) { return caches.delete(k); })); }));
+          if (window.caches) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k.indexOf('entite-mallette-') === 0 && k.indexOf('entite-mallette-v015-') !== 0 && k.indexOf('entite-mallette-v016-') !== 0 && k.indexOf('entite-mallette-v026a-') !== 0 && k.indexOf('entite-mallette-v032-') !== 0 && k.indexOf('entite-mallette-v040-') !== 0; }).map(function (k) { return caches.delete(k); })); }));
         } catch (e) { /* rien à purger */ }
         return Promise.all(jobs).catch(function () {});
       };
@@ -218,7 +218,7 @@
                   <span class="silk">SG90 · TRAPPES A B</span>
                 </div>
               <div class="mod mod-signal">
-                <div class="cyd cyd2"><span class="pcb-tag" aria-hidden="true">CYD 2</span><div class="screen"><canvas id="cyd2" width="240" height="180" role="img" aria-label="Écran 2 : numéro de série"></canvas><div class="cyd2-hud" id="cyd2Hud"><div class="cyd2-serial" id="serialReadout"><span class="cyd2-slabel">N° SÉRIE</span><span class="cyd2-snum" id="serial">————-—————</span><span class="cyd2-slot" id="lot">LOT ———</span></div><div class="cyd2-big" id="cyd2Big" aria-live="off"></div><button class="cyd2-replay" id="btnReplay" type="button" aria-label="Réécouter la dernière consigne" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/></svg><span>RÉÉCOUTER</span></button></div><div class="batt" id="batt" role="img" aria-label="Batterie"><span class="batt-ico" aria-hidden="true"><i></i></span><span class="batt-txt" aria-hidden="true"><b id="battPct">— %</b><small id="battV">— V</small></span></div></div></div>
+                <div class="cyd cyd2"><span class="pcb-tag" aria-hidden="true">CYD 2</span><div class="screen"><canvas id="cyd2" width="240" height="180" role="img" aria-label="Écran 2 : numéro de série"></canvas><div class="cyd2-hud" id="cyd2Hud"><div class="cyd2-serial" id="serialReadout"><span class="cyd2-slabel">N° SÉRIE</span><span class="cyd2-snum" id="serial">——-——</span><span class="cyd2-slot" id="lot">LOT ———</span></div><div class="cyd2-sub" id="cyd2Sub" aria-hidden="true"></div><div class="cyd2-big" id="cyd2Big" aria-live="off"></div><button class="cyd2-replay" id="btnReplay" type="button" aria-label="Réécouter la dernière consigne" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/></svg><span>RÉÉCOUTER</span></button></div><div class="batt" id="batt" role="img" aria-label="Batterie"><span class="batt-ico" aria-hidden="true"><i></i></span><span class="batt-txt" aria-hidden="true"><b id="battPct">— %</b><small id="battV">— V</small></span></div></div></div>
               </div>
               </div>
               <div class="b4-col b4-c3">
