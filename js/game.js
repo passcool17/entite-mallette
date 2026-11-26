@@ -37,9 +37,15 @@ export const SIMON = {
   LEDS: 8, STICKS: 5, STEP_MS: 36, TAIL: 3, LEVELS: [255, 140, 56, 16], SWEEPS: 2, GAP_MS: 200,
   INPUT_STEP_MS: 24, ERROR_ON_MS: 140, ERROR_OFF_MS: 100, ERROR_FLASHES: 2, ERROR_LEVEL: 160,
   SPEEDUP: 0.88, STEP_MIN: 20, GAP_MIN: 120, PENALTY_S: 8,
-  moyen:     { start: 2, target: 5, first: 8000, between: 2500, speedup: false },
-  difficile: { start: 3, target: 6, first: 6000, between: 2000, speedup: true },
+  moyen:     { start: 2, target: 5, first: 8000, between: 2500, speedup: false, lastReversed: false },
+  difficile: { start: 3, target: 6, first: 6000, between: 2000, speedup: true, lastReversed: true },
 };
+// v0.5.1 : une note par barrette (gamme pentatonique do ré mi sol la, barrette 1 → 5), jouée dans SPK-L / SPK-R
+export const SIMON_NOTES = [262, 294, 330, 392, 440];
+// v0.5.1 : étape 10 contre la montre : la barrette 1 se vide LED par LED ; à zéro −8 s, une erreur, et elle se recharge
+export const PATCH_CLOCK = { moyen: 30000, difficile: 20000, PENALTY_S: 8 };
+// v0.5.1 : étape 8 (cryptex) : en moyen, la barrette n s'allume à chaque lettre épelée ; en difficile, Réécouter coûte 5 s
+export const CRYPTEX_REPLAY_COST_S = 5;
 // timing d'un tour (round = index 0..) : en difficile, ×0,88 par tour réussi, avec planchers
 export function simonTiming(tier, round) {
   const P = SIMON[tier] || SIMON.moyen, f = P.speedup ? Math.pow(SIMON.SPEEDUP, round) : 1;
@@ -145,8 +151,8 @@ export function makeRun(seed) {
   // ---- 3. Simon (v0.3) : série de barrettes 0..4 (répétitions permises, même de suite). On la reproduit en touchant
   // les prises sous les barrettes. Moyen : tours de 2 à 5 ; difficile : 3 à 6, plus rapide à chaque tour.
   const sp = SIMON[tier];
-  const simon = { seq: Array.from({ length: sp.target }, () => int(5)), start: sp.start, target: sp.target, first: sp.first, between: sp.between };
-  cues[3] = ['clue_simon', 'clue_simon_noir'];
+  const simon = { seq: Array.from({ length: sp.target }, () => int(5)), start: sp.start, target: sp.target, first: sp.first, between: sp.between, lastReversed: !!sp.lastReversed };
+  cues[3] = ['clue_simon', 'clue_simon_noir', 'simon_notes'];   // v0.5.1 : « Écoute les notes. »
 
   // ---- 4 et 10. baie banane 5x5 : 5 câbles ancrés sur la base (ports 0..4, couleurs toutes différentes),
   // chacun se branche dans N'IMPORTE LAQUELLE des 5 prises (0..4 = prises 1..5). Départ : câble c → prise c.

@@ -1,5 +1,5 @@
 {
- "version": "0.5.0",
+ "version": "0.5.1",
  "note": "Voix de l'Entité. Chaque réplique = un id ou une suite d'ids. mp3Ready true : voix/<id>.mp3 est joué (repli synthèse française si échec). mp3Ready false : synthèse française directe, aucun fichier demandé. Pour remplacer une voix : déposer voix/<id>.mp3 puis mettre mp3Ready à true, sans toucher au code. dfplayerTrack = nom du fichier sur la microSD du DFPlayer Mini (dossier mp3/0001.mp3…).",
  "cues": [
   {
@@ -1727,6 +1727,33 @@
    "source": "tts",
    "mp3Ready": false,
    "text": "dans la prise qui porte le rang, sur le numéro de série, du chiffre"
+  },
+  {
+   "id": "obj_mot_melange",
+   "file": "voix/obj_mot_melange.mp3",
+   "dfplayerTrack": "0188",
+   "category": "objective",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Mot mêlé : remets en ordre les lettres de l’écran du bas, sur les molettes."
+  },
+  {
+   "id": "simon_notes",
+   "file": "voix/simon_notes.mp3",
+   "dfplayerTrack": "0189",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Écoute les notes."
+  },
+  {
+   "id": "simon_envers",
+   "file": "voix/simon_envers.mp3",
+   "dfplayerTrack": "0190",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Cette fois, à l'envers."
   }
  ]
 }

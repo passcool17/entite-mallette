@@ -95,14 +95,14 @@ La couverture se calcule sur **l’ensemble des parties du run**, pas graine par
 | 0 | Armement | Ouvrir le capot (`#coverArm`) puis basculer le levier ARM (`#leverArm`). La partie passe à l’étape 1, voix `depart`. |
 | 1 | Mot mêlé, molettes (5 × KY-040, en ligne) + CYD 2 | Le CYD 2 affiche « MÊLÉ » et 5 lettres mélangées (jamais le mot) ; régler E1–E5 sur le mot (A–V, jamais de chiffres) et valider au centre d’une molette. Moyen : thème dit, score « n/5 » après un essai raté, −5 s. Difficile : sans thème ni score, −8 s. Mot 1 ≠ mot 8. |
 | 2 | Trappes A / B | Ouvrir la bonne trappe, d’après les 5 barrettes (10 moitiés de 4 LED, comptes toujours distincts : 5/3/2, 6/3/1 ou 5/4/1). |
-| 3 | Simon : barrettes + prises (`#jacks`) | Une barrette à la fois joue un effet K2000 (≤ 4 LED allumées, couleur du câble ; noir → violet). Reproduire la série en touchant les prises (ou en y glissant un câble, qui revient). Moyen 2→5, difficile 3→6 (plus rapide à chaque tour). Mauvaise prise ou trop lent : −8 s, le tour se rejoue ; toucher pendant la lecture : ignoré. **Réécouter** (CYD 2, ≥ 44 px) et l’indice 1 rejouent le tour sans pénalité. Le CYD 2 affiche `SIMON r/4`. |
-| 4 | Baie banane (1re couche) | Vraie baie 5×5. Brancher selon la consigne dictée (pas de réponse écrite à l’écran). |
+| 3 | Simon : barrettes + prises (`#jacks`) | Une barrette à la fois joue un effet K2000 (≤ 4 LED allumées, couleur du câble ; noir → violet). Reproduire la série en touchant les prises (ou en y glissant un câble, qui revient). Moyen 2→5, difficile 3→6 (plus rapide à chaque tour). Mauvaise prise ou trop lent : −8 s, le tour se rejoue ; toucher pendant la lecture : ignoré. **Réécouter** (CYD 2, ≥ 44 px) et l’indice 1 rejouent le tour sans pénalité. Le CYD 2 affiche `SIMON r/4`. v0.5.1 : une note par barrette ; difficile, dernier tour à l’envers (annoncé, CYD 2 « ↺ »). |
+| 4 | Baie banane (1re couche) | Vraie baie 5×5. Brancher selon la consigne dictée (pas de réponse écrite à l’écran). v0.5.1 : barrette au-dessus d’une prise = couleur du câble ; fiche fautive = éclair rouge + zap. |
 | 5 | Labyrinthe, CYD 2 + joystick | Rejoindre le but. Le labyrinthe prend l’écran ; le n° de série reste visible en petit dans un coin (≥ 11 px en paysage), avec RÉÉCOUTER (≥ 44 px réels), sans chevaucher ni la jauge batterie ni la grille du labyrinthe (412×915 et 915×412). Le bouton reste utilisable. Pas de plaque rivetée sur le couvercle, pas d’ECG. |
 | 6 | Code 1, clavier 4×4 | Saisir le code. Faux code refusé ; le bon avance tout de suite (voix `taunt_fini` / suite). |
 | 7 | Clés I, II | Les presser dans l’ordre dicté. |
-| 8 | Encodeurs, mot (cryptex) | Mot de 5 lettres épelé sur les anneaux (A–V), validation au centre. |
+| 8 | Encodeurs, mot (cryptex) | Mot de 5 lettres épelé sur les anneaux (A–V), validation au centre. v0.5.1 : moyen, barrette n à chaque lettre épelée (envers 5→1) ; difficile, pas de barrettes, Réécouter −5 s. |
 | 9 | Labyrinthe 2, CYD 2 | Rejoindre le but. Le joystick peut être inversé (sabotage). Comme à l’étape 5 : n° + RÉÉCOUTER visibles, sans chevaucher la grille. |
-| 10 | Baie banane (2e couche) | Même baie 5×5, deuxième consigne. Le bandeau reprend la consigne dictée. |
+| 10 | Baie banane (2e couche) | Même baie 5×5, deuxième consigne. Le bandeau reprend la consigne dictée. v0.5.1 : barrette 1 = chrono (moyen 30 s, difficile 20 s) ; vide → −8 s, recharge. |
 | 11 | Code 2, clavier 4×4 | Saisir le code. Faux code refusé ; le bon avance. |
 | 12 | Levier TRANSMIT (rouge) | Basculer le levier rouge. Victoire : « Mallette désamorcée », voix `outcome_victoire`. |
 

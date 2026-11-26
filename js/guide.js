@@ -1,13 +1,13 @@
-// guide.js (v0.5.0 : étape 1 = mot mêlé ; v0.3 ; base v0.2.5) : clarté du jeu (retour de Pascal : « on reste bloqué sans savoir quoi faire »).
+// guide.js (v0.5.1 : Simon à l'envers au dernier tour en difficile ; v0.5.0 : étape 1 = mot mêlé ; v0.3 ; base v0.2.5) : clarté du jeu (retour de Pascal : « on reste bloqué sans savoir quoi faire »).
 // Pour chaque étape : un OBJECTIF court (dit par l'Entité ET écrit dans le bandeau), le ou les MODULES à utiliser
 // (contour qui pulse), et 3 niveaux d'INDICES. Règle de Pascal : le bandeau dit QUOI faire et OÙ, jamais une réponse
 // calculée (aucun code, sauf ?debug=1). À l'étape 10 le bandeau reprend la consigne dictée (couleur / prise). Seul l'indice 3 DIT (à voix haute) un morceau de la réponse.
 // Logique pure (sans DOM) : testable avec node.
-import { RING, DIRS, canMove } from './game.js?v=0.5.0';
+import { RING, DIRS, canMove } from './game.js?v=0.5.1';
 
 // objectif : id de réplique (voix/manifest.json) ; le texte du bandeau = le texte de la réplique (même phrase)
 export const OBJECTIVE = {
-  0: 'obj_armer', 1: 'obj_molettes_code', 2: 'obj_trappe', 3: 'obj_simon', 4: 'obj_cables', 5: 'obj_verrou', 6: 'obj_code',
+  0: 'obj_armer', 1: 'obj_mot_melange', 2: 'obj_trappe', 3: 'obj_simon', 4: 'obj_cables', 5: 'obj_verrou', 6: 'obj_code',
   7: 'obj_cles', 8: 'obj_mot', 9: 'obj_verrou', 10: 'obj_cables2', 11: 'obj_code', 12: 'obj_transmit',
 };
 // Étape 10 : le bandeau reprend la consigne dictée (couleur / prise, ou rang d'une lettre), pas le résumé vague
@@ -85,7 +85,8 @@ export function hintCues(run, step, level, ctx = {}) {
     case 1: return ['hint3_mot_melange', let_(run.word1[0])];
     case 8: return ['hint3_molette1', let_(RING[run.enc2[0]])];
     case 2: return ['hint3_trappe', `couleur_${run.trapColors[run.trap]}`];
-    case 3: return ['hint3_simon', `couleur_${['noir', 'bleu', 'vert', 'rouge', 'jaune'][run.simon.seq[0]]}`];
+    case 3: { const k = ctx.simonRev ? run.simon.seq[run.simon.target - 1] : run.simon.seq[0];   // dernier tour à l'envers : la 1re prise est la dernière de la série
+      return ['hint3_simon', `couleur_${['noir', 'bleu', 'vert', 'rouge', 'jaune'][k]}`]; }
     case 6: return ['hint3_premier_chiffre', dig(run.code1[0])];
     case 11: return ['hint3_premier_chiffre', dig(run.code2[0])];
     case 4: case 10: {
@@ -107,7 +108,7 @@ export function hintCues(run, step, level, ctx = {}) {
 export const GUIDE_CUES = [
   ...new Set(Object.values(OBJECTIVE)), ...new Set(Object.values(H1)), 'hint1_armer', 'hint2_armer', 'hint2_verrou', 'hint2_transmit', 'hint_rappel_fragments',
   'hint2_mot_melange', 'hint3_mot_melange', 'theme_objet', 'theme_nature', 'theme_machine', ...['frequente', 'rare', 'moyenne', 'gauche'].map((k) => `hint2_trappe_${k}`),
-  'hint2_simon', 'hint3_simon', ...['route', 'echange', 'debranche', 'serie', 'double'].map((k) => `hint2_patch_${k}`),
+  'hint2_simon', 'hint3_simon', 'simon_notes', 'simon_envers', ...['route', 'echange', 'debranche', 'serie', 'double'].map((k) => `hint2_patch_${k}`),
   ...['ordre', 'envers', 'plus1'].map((k) => `hint2_code1_${k}`), ...['envers', 'rotation', 'decale'].map((k) => `hint2_code2_${k}`),
   'hint2_cles_legere', 'hint2_cles_lourde', ...['ordre', 'envers', 'suivante'].map((k) => `hint2_mot_${k}`),
   'hint3_molette1', 'hint3_trappe', 'hint3_premier_chiffre', 'hint3_geste', 'hint3_debranche', 'hint3_direction', 'hint3_serrure', ...Object.values(DIR_CUE),

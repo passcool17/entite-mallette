@@ -1,7 +1,7 @@
 // audio.js (v0.2.5) : graphe WebAudio unique (voix / musique / effets, limiteur, L/R), musique de tension, voix de l'Entité (manifeste voix/manifest.json : mp3 si prêt, sinon synthèse française),
 // routée dans un AnalyserNode pour animer l'œil.
-import { loadManifest, sentence, fileOf, cue } from './voice-manifest.js?v=0.5.0';
-import { takePreloaded, MUSIC_URL } from './preload.js?v=0.5.0';
+import { loadManifest, sentence, fileOf, cue } from './voice-manifest.js?v=0.5.1';
+import { takePreloaded, MUSIC_URL } from './preload.js?v=0.5.1';
 
 let ac = null, master, limiter, sfxBus, voiceBus, analyser, data, muted = false, volume = 0.9;
 let musicBus, musicDuck, musicLP, music = null, musicBuf = null, musicLoad = null;
@@ -161,10 +161,14 @@ export function speak(ids, { lie = false } = {}) {
     });
   });
 }
+// v0.5.1 : appelé au début de chaque réplique d'une suite (barrettes qui accompagnent le cryptex). Affichage seulement.
+let cueHook = null;
+export function setCueHook(fn) { cueHook = fn; }
 function readyMp3(id) { return !!ac && cue(id)?.mp3Ready === true && !voiceFailed.has(id); }
 async function playSeq(ids, i, token, done, lie) {
   if (token !== speakToken) return;
   if (i >= ids.length) { done(); return; }
+  try { cueHook?.(ids[i]); } catch { /* affichage seulement */ }
   if (readyMp3(ids[i])) {
     try {
       const buf = await loadVoice(ids[i]);
@@ -182,6 +186,7 @@ async function playSeq(ids, i, token, done, lie) {
   // id consécutifs sans mp3 : une seule phrase, puis reprise (le suivant peut être un fichier)
   let j = i + 1;
   while (j < ids.length && !readyMp3(ids[j])) j++;
+  for (let k = i + 1; k < j; k++) { try { cueHook?.(ids[k]); } catch { /* rien */ } }
   speakTTS(sentence(ids.slice(i, j)), token, () => playSeq(ids, j, token, done, lie), lie);
 }
 let voiceFast = false;
@@ -323,7 +328,7 @@ export function stopMusic(kind = 'fade', silent = false) {
 // ---------- jingle de victoire (v0.3, Suno « victoire v2 », 14,8 s, 112 kb/s) ----------
 // Chargé tard (pendant la partie, jamais au démarrage), joué une fois par victoire, par le bus effets
 // → master : le bouton son et le volume s'appliquent. Le contexte audio est déjà débloqué par le geste d'armement.
-export const JINGLE_URL = 'audio/victoire.mp3?v=0.5.0';
+export const JINGLE_URL = 'audio/victoire.mp3?v=0.5.1';
 export const jingleStats = { demandes: 0, lances: 0, charge: false, erreur: '', t: 0 };
 let jingleBuf = null, jingleLoad = null, jingleSrc = null;
 export function preloadJingle() {

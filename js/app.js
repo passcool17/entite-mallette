@@ -8,17 +8,17 @@
 // Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 // v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 2, variantes d'énigmes
 // tirées par étape (deux parties de suite ne se ressemblent pas : signature de la partie précédente dans localStorage).
-import { createEye } from './eye.js?v=0.5.0';
-import { EYE, deepMerge } from './eye-config.js?v=0.5.0';
-import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS, NENC, SIMON, STICK_COLORS, STICK_NAMES, simonTiming, beatMs, scannerFrame } from './game.js?v=0.5.0';
-import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.5.0';
-import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable, preloadJingle, playJingle, stopJingle, jingleStats } from './audio.js?v=0.5.0';
-import { sfx } from './sfx.js?v=0.5.0';
-import { preloadAll } from './preload.js?v=0.5.0';
-import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.5.0';
-import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.5.0';
+import { createEye } from './eye.js?v=0.5.1';
+import { EYE, deepMerge } from './eye-config.js?v=0.5.1';
+import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS, NENC, SIMON, STICK_COLORS, STICK_NAMES, simonTiming, beatMs, scannerFrame, PATCH_CLOCK, CRYPTEX_REPLAY_COST_S } from './game.js?v=0.5.1';
+import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.5.1';
+import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable, setCueHook, preloadJingle, playJingle, stopJingle, jingleStats } from './audio.js?v=0.5.1';
+import { sfx } from './sfx.js?v=0.5.1';
+import { preloadAll } from './preload.js?v=0.5.1';
+import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.5.1';
+import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.5.1';
 
-const VERSION = '0.5.0';
+const VERSION = '0.5.1';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -53,6 +53,7 @@ function resetState(remember = false) {
     step: 0, running: false, ended: false, result: null,
     endAt: 0, remaining: TIME_S, rate: 1, lastTick: 0, lastSec: null,
     prob: 99.7, errors: 0, lieUntil: 0, lies: 0, melScore: null,
+    pclock: null, pflash: null, acc: null, accLog: [], lastLeds: null,   // v0.5.1 : chrono barrette 1 (ét. 10), éclair rouge (ét. 4/10), cryptex (ét. 8)
     coverArm: false, coverTx: false, armed: false, txOn: false,
     enc: Array(NENC).fill(0), encRaw: Array(NENC).fill(0), encMode: 'alpha', trapOpen: [false, false], simon: null,
     cables: run.wires.map((color, i) => ({ color, socket: i })), sel: null, patchTok: 0, // câble c (port c de la base) → prise 0..4 ou null
@@ -342,7 +343,7 @@ function afterPatch(ev, before) {
   if (g.step === 4 || g.step === 10) {
     const p = g.step === 4 ? run.patch1 : run.patch2;
     if (patchDone(p.req)) { g.step === 4 ? good(5, 2) : good(11); return; }
-    if (patchWrong(p.req, ev)) { bad(8); revert(900); }
+    if (patchWrong(p.req, ev)) { g.pflash = { s: ev.s, t0: performance.now() }; sfx.zap(); bad(8); revert(900); }
     return;
   }
   bad(5); revert(900);
@@ -450,7 +451,8 @@ function cydBigState() {
   if (g.step === 6 || g.step === 11) { const n = g.code.length; return { mode: 'code', text: '●'.repeat(n) + '–'.repeat(4 - n), sr: `Code : ${n} sur 4` }; }
   if (g.step === 3 && g.simon) {
     const S = g.simon, rounds = run.simon.target - run.simon.start + 1, r = Math.min(rounds, S.round + 1);
-    return { mode: 'simon', text: `SIMON ${r}/${rounds}`, sr: `Simon, tour ${r} sur ${rounds}` };
+    const rev = simonReversed(S);
+    return { mode: 'simon', text: `SIMON ${r}/${rounds}${rev ? ' ↺' : ''}`, sr: `Simon, tour ${r} sur ${rounds}${rev ? ', à l’envers' : ''}` };
   }
   return { mode: '', text: '', sr: '' };
 }
@@ -564,6 +566,7 @@ function drawCyd2() {
 // ================= déroulé =================
 function nextStep(n, { holdStrip = 0 } = {}) {
   g.step = n; g.pressure.forEach(clearTimeout); g.pressure = []; g.decoy = null; clearDecoys();
+  if (n !== 10) g.pclock = null; g.pflash = null; g.acc = null;
   stopSimon();
   g.hint = 0; progress(); showStep();
   if (!holdStrip) showObjective();
@@ -589,7 +592,8 @@ function nextStep(n, { holdStrip = 0 } = {}) {
       voice(C[8], { clue: true }); pressureEnc(); break;
     case 9: g.pos = run.maze2.start.slice(); voice([O, 'clue_verrou'], { clue: true }); g.sabT = performance.now() + 5000; break;
     case 10: straightCables(); sfx.servo(); batt?.dip('servo');
-      voice(C[10], { clue: true });
+      g.pclock = { total: PATCH_CLOCK[run.tier] || PATCH_CLOCK.moyen, t0: 0, expired: 0 };   // pleine pendant la consigne
+      voice(C[10], { clue: true }).then(() => { if (g.step === 10 && g.pclock && !g.pclock.t0) g.pclock.t0 = performance.now(); });
       if (run.lies.wire2False) pressure(6000, () => { const w = run.decoys.wire2; decoy('wire', w); voice(['taunt_branche', cableCue(w.cable), prise(w.socket)], { lie: true, now: true }); }); break;
     case 11: g.code = ''; voice(C[11], { clue: true });
       pressure(7000, () => { decoy('tx'); voice('taunt_rouge', { lie: true, now: true }); }); break;
@@ -753,7 +757,7 @@ function giveHint(level, auto = false) {
   g.hint = level; g.hintsUsed++;
   const cost = k === 0 ? 0 : HINT_COST[level];
   if (cost) { g.remaining -= cost; showTime(g.remaining); }
-  const ids = hintCues(run, k, level, { pos: g.pos, sabotage: g.sabotage });
+  const ids = hintCues(run, k, level, { pos: g.pos, sabotage: g.sabotage, simonRev: !!(g.simon && simonReversed(g.simon)) });
   sfx.push();
   const spoken = voice(ids, { now: true });
   // indices 1 et 2 de l'étape 3 (Simon) : rejouer le tour en cours après la voix, comme Réécouter, sans pénalité
@@ -875,6 +879,9 @@ function wire() {
   $('#btnAgain').addEventListener('click', () => { document.body.classList.remove('boom'); stopVoice(); startGame(); });
   $('#btnReplay').addEventListener('click', () => {
     if (!g.lastClue) return;
+    if (g.step === 8 && g.phase === 'play' && run.tier === 'difficile') {   // v0.5.1 : Réécouter le cryptex coûte 5 s en difficile
+      g.remaining -= CRYPTEX_REPLAY_COST_S; showTime(g.remaining); setStrip('Réécouter', `−${CRYPTEX_REPLAY_COST_S} s`, 'hint', 1800);
+    }
     const p = voice(g.lastClue, { now: true });
     if (g.step === 3 && g.phase === 'play') simonAfter(p);
   });
@@ -1058,7 +1065,7 @@ function simonPlay() {
   const gen = S.gen, beat = beatMs(S.tm), per = beat + S.tm.gap, seq = run.simon.seq.slice(0, S.len);
   if (!S.rounds[S.round]) S.rounds[S.round] = { len: S.len, step: base.step, gap: base.gap, plays: 0 };
   S.rounds[S.round].plays++;
-  seq.forEach((k, i) => setTimeout(() => { if (S.gen === gen && S.phase === 'play') { S.played.push(k); sfx.simon(STICK_NAMES[k]); } }, i * per));
+  seq.forEach((k, i) => setTimeout(() => { if (S.gen === gen && S.phase === 'play') { S.played.push(k); sfx.simon(k); } }, i * per));
   setTimeout(() => {
     simonTrace('play-end', { gen, now: S.gen, ph: S.phase, act: simonActive(), run: g.running, st: g.step, gp: g.phase });
     if (S.gen !== gen || S.phase !== 'play' || !simonActive()) return;
@@ -1074,8 +1081,8 @@ function simonTouch(s) {
   const el = $(`#jacks .jack[data-s="${s}"]`); el?.classList.remove('wiggle'); void el?.offsetWidth; el?.classList.add('wiggle');
   if (S.phase !== 'input') { S.ignored++; sfx.plugIn(); return; }   // pendant la lecture : ne compte pas
   const now = performance.now();
-  if (s !== run.simon.seq[S.input.length]) { simonFail(s); return; }
-  S.input.push(s); S.flash = { s, t0: now, kind: 'ok' }; sfx.simon(STICK_NAMES[s]); buzz(12); progress();
+  if (s !== simonWant(S)[S.input.length]) { simonFail(s); return; }
+  S.input.push(s); S.flash = { s, t0: now, kind: 'ok' }; sfx.simon(s); buzz(12); progress();
   if (S.input.length < S.len) { S.deadline = now + run.simon.between; return; }
   if (S.len >= run.simon.target) { S.phase = 'done'; S.gen++; good(4, 1); return; }
   // tour réussi : une lumière de plus, on rejoue depuis le début (un petit son, pas de voix)
@@ -1083,14 +1090,55 @@ function simonTouch(s) {
   setTimeout(() => sfx.confirm(), 160);
   drawCydBig();
   simonTrace('advance', { gen, round: S.round });
+  // v0.5.1 difficile : dernier tour à l'envers ; l'Entité l'annonce, puis le tour se joue (dans l'ordre, on répond à l'envers)
+  if (simonReversed(S)) { setTimeout(() => { if (S.gen !== gen || !simonActive()) return; setStrip('À l’envers', 'Dernier tour : touche la série à l’envers.', 'hint', 5000); simonAfter(voice('simon_envers', { now: true })); }, 700); return; }
   setTimeout(() => { const ok = S.gen === gen && simonActive(); simonTrace('advance-timer', { gen, now: S.gen, ok, act: simonActive(), ph: g.phase, st: g.step, run: g.running }); if (ok) simonPlay(); }, 700);
 }
+// v0.5.1 : série attendue au toucher (à l'envers au dernier tour en difficile)
+const simonReversed = (S) => !!run.simon.lastReversed && S.len === run.simon.target;
+function simonWant(S) { const q = run.simon.seq.slice(0, S.len); return simonReversed(S) ? q.reverse() : q; }
 function simonFail(s) {
   simonTrace('fail', { s, gen: g.simon?.gen, ph: g.simon?.phase });
   const S = g.simon; S.errors++; S.flash = { s, t0: performance.now(), kind: 'err' };
   S.phase = 'wait'; S.input = []; const gen = ++S.gen;
   bad(SIMON.PENALTY_S);
   setTimeout(() => { const ok = S.gen === gen && simonActive(); simonTrace('fail-timer', { gen, now: S.gen, ok, act: simonActive(), ph: S.phase }); if (ok) simonPlay(); }, 1400);
+}
+// v0.5.1 « barrettes vivantes » (étapes 4 et 10) : la barrette au-dessus d'une prise prend la couleur du câble branché
+// (état, jamais la réponse) ; une fiche fautive = éclair rouge sur sa barrette ; à l'étape 10 la barrette 1 est le chrono.
+const STICK_OF_WIRE = { noir: STICK_COLORS[0], bleu: STICK_COLORS[1], vert: STICK_COLORS[2], rouge: STICK_COLORS[3], jaune: STICK_COLORS[4] };  // noir → violet (une LED ne fait pas de noir)
+function patchClockLeft(now = performance.now()) { const c = g.pclock; if (!c) return null; return c.t0 ? Math.max(0, c.total - (now - c.t0)) : c.total; }
+function patchLeds(now) {
+  const L = SIMON.LEDS, out = Array(SIMON.STICKS * L).fill(null);
+  for (let s = 0; s < SIMON.STICKS; s++) {
+    const c = cableOf(s); if (c < 0) continue;
+    const col = STICK_OF_WIRE[g.cables[c].color] || LED.cyan;
+    for (let i = 0; i < L; i++) out[s * L + i] = [col, 0.7];
+  }
+  if (g.step === 10 && g.pclock) {
+    const left = patchClockLeft(now), n = Math.ceil(left / g.pclock.total * L), low = left < g.pclock.total / 4;
+    for (let i = 0; i < L; i++) out[i] = i < n ? [low ? LED.rouge : LED.ambre, low && Math.floor(now / 200) % 2 ? 0.5 : 1] : null;
+  }
+  const f = g.pflash;
+  if (f) { const t = now - f.t0; if (t < 650) { if (t % 250 < 150) for (let i = 0; i < L; i++) out[f.s * L + i] = [LED.rouge, 1]; } else g.pflash = null; }
+  return out;
+}
+// v0.5.1 cryptex (étape 8, moyen) : à chaque lettre épelée, la barrette n s'allume (molette n) ; à l'envers, l'ordre aussi
+function cryptexLeds(now) {
+  const L = SIMON.LEDS, out = Array(SIMON.STICKS * L).fill(null), a = g.acc;
+  if (a && a.k >= 0 && (a.k < NENC - 1 || now - a.t < 1400)) { const s = run.v.word === 'envers' ? NENC - 1 - a.k : a.k; for (let i = 0; i < L; i++) out[s * L + i] = [LED.cyan, 1]; }
+  return out;
+}
+function onCue(id) {
+  if (g.phase !== 'play' || g.step !== 8 || run.tier !== 'moyen') return;
+  if (/^clue_mot_/.test(id)) { g.acc = { on: true, k: -1, t: 0 }; return; }
+  if (g.acc?.on && /^lettre_/.test(id)) {
+    g.acc.k++; g.acc.t = performance.now();
+    g.accLog.push(run.v.word === 'envers' ? NENC - 1 - g.acc.k : g.acc.k);
+    if (g.acc.k >= NENC - 1) g.acc.on = false;
+    return;
+  }
+  if (g.acc?.on && !/^obj_/.test(id)) g.acc.on = false;
 }
 // image des 40 LED pendant l'étape 3
 function simonLeds(now) {
@@ -1211,6 +1259,11 @@ function loop(now) {
     }
     if (!g.lieUntil && eye && !g.ended) eye.setMood(g.remaining <= 30 ? 'angry' : 'watching');
     setMusicIntensity(Math.pow(Math.min(1, Math.max(0, 1 - g.remaining / TIME_S)), 1.8));
+    // v0.5.1 étape 10 : la barrette 1 est vide → −8 s, une erreur, elle se recharge
+    if (g.step === 10 && g.pclock?.t0 && now - g.pclock.t0 >= g.pclock.total) {
+      g.pclock.t0 = now; g.pclock.expired++;
+      bad(PATCH_CLOCK.PENALTY_S, null); setStrip('Trop lent', `−${PATCH_CLOCK.PENALTY_S} s · la barrette 1 se recharge`, 'ko', 2200);
+    }
     // Simon : trop lent entre deux touchers (ou pour le premier) = faux, on rejoue le tour
     const S = g.simon;
     if (g.step === 3 && S) {
@@ -1230,11 +1283,14 @@ function loop(now) {
     if (simonNow) leds = simonLeds(now);
     // étape 2 : 10 moitiés de 4 LED (bar[0] = moitié gauche de la barrette 1)
     else if (g.phase === 'play' && g.step === 2) leds = Array.from({ length: N }, (_, i) => [LED[run.bar[Math.floor(i / H)]], 1]);
+    else if (g.phase === 'play' && (g.step === 4 || g.step === 10)) leds = patchLeds(now);
+    else if (g.phase === 'play' && g.step === 8 && run.tier === 'moyen') leds = cryptexLeds(now);
     else if (g.phase === 'play') { const done = Math.round((g.step - 1) / NSTEPS * N); leds = Array.from({ length: N }, (_, i) => (i < done ? [LED.cyan, 0.45] : i === done && Math.floor(now / 300) % 2 ? [LED.ambre, 1] : null)); }
     else if (g.phase === 'win') { const a = Math.floor(((Math.sin(now / 500) + 1) / 2) * N); leds = Array.from({ length: N }, (_, i) => (i <= a ? [LED.cyan, 0.8] : null)); }
     else if (g.phase === 'boom') leds = Array.from({ length: N }, () => (Math.floor(now / 90) % 2 ? [LED.rouge, 1] : null));
     else { const k = Math.floor(now / 900) % SIMON.STICKS; leds = Array(N).fill(null); scannerFrame(now % 900, { step: 900 / 16 }).forEach((v, i) => { if (v) leds[k * SIMON.LEDS + i] = ['#3d8bff', v / 255]; }); }
     // mensonge : grésillement rouge, jamais pendant Simon (la série ne ment pas)
+    g.lastLeds = leds;   // image voulue (avant le grésillement du mensonge), lue par ?debug=1
     if (!simonNow && performance.now() < g.lieUntil) leds = leds.map((c) => (Math.random() < 0.35 ? [LED.rouge, 1] : c));
     setSticks(leds);
     if (slow && face === 'mallette') { drawCyd2(); drawCydBig(); }
@@ -1314,6 +1370,7 @@ function init() {
   battInit();
   if (DEBUG && q.get('voix') === 'rapide') setVoiceFast(true);
   loadManifest().then(showObjective);
+  setCueHook(onCue);   // v0.5.1 : barrettes qui accompagnent le cryptex
   // secours silencieux : sous-titre seulement si la synthèse vocale manque (ou son coupé)
   setCaptionHandler((text, lie) => { const c = $('#caption'); c.textContent = text; c.classList.toggle('show', !!text); c.classList.toggle('lie', !!lie); });
   eye = createEye($('#eye'), { config: deepMerge(EYE, { radiusOfMin: 0.3, center: { x: 0.5, y: 0.5 } }), reducedMotion: reduced });
@@ -1338,6 +1395,8 @@ function init() {
       sigDiff, lastSig, hint(l) { giveHint(l ?? g.hint + 1); }, ageStep(ms) { g.progressT -= ms; }, objective: () => ({ label: $('#objLabel').textContent, text: $('#objText').textContent, kind: $('#objective').className }),
       active: () => { const k = hintStep(); return k == null ? [] : MODULES[k].filter((sel) => $(sel)?.classList.contains('active-mod')); }, showTuto() { showTuto(null); },
       goto(n) { if (g.phase === 'play') nextStep(n); },
+      patchClock: () => (g.pclock ? { total: g.pclock.total, left: Math.round(patchClockLeft()), started: !!g.pclock.t0, expired: g.pclock.expired } : null),
+      agePatchClock(ms) { if (g.pclock?.t0) g.pclock.t0 -= ms; }, accLog: () => g.accLog.slice(), stickColors: () => (g.lastLeds ? Array.from({ length: SIMON.STICKS }, (_, k) => { const seg = g.lastLeds.slice(k * SIMON.LEDS, (k + 1) * SIMON.LEDS).filter(Boolean); return seg.length ? { col: seg[0][0], n: seg.length } : null; }) : null),
       clearVoice, SIMON, STICK_COLORS, simonTiming, simonTouch(s) { simonTouch(s); }, get simon() { return g.simon; },
       simonSpeed: SIMON_SPEED, cydBig: () => cydBigState(), jingle: () => ({ ...jingleStats }),
       cables: () => cableGeom.map((c) => ({ ...c })), mazeGrid: () => g.mazeGridCss, get drag() { return drag; }, RING, DETENTS,

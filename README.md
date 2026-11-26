@@ -18,9 +18,28 @@ Archive figée de la v0.4.0 (commit d7c1ba2, plan v0.8, n° de série à lettres
 Archive figée de la v0.3.2 (commit 5e9d940, avant la refonte : trois trappes, trois serrures) : https://passcool17.github.io/entite-mallette-v032/
 (dépôt passcool17/entite-mallette-v032, cache séparé `entite-mallette-v032-0.3.2`).
 
+## Version 0.5.1 (26 nov. 2026) — barrettes vivantes
+
+État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.5.1`, imports `?v=0.5.1`).
+Plan : `revision-jeux-proposition.md` §11, point 2. Aucune pièce du plan v0.8 déplacée.
+
+- **Simon (étape 3)** : une note par barrette, gamme pentatonique (do ré mi sol la, barrette 1 → 5), donc on joue un air.
+  L'Entité dit « Écoute les notes. ». **Difficile** : au dernier tour, « Cette fois, à l'envers. » : la série se joue dans
+  l'ordre, on la touche **à l'envers** (bandeau « À l'envers », CYD 2 « SIMON 4/4 ↺ » ; l'indice 3 dit la dernière barrette).
+- **Câbles (étapes 4 et 10)** : la barrette au-dessus d'une prise prend la **couleur du câble** qui y est branché
+  (câble noir → violet, une LED ne fait pas de noir). C'est un retour d'état, jamais la réponse. Une fiche fautive fait un
+  **éclair rouge** sur sa barrette et un **zap** dans les haut-parleurs (et −8 s, comme avant).
+- **Étape 10 contre la montre** : la **barrette 1 se vide** LED par LED (moyen 30 s, difficile 20 s), à partir de la fin de
+  la consigne ; dernier quart en rouge clignotant. À zéro : −8 s, une erreur, et elle se recharge.
+- **Cryptex (étape 8)** : en **moyen**, à chaque lettre épelée la barrette n s'allume (molette n) ; règle « à l'envers » :
+  barrettes 5 → 1. En **difficile** : pas de barrettes, et **Réécouter coûte 5 s** (sans erreur).
+- Petits correctifs (QA v0.5.0) : le bandeau de l'étape 1 dit « Mot mêlé : … » (nouvelle réplique `obj_mot_melange`) ;
+  la jauge batterie du CYD 2 ne dépasse plus de l'écran en portrait.
+- **Voix de base** (synthèse de l'appareil, `mp3Ready: false`) : `obj_mot_melange`, `simon_notes`, `simon_envers`.
+
 ## Version 0.5.0 (25 nov. 2026) — refonte des jeux, 1re étape : « Mot mêlé »
 
-État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.5.0`, imports `?v=0.5.0`).
+État : publiée (commit `1df0188`, QA PASS), remplacée par la 0.5.1.
 Plan : `revision-jeux-proposition.md` §11 (Pascal 22:24 : « go avec le plus tripan, on refait les jeux, voix de base »).
 
 - **Étape 1 = Mot mêlé** : le CYD 2 affiche une ligne « MÊLÉ » avec les 5 lettres **mélangées** d’un mot (aucune à sa place,

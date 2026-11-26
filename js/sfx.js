@@ -1,5 +1,5 @@
 // sfx.js : effets procéduraux WebAudio (aucun fichier). Branchés sur le bus d'effets d'audio.js (donc coupés par le bouton son).
-import { bus } from './audio.js?v=0.5.0';
+import { bus } from './audio.js?v=0.5.1';
 
 let noiseBuf = null;
 function ctx() { return bus(); }
@@ -30,6 +30,7 @@ function noise(dur, { vol = 0.3, at = 0, lp = 1200, hp = 0, q = 0.7 } = {}) {
   if (hp) { const h = ac.createBiquadFilter(); h.type = 'highpass'; h.frequency.value = hp; node = node.connect(h); }
   node.connect(g).connect(out); src.start(t, Math.random()); src.stop(t + dur + 0.05);
 }
+const NOTES = [262, 294, 330, 392, 440]; // = SIMON_NOTES de game.js
 const SIMON = { rouge: 330, vert: 415, bleu: 523, ambre: 622, violet: 262, jaune: 698 }; // v0.3 : Simon sur 5 barrettes (violet = câble noir)
 
 export const sfx = {
@@ -44,7 +45,10 @@ export const sfx = {
   plugIn() { noise(0.018, { vol: 0.45, lp: 6500, hp: 1800 }); tone(950, 0.03, { type: 'square', vol: 0.05 }); tone(420, 0.04, { vol: 0.09, at: 0.012 }); },   // fiche banane enfoncée : clic sec
   servo() { tone(130, 0.5, { type: 'sawtooth', vol: 0.045, slide: 1.5, attack: 0.03 }); noise(0.5, { vol: 0.07, lp: 1800, hp: 600 }); noise(0.04, { vol: 0.3, lp: 4000, hp: 800, at: 0.52 }); },
   keypad() { tone(1480, 0.045, { type: 'square', vol: 0.05 }); },
-  simon(c) { tone(SIMON[c] || 440, 0.22, { type: 'triangle', vol: 0.12 }); },
+  // v0.5.1 : une note par barrette, gamme pentatonique (do ré mi sol la) ; c = index 0..4 de la barrette (ou ancien nom)
+  simon(c) { const f = typeof c === 'number' ? NOTES[c] : SIMON[c]; tone(f || 440, 0.26, { type: 'triangle', vol: 0.13 }); tone((f || 440) * 2, 0.12, { type: 'sine', vol: 0.03 }); },
+  // v0.5.1 : mauvaise fiche à l'étape 4/10 : zap électrique (bruit aigu + scie qui chute)
+  zap() { noise(0.09, { vol: 0.35, lp: 9000, hp: 2500 }); tone(1400, 0.16, { type: 'sawtooth', vol: 0.07, slide: 0.12 }); },
   rfPulse() { tone(13560 / 10, 0.05, { type: 'sine', vol: 0.05 }); tone(1760, 0.06, { type: 'square', vol: 0.04, at: 0.12 }); tone(2640, 0.12, { type: 'square', vol: 0.05, at: 0.2 }); },
   joy() { tone(900, 0.02, { type: 'square', vol: 0.03 }); },
   wall() { tone(110, 0.08, { type: 'square', vol: 0.07 }); },

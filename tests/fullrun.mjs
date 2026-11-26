@@ -42,8 +42,8 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.5.0';
-import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.5.0';
+import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.5.1';
+import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.5.1';
 
 const require = createRequire(import.meta.url);
 function loadChromium() {
@@ -978,7 +978,9 @@ async function playOne(b, seed, opts) {
     const len = SM.start + r;
     // texte du CYD 2
     const cyd = await D(p, () => (document.querySelector('#cyd2Big')?.textContent || '').trim());
-    if (cyd !== `SIMON ${r + 1}/${rounds}`) return simonFail(`CYD 2 « ${cyd} » ≠ SIMON ${r + 1}/${rounds}`);
+    const revR = runInfo.tier === 'difficile' && r === rounds - 1;   // v0.5.1 : dernier tour à l'envers en difficile
+    const cydWant = `SIMON ${r + 1}/${rounds}${revR ? ' ↺' : ''}`;
+    if (cyd !== cydWant) return simonFail(`CYD 2 « ${cyd} » ≠ ${cydWant}`);
     sx.timing.push(cp.s.rounds[r]);
     if (r === 0) {
       // Réécouter pendant la saisie : même série, sans pénalité
@@ -1037,7 +1039,13 @@ async function playOne(b, seed, opts) {
       cp = cw;
     }
     // reproduire la série : vraies touches (et un glisser au dernier tour, une partie sur trois)
-    const want = SM.seq.slice(0, len);
+    const want = revR ? SM.seq.slice(0, len).reverse() : SM.seq.slice(0, len);
+    if (revR) {
+      const vr = await D(p, () => (__entiteDebug.voiceLog || []).some((v) => (v.ids || []).includes('simon_envers')));
+      rec(vr, 3, 3, vr ? `dernier tour à l’envers annoncé (simon_envers), réponse ${want.map((k) => k + 1).join('-')}` : 'simon_envers jamais dit');
+      if (!vr) return simonFail('envers non annoncé');
+      sx.reversed = true;
+    }
     const tRight = await tNow();
     const touchT = [];   // horodatage page de chaque toucher (diagnostic machine lente)
     for (let i = 0; i < want.length; i++) {
@@ -1073,7 +1081,40 @@ async function playOne(b, seed, opts) {
   }
   if (!(await hud(4, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
-  // ---- 4 baie
+  {
+    const vn = await D(p, () => (__entiteDebug.voiceLog || []).some((v) => (v.ids || []).includes('simon_notes')));
+    const rv = runInfo.tier !== 'difficile' || !!extras.simon?.reversed;
+    rec(vn && rv, 3, 4, vn && rv ? `Simon : « Écoute les notes » dit${runInfo.tier === 'difficile' ? ', dernier tour joué à l’envers' : ''}` : `Simon v0.5.1 ${JSON.stringify({ vn, rv })}`);
+    if (!(vn && rv)) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  }
+  // ---- 4 baie : v0.5.1 chaque barrette au-dessus d'une prise branchée a la couleur du câble (noir → violet)
+  {
+    await W(p, 200);
+    const st = await D(p, () => ({ cols: __entiteDebug.stickColors(), cables: __entiteDebug.state.cables.map((k) => ({ color: k.color, socket: k.socket })), SC: __entiteDebug.STICK_COLORS }));
+    const map = { noir: st.SC[0], bleu: st.SC[1], vert: st.SC[2], rouge: st.SC[3], jaune: st.SC[4] };
+    const okC = !!st.cols && [0, 1, 2, 3, 4].every((s) => { const c = st.cables.find((k) => k.socket === s); const x = st.cols[s]; return c ? (x && x.n === 8 && x.col === map[c.color]) : !x; });
+    rec(okC, 4, 4, okC ? `barrettes = couleur du câble branché (${st.cables.map((k) => k.color).join(',')})` : `barrettes câbles ${JSON.stringify(st)}`);
+    if (!okC) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+    // fiche fautive (le leurre de l'Entité) : éclair rouge sur la barrette de la prise, une erreur, les câbles reviennent
+    const w = answers.decoys?.wire1 || await D(p, () => __entiteDebug.run.decoys.wire1);
+    const before = await D(p, () => __entiteDebug.state.cables.map((k) => k.socket)), e0 = await D(p, () => __entiteDebug.state.errors);
+    const already = before[w.cable] === w.socket;   // le câble y est déjà : toucher = débrancher, pas une faute
+    let fl = null, after = before;
+    if (!already) {
+      await p.tap(`#ports .port-btn[data-c="${w.cable}"]`); await W(p, 60);
+      await p.tap(`#jacks .jack[data-s="${w.socket}"] .plug`); await W(p, 30);
+      for (let k = 0; k < 24; k++) {   // les barrettes se redessinent ~12 fois/s : attendre l'éclair (≤ 600 ms)
+        fl = await D(p, (s) => ({ col: __entiteDebug.stickColors()?.[s], err: __entiteDebug.state.errors }), w.socket);
+        if (fl.col?.col === '#ff3b30') break;
+        await W(p, 25);
+      }
+      await W(p, 1200);
+      after = await D(p, () => __entiteDebug.state.cables.map((k) => k.socket));
+    }
+    const okF = already || (fl.col?.col === '#ff3b30' && fl.err === e0 + 1 && after.join() === before.join());
+    rec(okF, 4, 4, okF ? (already ? 'fiche fautive : leurre déjà en place, non testé' : `fiche fautive ${w.cable + 1}→prise ${w.socket + 1} : éclair rouge, −8 s, câbles remis`) : `fiche fautive ${JSON.stringify({ w, fl, e0, before, after })}`);
+    if (!okF) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  }
   const t4 = await tNow();
   await doPatch(p, answers.patch1);
   if (!(await expectAdvance(4, 5, `patch ${JSON.stringify(answers.patch1)}`, t4))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
@@ -1116,6 +1157,25 @@ async function playOne(b, seed, opts) {
 
   // ---- 8 encodeurs (mot)
   if (!(await cydLetters(8))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  {
+    // v0.5.1 : moyen = la barrette n s'allume à chaque lettre épelée (à l'envers : 5→1) ; difficile = rien, et Réécouter −5 s
+    await p.waitForFunction(() => (__entiteDebug.voiceLog || []).some((v) => (v.ids || []).some((id) => /^clue_mot_/.test(id))), { timeout: 8000 }).catch(() => {});
+    await W(p, 600);
+    const expAcc = runInfo.tier === 'moyen' ? (runInfo.v.word === 'envers' ? [4, 3, 2, 1, 0] : [0, 1, 2, 3, 4]) : [];
+    const a0 = await D(p, () => __entiteDebug.accLog());
+    const okA = a0.join() === expAcc.join();
+    rec(okA, 8, 8, okA ? (expAcc.length ? `barrettes du cryptex ${expAcc.map((k) => k + 1).join('-')} (${runInfo.v.word})` : 'difficile : pas de barrettes au cryptex') : `barrettes cryptex ${JSON.stringify({ a0, expAcc })}`);
+    if (!okA) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+    const e0 = await D(p, () => __entiteDebug.state.errors), r0 = await D(p, () => __entiteDebug.state.remaining);
+    await p.waitForFunction(() => !document.querySelector('#btnReplay')?.disabled, { timeout: 8000 }).catch(() => {});
+    await p.locator('#btnReplay').click({ force: true });
+    await W(p, 900);
+    const e1 = await D(p, () => __entiteDebug.state.errors), r1 = await D(p, () => __entiteDebug.state.remaining), a1 = await D(p, () => __entiteDebug.accLog());
+    const cost = r0 - r1;
+    const okR = e1 === e0 && (runInfo.tier === 'difficile' ? cost >= 4.9 && cost < 7 : cost < 2) && (runInfo.tier === 'moyen' ? a1.length === 10 && a1.slice(5).join() === expAcc.join() : a1.length === 0);
+    rec(okR, 8, 8, okR ? `Réécouter cryptex : ${runInfo.tier === 'difficile' ? '−5 s' : 'gratuit, barrettes rejouées'}` : `Réécouter cryptex ${JSON.stringify({ e0, e1, cost, a1 })}`);
+    if (!okR) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  }
   const t8 = await tNow();
   await rotateTo(p, answers.enc2);
   if (!(await expectAdvance(8, 9, `lettres ${answers.enc2.join('')}`, t8))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
@@ -1127,7 +1187,22 @@ async function playOne(b, seed, opts) {
   if (!(await expectAdvance(9, 10, 'labyrinthe 2', t9))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   if (!(await hud(10, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
-  // ---- 10 baie 2
+  // ---- 10 baie 2 : v0.5.1 la barrette 1 est un chrono (moyen 30 s, difficile 20 s) ; vide → −8 s, une erreur, recharge
+  {
+    await p.waitForFunction(() => __entiteDebug.patchClock()?.started, { timeout: 15000 }).catch(() => {});
+    const c0 = await D(p, () => __entiteDebug.patchClock());
+    const tot = runInfo.tier === 'moyen' ? 30000 : 20000;
+    const e0 = await D(p, () => __entiteDebug.state.errors), r0 = await D(p, () => __entiteDebug.state.remaining);
+    await D(p, () => { const c = __entiteDebug.patchClock(); __entiteDebug.agePatchClock(c.left - 450); });   // il reste 0,45 s
+    await W(p, 120);
+    const mid = await D(p, () => ({ c: __entiteDebug.patchClock(), cols: __entiteDebug.stickColors() }));
+    await W(p, 700);
+    const c1 = await D(p, () => __entiteDebug.patchClock()), e1 = await D(p, () => __entiteDebug.state.errors), r1 = await D(p, () => __entiteDebug.state.remaining);
+    const ob = await D(p, () => document.querySelector('#objText')?.textContent || '');
+    const okK = !!c0 && c0.started && c0.total === tot && mid.cols?.[0]?.n === 1 && c1.expired === 1 && e1 === e0 + 1 && r0 - r1 >= 7.5 && c1.left > tot - 3000 && /−8 s/.test(ob);
+    rec(okK, 10, 10, okK ? `chrono barrette 1 : ${tot / 1000} s, vide → −8 s, recharge (${Math.round(c1.left / 1000)} s)` : `chrono ét. 10 ${JSON.stringify({ c0, mid, c1, e0, e1, r0, r1, ob })}`);
+    if (!okK) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  }
   const t10 = await tNow();
   await doPatch(p, answers.patch2);
   if (!(await expectAdvance(10, 11, `patch ${JSON.stringify(answers.patch2)}`, t10))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }

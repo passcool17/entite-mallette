@@ -52,6 +52,10 @@ Le simulateur reste dans ces limites. **Aucun numéro de GPIO n’est figé** : 
 - **Clé dans les trappes A et B** : la clé tient debout sur la tranche dans une fente verticale, **à gauche**, sous le
   plancher du compartiment ; on ouvre la porte et on la prend par le haut. Mini-clé 35 × 15 × 2 : tout dans le module ;
   clé typique 50 × 22 × 2,5 : avec un puits de 3 à 5 mm dans le capot. Pas de poche extérieure. Aucune pièce déplacée.
+- **Barrettes vivantes (v0.5.1)** : Simon = une note par barrette (do ré mi sol la, générées par l’ESP32 en I2S vers les
+  MAX98357A) ; étapes 4/10 : la barrette au-dessus d’une douille prend la couleur du câble détecté (câble noir → violet) ;
+  étape 10 : la barrette 1 sert de chrono (8 LED) ; étape 8 (moyen) : la barrette n s’allume à chaque lettre épelée.
+  Aucun matériel en plus : la détection câble/douille et les 40 LED sont déjà au plan.
 - **N° de série (v0.5.0)** : 4 chiffres seulement (`47-19`) sur le CYD 2, plus un lot leurre. Les molettes ne servent
   qu’à des mots de 5 lettres.
 
