@@ -56,6 +56,13 @@ Le simulateur reste dans ces limites. **Aucun numéro de GPIO n’est figé** : 
   MAX98357A) ; étapes 4/10 : la barrette au-dessus d’une douille prend la couleur du câble détecté (câble noir → violet) ;
   étape 10 : la barrette 1 sert de chrono (8 LED) ; étape 8 (moyen) : la barrette n s’allume à chaque lettre épelée.
   Aucun matériel en plus : la détection câble/douille et les 40 LED sont déjà au plan.
+- **Trappes et serrures (v0.5.2)** : étape 2, le maître lit le joystick (X : gauche = A, droite = B) et SW (appui = ouvrir).
+  Mauvaise trappe : tremblement du SG90 de cette porte, ±6°, 3 cycles, 100 ms par pas, puis tenir porte fermée ;
+  pendant ce temps le maître coupe la voix (DFPlayer en pause) et limite les 40 LED à 30 % ; le son d'erreur et le flash
+  rouge viennent après. Clé I rangée derrière la trappe A, clé II derrière la B. Étape 7 : signal = 40 LED vertes + bip ;
+  les deux contacts doivent passer à LOW à moins de 1 s (moyen) ou dans l'ordre (difficile). Une serrure LOW **avant** le
+  signal = « trop tôt » ; le firmware attend que les deux contacts soient revenus à HIGH (clés remises droites) avant le
+  signal suivant.
 - **N° de série (v0.5.0)** : 4 chiffres seulement (`47-19`) sur le CYD 2, plus un lot leurre. Les molettes ne servent
   qu’à des mots de 5 lettres.
 

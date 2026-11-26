@@ -8,17 +8,17 @@
 // Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 // v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 2, variantes d'énigmes
 // tirées par étape (deux parties de suite ne se ressemblent pas : signature de la partie précédente dans localStorage).
-import { createEye } from './eye.js?v=0.5.1';
-import { EYE, deepMerge } from './eye-config.js?v=0.5.1';
-import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS, NENC, SIMON, STICK_COLORS, STICK_NAMES, simonTiming, beatMs, scannerFrame, PATCH_CLOCK, CRYPTEX_REPLAY_COST_S } from './game.js?v=0.5.1';
-import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.5.1';
-import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable, setCueHook, preloadJingle, playJingle, stopJingle, jingleStats } from './audio.js?v=0.5.1';
-import { sfx } from './sfx.js?v=0.5.1';
-import { preloadAll } from './preload.js?v=0.5.1';
-import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.5.1';
-import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.5.1';
+import { createEye } from './eye.js?v=0.5.2';
+import { EYE, deepMerge } from './eye-config.js?v=0.5.2';
+import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS, NENC, SIMON, STICK_COLORS, STICK_NAMES, simonTiming, beatMs, scannerFrame, PATCH_CLOCK, CRYPTEX_REPLAY_COST_S, SERVO_SHAKE, TRAP_BARS, KEYS7 } from './game.js?v=0.5.2';
+import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.5.2';
+import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable, setCueHook, isSpeaking, preloadJingle, playJingle, stopJingle, jingleStats } from './audio.js?v=0.5.2';
+import { sfx } from './sfx.js?v=0.5.2';
+import { preloadAll } from './preload.js?v=0.5.2';
+import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds, objectiveId } from './guide.js?v=0.5.2';
+import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.5.2';
 
-const VERSION = '0.5.1';
+const VERSION = '0.5.2';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -53,7 +53,8 @@ function resetState(remember = false) {
     step: 0, running: false, ended: false, result: null,
     endAt: 0, remaining: TIME_S, rate: 1, lastTick: 0, lastSec: null,
     prob: 99.7, errors: 0, lieUntil: 0, lies: 0, melScore: null,
-    pclock: null, pflash: null, acc: null, accLog: [], lastLeds: null,   // v0.5.1 : chrono barrette 1 (ét. 10), éclair rouge (ét. 4/10), cryptex (ét. 8)
+    pclock: null, pflash: null, acc: null, accLog: [], lastLeds: null,
+    trapSel: null, shake: null, shakeLog: [], barT0: 0, keyIn: [false, false], k7: null,   // v0.5.2 : joystick A/B, tremblement SG90, barrettes qui s'éteignent, clés prises, étape 7   // v0.5.1 : chrono barrette 1 (ét. 10), éclair rouge (ét. 4/10), cryptex (ét. 8)
     coverArm: false, coverTx: false, armed: false, txOn: false,
     enc: Array(NENC).fill(0), encRaw: Array(NENC).fill(0), encMode: 'alpha', trapOpen: [false, false], simon: null,
     cables: run.wires.map((color, i) => ({ color, socket: i })), sel: null, patchTok: 0, // câble c (port c de la base) → prise 0..4 ou null
@@ -571,11 +572,12 @@ function nextStep(n, { holdStrip = 0 } = {}) {
   g.hint = 0; progress(); showStep();
   if (!holdStrip) showObjective();
   highlight(); hintUi();
-  const O = OBJECTIVE[n], C = Object.fromEntries(Object.entries(run.cues).map(([k, v]) => [k, [O, ...v]]));
+  const O = objectiveId(run, n), C = Object.fromEntries(Object.entries(run.cues).map(([k, v]) => [k, [O, ...v]]));
   switch (n) {
     case 1: setEncMode('alpha');
       voice(C[1], { clue: true }); pressureEnc(); break;
-    case 2: voice(C[2], { clue: true });
+    case 2: g.trapSel = null; g.barT0 = 0; trapSelUi();
+      voice(C[2], { clue: true }).then(() => { if (g.step === 2 && !g.barT0) g.barT0 = performance.now(); });   // difficile : 5 s puis noir
       pressure(5500, () => { const w = (run.trap + 1) % 2; decoy('trap', w); voice(['taunt_trappe', color(run.trapColors[w])], { lie: true, now: true }); }); break;
     case 3: g.code = ''; startSimon(voice(C[3], { clue: true })); break;
     case 4: voice(C[4], { clue: true });
@@ -585,9 +587,8 @@ function nextStep(n, { holdStrip = 0 } = {}) {
     case 6: g.code = ''; voice(C[6], { clue: true });
       pressure(6000, () => { const i = Math.floor(Math.random() * 4); voice(['taunt_cetait', digit(run.decoys.frags[i]), 'taunt_depeche'], { lie: true, now: true }); }); break;
     case 7: $$('.lock.key .lock-btn').forEach((b) => { b.disabled = false; b.closest('.lock').classList.add('ready'); });
-      voice(C[7], { clue: true });
-      pressure(5000, () => voice(['taunt_cles', ...run.decoys.keys.map((k) => digit(k + 1))], { lie: true, now: true }));
-      if (run.lies.keysTwice) pressure(14000, () => voice(['taunt_cles', ...run.decoys.keys.map((k) => digit(k + 1))], { lie: true, now: true })); break;
+      g.k7 = { phase: 'wait', alerts: 0, signalAt: 0, first: 0, tok: 0, fails: [] };
+      voice(C[7], { clue: true }).then(() => keysArm()); break;
     case 8: setEncMode('alpha');
       voice(C[8], { clue: true }); pressureEnc(); break;
     case 9: g.pos = run.maze2.start.slice(); voice([O, 'clue_verrou'], { clue: true }); g.sabT = performance.now() + 5000; break;
@@ -602,7 +603,11 @@ function nextStep(n, { holdStrip = 0 } = {}) {
   drawCydBig(); drawCyd2();
 }
 // pression pendant le choix : une réplique trompeuse après la consigne (si l'étape n'est pas finie)
-function pressure(ms, fn) { const s = g.step; g.pressure.push(setTimeout(() => { if (g.running && g.step === s) fn(); }, ms)); }
+function pressure(ms, fn) {
+  const s = g.step;
+  const go = () => { if (!(g.running && g.step === s)) return; if (g.shake) { g.pressure.push(setTimeout(go, 200)); return; } fn(); };   // v0.5.2 : jamais de voix pendant le tremblement SG90
+  g.pressure.push(setTimeout(go, ms));
+}
 function pressureEnc() {
   g._encTaunted = false;
   if (run.lies.encFalse && g.step === 1) pressure(4000, () => { const tgt = curEncTarget(); g.decoy = { enc: tgt.map((d) => (d + 3) % DETENTS) }; voice(['taunt_cetait', letter(RING[g.decoy.enc[0]]), 'taunt_depeche'], { lie: true, now: true }); });
@@ -625,7 +630,7 @@ function decoy(kind, i) {
 }
 function clearDecoys() { $$('.decoy').forEach((e) => e.classList.remove('decoy')); }
 
-function good(nextN, fragIdx) {
+function good(nextN, fragIdx, okLine = 'outcome_ok') {
   // réussite : l'étape avance tout de suite, et la voix aussi — plus de consigne / indice / fragment de l'étape d'avant
   stopSimon();
   clearVoice();
@@ -636,7 +641,7 @@ function good(nextN, fragIdx) {
   if (fragIdx != null) {
     if (run.lies.fragLies.includes(fragIdx)) voice(['clue_fragment', digit(run.decoys.frags[fragIdx])], { lie: true, now: true });
     voice(['clue_fragment', digit(run.frags[fragIdx])], { clue: true, now: !run.lies.fragLies.includes(fragIdx) });
-  } else voice('outcome_ok', { now: true });
+  } else voice(okLine, { now: true });
   if (nextN) nextStep(nextN, { holdStrip: 900 });
 }
 function bad(sec = 5, line = 'outcome_faux') {
@@ -762,7 +767,7 @@ function giveHint(level, auto = false) {
   const spoken = voice(ids, { now: true });
   // indices 1 et 2 de l'étape 3 (Simon) : rejouer le tour en cours après la voix, comme Réécouter, sans pénalité
   if (k === 3 && level <= 2) simonAfter(spoken);
-  setStrip(cost ? `Indice ${level} · −${cost} s` : `Indice ${level}${auto ? ' · automatique' : ''}`, hintStrip(k, level).replace(/^Indice : /, ''), 'hint', 7000);
+  setStrip(cost ? `Indice ${level} · −${cost} s` : `Indice ${level}${auto ? ' · automatique' : ''}`, hintStrip(k, level, run).replace(/^Indice : /, ''), 'hint', 7000);
   hintUi();
 }
 // tutoriel (première partie, ou bouton « Comment jouer ») : 5 écrans, « Passer » à tout moment
@@ -792,7 +797,7 @@ function closeTuto() {
 
 // ---------- armement ----------
 function resetHardware() {
-  $$('.lock.key').forEach((l) => { l.classList.remove('on', 'ready'); const b = $('.lock-btn', l); b.disabled = true; b.setAttribute('aria-pressed', 'false'); });
+  $$('.lock.key').forEach((l) => { l.classList.remove('on', 'ready', 'inserted'); const b = $('.lock-btn', l); b.disabled = true; b.setAttribute('aria-pressed', 'false'); });
   for (const k of ['Arm', 'Tx']) {
     const t = $(`#gt${k}`); t.classList.remove('open', 'on', 'armed', 'decoy', 'snap');
     $(`#cover${k}`).setAttribute('aria-expanded', 'false'); const lv = $(`#lever${k}`); lv.disabled = true; lv.setAttribute('aria-checked', 'false');
@@ -882,7 +887,13 @@ function wire() {
     if (g.step === 8 && g.phase === 'play' && run.tier === 'difficile') {   // v0.5.1 : Réécouter le cryptex coûte 5 s en difficile
       g.remaining -= CRYPTEX_REPLAY_COST_S; showTime(g.remaining); setStrip('Réécouter', `−${CRYPTEX_REPLAY_COST_S} s`, 'hint', 1800);
     }
+    const trapRelight = g.step === 2 && g.phase === 'play';
+    if (trapRelight && run.tier === 'difficile') {   // v0.5.2 : Réécouter rallume les barrettes de la trappe, −5 s
+      g.remaining -= TRAP_BARS.REPLAY_COST_S; showTime(g.remaining); setStrip('Réécouter', `−${TRAP_BARS.REPLAY_COST_S} s · les barrettes se rallument`, 'hint', 1800);
+    }
+    if (trapRelight) g.barT0 = 0;
     const p = voice(g.lastClue, { now: true });
+    if (trapRelight) p.then(() => { if (g.step === 2 && !g.barT0) g.barT0 = performance.now(); });
     if (g.step === 3 && g.phase === 'play') simonAfter(p);
   });
   $('#btnHint').addEventListener('click', () => { input(); giveHint(g.hint + 1); });
@@ -894,17 +905,9 @@ function wire() {
   sonUi(); // état du bouton son gardé d'une session à l'autre (localStorage entite-son)
 
   // serrures Gebildet I, II (v0.4 : 2 serrures, base en bas à gauche sous le TM1637)
-  $$('.lock.key').forEach((l) => $('.lock-btn', l).addEventListener('click', (e) => {
-    input(); if (g.step !== 7) return;
-    const k = +l.dataset.key; if (g.keysTurned.includes(k)) return;
-    sfx.keyTurn();
-    const expect = run.keyOrder[g.keysTurned.length];
-    if (k !== expect) {
-      bad(5); g.keysTurned = []; $$('.lock.key').forEach((x) => { x.classList.remove('on'); $('.lock-btn', x).setAttribute('aria-pressed', 'false'); }); return;
-    }
-    g.keysTurned.push(k); l.classList.add('on'); e.currentTarget.setAttribute('aria-pressed', 'true'); progress();
-    if (g.keysTurned.length === run.keyOrder.length) good(8);
-  }));
+  // v0.5.2 « deux clés, deux mains » : contact sec par serrure (clé tournée = LOW). Moyen : au vert, les deux à moins
+  // d'1 s ; difficile : 2 faux « Maintenant ! » (œil rouge), puis au vert, dans l'ordre du poids. Avant le vert = trop tôt.
+  $$('.lock.key').forEach((l) => $('.lock-btn', l).addEventListener('click', () => keyTurnAt(+l.dataset.key)));
 
   // leviers à capot (base) : bleu = armement, rouge = TRANSMIT
   $('#coverArm').addEventListener('click', () => coverTap('Arm'));
@@ -968,10 +971,9 @@ function wire() {
     const t = e.target.closest('.trap'); if (!t) return;
     input();
     const i = +t.dataset.i;
-    const shake = () => { t.classList.add('wiggle'); setTimeout(() => t.classList.remove('wiggle'), 400); };
-    if (g.step !== 2 || g.trapOpen[i]) { sfx.wall(); shake(); return; }
-    if (i === run.trap) { openTrap(i, 'ok'); good(3); }
-    else { shake(); sfx.servo(); batt?.dip('servo'); bad(5); }
+    const key = e.target.closest('.cle-chant');
+    if (key) { takeKey(+key.dataset.k); return; }
+    chooseTrap(i);
   });
 
   // clavier 4x4 (clavier pur)
@@ -989,6 +991,9 @@ function wire() {
     if (!jfired && Math.hypot(dx, dy) > 22) { jfired = true; stick(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up')); }
   });
   const release = () => { cap.style.transform = ''; };
+  // v0.5.2 : appui sur le chapeau (bouton SW du KY-023, actif bas) = toucher sans glisser
+  $('.joy-well', joy).addEventListener('pointerup', (e) => { if (!jfired && Math.hypot(e.clientX - jx, e.clientY - jy) < 10) joyPress(); });
+  $('.joy-well', joy).addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); joyPress(); } });
   $('.joy-well', joy).addEventListener('pointerup', release); $('.joy-well', joy).addEventListener('pointercancel', release);
   $$('.joy-dir', joy).forEach((b) => b.addEventListener('click', () => {
     const d = b.dataset.dir, v = DIRS[d]; cap.style.transform = `translate(${v[0] * 14}px, ${v[1] * 14}px)`; setTimeout(release, 140); stick(d);
@@ -998,7 +1003,7 @@ function wire() {
   addEventListener('keydown', (e) => {
     if (!g.running || e.target.closest?.('.knob, .faces, dialog')) return;
     const map = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right', W: 'up', S: 'down', A: 'left', D: 'right' };
-    if (map[e.key] && face === 'mallette' && (g.step === 5 || g.step === 9)) { e.preventDefault(); input(); stick(map[e.key]); }
+    if (map[e.key] && face === 'mallette' && (g.step === 2 || g.step === 5 || g.step === 9)) { e.preventDefault(); input(); stick(map[e.key]); }
     else if (/^[0-9]$/.test(e.key) && face === 'mallette') { input(); press(e.key); }
   });
 }
@@ -1027,11 +1032,81 @@ function pushEnc(i) {
     drawCydBig(); bad(run.v.enc1 === 'theme' ? 5 : 8);
   } else bad(5);
 }
-function openTrap(i, what) {
+function openTrap(i) {
   g.trapOpen[i] = true; sfx.servo(); batt?.dip('trap');
-  const t = $(`.trap[data-i="${i}"]`); t.classList.add('open');
-  const well = $('.trap-well', t);
-  well.innerHTML = what === 'keys' ? '<span class="keyset" role="img" aria-label="Clés I, II"><i></i><i></i></span>' : '<span class="trap-led" role="img" aria-label="Trappe ouverte"></span>';
+  const t = $(`.trap[data-i="${i}"]`); t.classList.add('open'); t.classList.remove('sel');
+  // v0.5.2 (Impression 3D) : une clé par trappe, debout sur la tranche dans une fente à gauche ; on la prend par le haut
+  const k = KEYS7.keyTrap.indexOf(i);
+  $('.trap-well', t).innerHTML = k < 0 || g.keyIn[k] ? '<span class="cle-fente" aria-hidden="true"></span>'
+    : `<button class="cle-chant" type="button" data-k="${k}" aria-label="Prendre la clé ${ROMAN[k]}"><span class="cle-fente"><i class="cle"></i></span><span class="cle-n">${ROMAN[k]}</span></button>`;
+}
+const ROMAN = ['I', 'II'];
+function trapSelUi() { $$('.trap').forEach((t) => t.classList.toggle('sel', g.phase === 'play' && g.step === 2 && +t.dataset.i === g.trapSel && !t.classList.contains('open'))); }
+function joyPress() {
+  input(); if (g.phase !== 'play') return;
+  sfx.push(); $('#joy').classList.remove('pressed'); void $('#joy').offsetWidth; $('#joy').classList.add('pressed');
+  if (g.step === 2) { if (g.trapSel == null) setStrip('Joystick', 'Gauche = A, droite = B, puis appuie', 'hint', 2400); else chooseTrap(g.trapSel); }
+}
+function chooseTrap(i) {
+  const t = $(`.trap[data-i="${i}"]`); if (!t || g.shake) return;   // une porte à la fois : le servo occupé ignore
+  if (g.step !== 2 || g.phase !== 'play' || g.trapOpen[i]) { sfx.wall(); t.classList.add('wiggle'); setTimeout(() => t.classList.remove('wiggle'), 400); return; }
+  if (i === run.trap) { openTrap(i); good(3); return; }
+  trapShake(i);
+}
+// v0.5.2 : mauvaise trappe = le SG90 secoue la porte (±6°, 3 cycles, 100 ms par pas), puis s'arrête porte fermée.
+// Pendant le tremblement : voix coupée, aucune réplique, barrettes à 30 % max. L'erreur (son, flash, −5 s) vient après.
+function trapShake(i) {
+  const S = SERVO_SHAKE, t = $(`.trap[data-i="${i}"]`), door = $('.trap-door', t);
+  clearVoice(); g.trapSel = i; trapSelUi();
+  g.shake = { i, t0: performance.now(), ledMax: 0, speaking: false };
+  const kf = [0]; for (let c = 0; c < S.cycles; c++) kf.push(S.deg, -S.deg); kf.push(0);
+  door.animate(kf.map((d, k) => ({ transform: `perspective(200px) rotateX(${d}deg)`, offset: k / (kf.length - 1) })), { duration: (kf.length - 1) * S.stepMs, easing: 'steps(1, end)' });
+  t.classList.add('shaking'); sfx.jitter(S.cycles, S.stepMs);
+  setTimeout(() => {
+    const sh = g.shake; g.shake = null; t.classList.remove('shaking');
+    g.shakeLog.push({ i, deg: S.deg, cycles: S.cycles, stepMs: S.stepMs, ms: Math.round(performance.now() - sh.t0), ledMax: +sh.ledMax.toFixed(2), speaking: sh.speaking, open: g.trapOpen[i] });
+    if (g.running && g.step === 2) { batt?.dip('servo'); bad(5); }
+  }, (kf.length - 1) * S.stepMs);
+}
+function takeKey(k) {
+  input(); if (g.keyIn[k] || g.phase !== 'play') return;
+  g.keyIn[k] = true; sfx.plugIn();
+  const tr = $(`.trap[data-i="${KEYS7.keyTrap[k]}"] .trap-well`); if (tr) tr.innerHTML = '<span class="cle-fente" aria-hidden="true"></span>';
+  const l = $(`.lock.key[data-key="${k}"]`); l?.classList.add('inserted');
+  setStrip(`Clé ${ROMAN[k]}`, `Dans la serrure ${ROMAN[k]}`, 'ok', 1200);
+}
+// ---- étape 7 : signal vert (5 barrettes vertes + bip), fausses alertes en difficile
+function keysArm() {
+  const K = g.k7; if (!K || g.step !== 7 || !g.running) return;
+  const tok = ++K.tok, want = KEYS7.falseAlerts[run.tier] || 0;
+  let t = 0;
+  const at = (ms, fn) => pressure(ms, () => { if (g.k7 === K && K.tok === tok) fn(); });
+  for (let a = K.alerts; a < want; a++) { t += 1600 + Math.random() * 1200; at(t, () => { K.alerts++; voice('cles_maintenant', { lie: true, now: true }); }); }
+  t += 1800 + Math.random() * 1400;
+  at(t, () => { K.phase = 'go'; K.signalAt = performance.now(); sfx.bip(); });
+}
+function keyTurnAt(k) {
+  input(); if (g.step !== 7 || g.phase !== 'play') return;
+  const K = g.k7; if (!K || g.keysTurned.includes(k)) return;
+  if (!g.keyIn[k]) { sfx.wall(); setStrip('Pas de clé', `Prends la clé ${ROMAN[k]} dans la trappe ${'AB'[KEYS7.keyTrap[k]]}`, 'hint', 2400); return; }
+  sfx.keyTurn();
+  const l = $(`.lock.key[data-key="${k}"]`); l.classList.add('on'); $('.lock-btn', l).setAttribute('aria-pressed', 'true');
+  if (K.phase !== 'go') return keysFail('tot');
+  if (run.v.keys !== 'ensemble' && k !== run.keyOrder[g.keysTurned.length]) return keysFail('ordre');
+  const now = performance.now();
+  g.keysTurned.push(k); progress();
+  if (g.keysTurned.length === 1) { K.first = now; return; }
+  K.dt = Math.round(now - K.first);
+  if (run.v.keys === 'ensemble' && K.dt > KEYS7.windowMs) return keysFail('ensemble');
+  K.phase = 'done'; good(8, null, run.v.keys === 'ensemble' ? 'cles_ensemble' : 'outcome_ok');
+}
+function keysFail(why) {
+  const K = g.k7; K.fails.push(why); K.phase = 'wait'; K.first = 0; K.tok++;
+  setTimeout(() => { g.keysTurned = []; $$('.lock.key').forEach((x) => { x.classList.remove('on'); $('.lock-btn', x).setAttribute('aria-pressed', 'false'); }); }, 250);
+  g.keysTurned = [0, 1];   // bloqué pendant le retour des clés
+  bad(KEYS7.PENALTY_S, { tot: 'cles_trop_tot', ensemble: 'cles_pas_ensemble', ordre: 'outcome_faux' }[why]);
+  setStrip({ tot: 'Trop tôt', ensemble: 'Pas ensemble', ordre: 'Faux' }[why], `−${KEYS7.PENALTY_S} s · ${why === 'ensemble' ? 'moins d’une seconde entre les deux clés' : why === 'tot' ? 'attends le vert, pas la voix' : 'mauvais ordre'}`, 'ko', 2400);
+  pressure(1800, () => { if (g.k7 === K) keysArm(); });
 }
 // ================= Simon (étape 3, v0.3) =================
 // Série de barrettes tirée par graine (run.simon.seq). Tours : moyen 2→5, difficile 3→6 (plus rapide à chaque tour).
@@ -1183,6 +1258,7 @@ function press(k) {
 }
 function stick(dir) {
   input(); sfx.joy();
+  if (g.step === 2 && g.phase === 'play') { if (dir === 'left' || dir === 'right') { g.trapSel = dir === 'left' ? 0 : 1; trapSelUi(); } return; }   // v0.5.2 : gauche = A, droite = B
   if (g.step !== 5 && g.step !== 9) return;
   const inv = { up: 'down', down: 'up', left: 'right', right: 'left' };
   const d = g.sabotage ? inv[dir] : dir;
@@ -1264,6 +1340,8 @@ function loop(now) {
       g.pclock.t0 = now; g.pclock.expired++;
       bad(PATCH_CLOCK.PENALTY_S, null); setStrip('Trop lent', `−${PATCH_CLOCK.PENALTY_S} s · la barrette 1 se recharge`, 'ko', 2200);
     }
+    // v0.5.2 : étape 7 moyen, une seule clé tournée depuis plus d'1 s = pas ensemble
+    if (g.step === 7 && g.k7?.phase === 'go' && run.v.keys === 'ensemble' && g.keysTurned.length === 1 && g.k7.first && now - g.k7.first > KEYS7.windowMs) keysFail('ensemble');
     // Simon : trop lent entre deux touchers (ou pour le premier) = faux, on rejoue le tour
     const S = g.simon;
     if (g.step === 3 && S) {
@@ -1282,7 +1360,11 @@ function loop(now) {
     let leds;
     if (simonNow) leds = simonLeds(now);
     // étape 2 : 10 moitiés de 4 LED (bar[0] = moitié gauche de la barrette 1)
-    else if (g.phase === 'play' && g.step === 2) leds = Array.from({ length: N }, (_, i) => [LED[run.bar[Math.floor(i / H)]], 1]);
+    else if (g.phase === 'play' && g.step === 2) {   // v0.5.2 difficile : noir 5 s après la consigne (Réécouter rallume, −5 s)
+      const dark = run.tier === 'difficile' && g.barT0 && now - g.barT0 > TRAP_BARS.darkMs;
+      leds = Array.from({ length: N }, (_, i) => (dark ? null : [LED[run.bar[Math.floor(i / H)]], 1]));
+    }
+    else if (g.phase === 'play' && g.step === 7 && g.k7?.phase === 'go') leds = Array(N).fill([LED.vert, 1]);   // v0.5.2 : le vrai signal
     else if (g.phase === 'play' && (g.step === 4 || g.step === 10)) leds = patchLeds(now);
     else if (g.phase === 'play' && g.step === 8 && run.tier === 'moyen') leds = cryptexLeds(now);
     else if (g.phase === 'play') { const done = Math.round((g.step - 1) / NSTEPS * N); leds = Array.from({ length: N }, (_, i) => (i < done ? [LED.cyan, 0.45] : i === done && Math.floor(now / 300) % 2 ? [LED.ambre, 1] : null)); }
@@ -1290,8 +1372,13 @@ function loop(now) {
     else if (g.phase === 'boom') leds = Array.from({ length: N }, () => (Math.floor(now / 90) % 2 ? [LED.rouge, 1] : null));
     else { const k = Math.floor(now / 900) % SIMON.STICKS; leds = Array(N).fill(null); scannerFrame(now % 900, { step: 900 / 16 }).forEach((v, i) => { if (v) leds[k * SIMON.LEDS + i] = ['#3d8bff', v / 255]; }); }
     // mensonge : grésillement rouge, jamais pendant Simon (la série ne ment pas)
+    if (g.shake) {   // v0.5.2 : pendant le tremblement SG90, barrettes à 30 % max (pas de DEL vives), et aucune voix
+      leds = leds.map((c) => (c ? [c[0], Math.min(c[1], SERVO_SHAKE.ledMax)] : c));
+      g.shake.ledMax = Math.max(g.shake.ledMax, ...leds.map((c) => (c ? c[1] : 0)));
+      if (isSpeaking()) g.shake.speaking = true;
+    }
     g.lastLeds = leds;   // image voulue (avant le grésillement du mensonge), lue par ?debug=1
-    if (!simonNow && performance.now() < g.lieUntil) leds = leds.map((c) => (Math.random() < 0.35 ? [LED.rouge, 1] : c));
+    if (!simonNow && !g.shake && performance.now() < g.lieUntil) leds = leds.map((c) => (Math.random() < 0.35 ? [LED.rouge, 1] : c));
     setSticks(leds);
     if (slow && face === 'mallette') { drawCyd2(); drawCydBig(); }
   }
@@ -1396,7 +1483,9 @@ function init() {
       active: () => { const k = hintStep(); return k == null ? [] : MODULES[k].filter((sel) => $(sel)?.classList.contains('active-mod')); }, showTuto() { showTuto(null); },
       goto(n) { if (g.phase === 'play') nextStep(n); },
       patchClock: () => (g.pclock ? { total: g.pclock.total, left: Math.round(patchClockLeft()), started: !!g.pclock.t0, expired: g.pclock.expired } : null),
-      agePatchClock(ms) { if (g.pclock?.t0) g.pclock.t0 -= ms; }, accLog: () => g.accLog.slice(), stickColors: () => (g.lastLeds ? Array.from({ length: SIMON.STICKS }, (_, k) => { const seg = g.lastLeds.slice(k * SIMON.LEDS, (k + 1) * SIMON.LEDS).filter(Boolean); return seg.length ? { col: seg[0][0], n: seg.length } : null; }) : null),
+      agePatchClock(ms) { if (g.pclock?.t0) g.pclock.t0 -= ms; },
+      shakeLog: () => g.shakeLog.slice(), get shaking() { return !!g.shake; }, ageBars(ms) { if (g.barT0) g.barT0 -= ms; }, barsStarted: () => !!g.barT0,
+      k7: () => (g.k7 ? { ...g.k7, fails: g.k7.fails.slice() } : null), keyIn: () => g.keyIn.slice(), joyPress() { joyPress(); }, SERVO_SHAKE, KEYS7, TRAP_BARS, accLog: () => g.accLog.slice(), stickColors: () => (g.lastLeds ? Array.from({ length: SIMON.STICKS }, (_, k) => { const seg = g.lastLeds.slice(k * SIMON.LEDS, (k + 1) * SIMON.LEDS).filter(Boolean); return seg.length ? { col: seg[0][0], n: seg.length } : null; }) : null),
       clearVoice, SIMON, STICK_COLORS, simonTiming, simonTouch(s) { simonTouch(s); }, get simon() { return g.simon; },
       simonSpeed: SIMON_SPEED, cydBig: () => cydBigState(), jingle: () => ({ ...jingleStats }),
       cables: () => cableGeom.map((c) => ({ ...c })), mazeGrid: () => g.mazeGridCss, get drag() { return drag; }, RING, DETENTS,

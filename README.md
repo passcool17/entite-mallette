@@ -18,9 +18,32 @@ Archive figée de la v0.4.0 (commit d7c1ba2, plan v0.8, n° de série à lettres
 Archive figée de la v0.3.2 (commit 5e9d940, avant la refonte : trois trappes, trois serrures) : https://passcool17.github.io/entite-mallette-v032/
 (dépôt passcool17/entite-mallette-v032, cache séparé `entite-mallette-v032-0.3.2`).
 
+## Version 0.5.2 (26 nov. 2026) — trappes qui tremblent, « deux clés, deux mains »
+
+État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.5.2`, imports `?v=0.5.2`).
+Plan : `revision-jeux-proposition.md` §11, point 3. Aucune pièce du plan v0.8 déplacée.
+
+- **Trappes (étape 2)** : on choisit au **joystick** (gauche = A, droite = B ; la trappe choisie s'entoure de bleu) et on
+  **appuie** sur le chapeau (bouton SW du KY-023) pour ouvrir. Toucher la porte marche encore dans le simulateur.
+  Mauvaise trappe : le **SG90 secoue la porte** (±6°, 3 cycles, 100 ms par pas, une seule porte), dans les limites
+  d'Électronique : pendant le tremblement, la voix se tait et les barrettes restent à 30 % ; l'erreur (son, flash, −5 s)
+  vient juste après. **Difficile** : les barrettes **s'éteignent 5 s** après la consigne ; Réécouter les rallume, −5 s.
+- **Clés dans les trappes** (Impression 3D) : la **clé I dort derrière la trappe A**, la **clé II derrière la trappe B**,
+  debout sur la tranche dans une fente **à gauche**. La bonne trappe de l'étape 2 en donne une, l'autre s'ouvre après le
+  code 1. On touche la clé pour la prendre : elle va dans sa serrure.
+- **Serrures (étape 7) « deux clés, deux mains »** : « Deux clés. Deux mains. Attends mon signal. » Le vrai signal : les
+  **5 barrettes passent au vert** et un bip. **Moyen** : tourner les deux clés **ensemble** (moins d'1 s d'écart).
+  **Difficile** : l'Entité crie deux fois un faux « Maintenant ! » (œil rouge), puis au vert on tourne dans l'ordre du
+  poids (règles légère / lourde d'avant). Tourner avant le vert : « Trop tôt. », −5 s ; pas ensemble : « Pas ensemble. »,
+  −5 s ; les clés reviennent et un nouveau signal suit.
+- **Voix de base** (synthèse de l'appareil, `mp3Ready: false`) : `obj_trappe_joy`, `obj_cles_ensemble`, `obj_cles_signal`,
+  `cles_intro`, `cles_maintenant`, `cles_trop_tot`, `cles_pas_ensemble`, `cles_ensemble`, `hint1/2/3_cles_ensemble`.
+- Test (QA v0.5.1) : `tests/fullrun.mjs` attend la fin de la vraie voix au cryptex et au chrono de l'étape 10 (plus
+  d'attente fixe trop courte en mode voix réelle).
+
 ## Version 0.5.1 (26 nov. 2026) — barrettes vivantes
 
-État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.5.1`, imports `?v=0.5.1`).
+État : publiée (commit 7a4e463, QA PASS).
 Plan : `revision-jeux-proposition.md` §11, point 2. Aucune pièce du plan v0.8 déplacée.
 
 - **Simon (étape 3)** : une note par barrette, gamme pentatonique (do ré mi sol la, barrette 1 → 5), donc on joue un air.

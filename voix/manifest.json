@@ -1,5 +1,5 @@
 {
- "version": "0.5.1",
+ "version": "0.5.2",
  "note": "Voix de l'Entité. Chaque réplique = un id ou une suite d'ids. mp3Ready true : voix/<id>.mp3 est joué (repli synthèse française si échec). mp3Ready false : synthèse française directe, aucun fichier demandé. Pour remplacer une voix : déposer voix/<id>.mp3 puis mettre mp3Ready à true, sans toucher au code. dfplayerTrack = nom du fichier sur la microSD du DFPlayer Mini (dossier mp3/0001.mp3…).",
  "cues": [
   {
@@ -1754,6 +1754,105 @@
    "source": "tts",
    "mp3Ready": false,
    "text": "Cette fois, à l'envers."
+  },
+  {
+   "id": "obj_trappe_joy",
+   "file": "voix/obj_trappe_joy.mp3",
+   "dfplayerTrack": "0191",
+   "category": "objective",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Ouvre la bonne trappe : joystick à gauche pour A, à droite pour B, puis appuie."
+  },
+  {
+   "id": "obj_cles_ensemble",
+   "file": "voix/obj_cles_ensemble.mp3",
+   "dfplayerTrack": "0192",
+   "category": "objective",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Prends les deux clés dans les trappes. Au vert, tourne-les ensemble."
+  },
+  {
+   "id": "obj_cles_signal",
+   "file": "voix/obj_cles_signal.mp3",
+   "dfplayerTrack": "0193",
+   "category": "objective",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Prends les deux clés dans les trappes. Au vert, tourne les serrures dans le bon ordre."
+  },
+  {
+   "id": "cles_intro",
+   "file": "voix/cles_intro.mp3",
+   "dfplayerTrack": "0194",
+   "category": "clue",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Deux clés. Deux mains. Attends mon signal."
+  },
+  {
+   "id": "cles_maintenant",
+   "file": "voix/cles_maintenant.mp3",
+   "dfplayerTrack": "0195",
+   "category": "taunt",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Maintenant !"
+  },
+  {
+   "id": "cles_trop_tot",
+   "file": "voix/cles_trop_tot.mp3",
+   "dfplayerTrack": "0196",
+   "category": "outcome",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Trop tôt."
+  },
+  {
+   "id": "cles_pas_ensemble",
+   "file": "voix/cles_pas_ensemble.mp3",
+   "dfplayerTrack": "0197",
+   "category": "outcome",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Pas ensemble. Recommence."
+  },
+  {
+   "id": "cles_ensemble",
+   "file": "voix/cles_ensemble.mp3",
+   "dfplayerTrack": "0198",
+   "category": "outcome",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Ensemble. Bien."
+  },
+  {
+   "id": "hint1_cles_ensemble",
+   "file": "voix/hint1_cles_ensemble.mp3",
+   "dfplayerTrack": "0199",
+   "category": "hint",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Indice : les clés sont dans les trappes A et B. Mets-les dans les serrures, puis attends que les barrettes passent au vert."
+  },
+  {
+   "id": "hint2_cles_ensemble",
+   "file": "voix/hint2_cles_ensemble.mp3",
+   "dfplayerTrack": "0200",
+   "category": "hint",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Au vert, tourne les deux clés en même temps. Le vert, pas ma voix."
+  },
+  {
+   "id": "hint3_cles_ensemble",
+   "file": "voix/hint3_cles_ensemble.mp3",
+   "dfplayerTrack": "0201",
+   "category": "hint",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Dernier indice. Moins d'une seconde entre les deux clés."
   }
  ]
 }

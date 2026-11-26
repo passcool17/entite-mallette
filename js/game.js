@@ -1,6 +1,8 @@
 // game.js : tirage d'une partie v0.5 (logique pure, sans DOM). Même graine = même partie.
 // v0.5.0 (Pascal 22:24) : étape 1 = « Mot mêlé » (le CYD 2 montre 5 lettres mélangées, jamais le mot ; on forme le mot
 // sur E1–E5). Les molettes ne servent qu'à des MOTS de 5 lettres. Le n° de série est en CHIFFRES seulement (4 chiffres).
+// v0.5.2 : serrures « deux clés, deux mains » (signal vert, fausses alertes en difficile), trappes : choix au joystick,
+// tremblement SG90 sur une erreur (limites Électronique), clé I derrière la trappe A, clé II derrière la trappe B.
 // v0.4 (plan d'impression v0.8) : 2 trappes (A, B) et 2 serrures (I, II). Les barrettes gardent 3 couleurs ; les 2 trappes
 // montrent la couleur réponse et un leurre, donc les 4 variantes de trappe restent justes.
 // v0.3 : 5 molettes (mots de 5 lettres), n° de série à 5 lettres, étape 3 = Simon sur 5 barrettes, trappe sur 10 demi-barrettes.
@@ -46,6 +48,14 @@ export const SIMON_NOTES = [262, 294, 330, 392, 440];
 export const PATCH_CLOCK = { moyen: 30000, difficile: 20000, PENALTY_S: 8 };
 // v0.5.1 : étape 8 (cryptex) : en moyen, la barrette n s'allume à chaque lettre épelée ; en difficile, Réécouter coûte 5 s
 export const CRYPTEX_REPLAY_COST_S = 5;
+// v0.5.2 : tremblement d'une trappe SG90 sur une erreur (Électronique : ±5–8°, ≤ 3 cycles, 80–120 ms par pas, une porte
+// à la fois, puis arrêt ; jamais pendant un son fort ni des DEL vives). ledMax = luminosité max des barrettes pendant le tremblement.
+export const SERVO_SHAKE = { deg: 6, cycles: 3, stepMs: 100, ledMax: 0.3 };
+// v0.5.2 : étape 2 en difficile, les barrettes s'éteignent 5 s après la consigne ; Réécouter les rallume, −5 s
+export const TRAP_BARS = { darkMs: 5000, REPLAY_COST_S: 5 };
+// v0.5.2 : étape 7 « deux clés, deux mains ». keyTrap[k] = trappe où dort la clé k (I → A, II → B, Impression 3D :
+// clé debout sur la tranche, à gauche, sous la porte). windowMs = écart max entre les deux clés (moyen).
+export const KEYS7 = { windowMs: 1000, falseAlerts: { moyen: 0, difficile: 2 }, keyTrap: [0, 1], PENALTY_S: 5 };
 // timing d'un tour (round = index 0..) : en difficile, ×0,88 par tour réussi, avec planchers
 export function simonTiming(tier, round) {
   const P = SIMON[tier] || SIMON.moyen, f = P.speedup ? Math.pow(SIMON.SPEEDUP, round) : 1;
@@ -88,7 +98,7 @@ export const POOLS = {
   trap:   { moyen: ['frequente', 'gauche'],      difficile: ['rare', 'moyenne'] },
   patch1: { moyen: ['route', 'echange', 'debranche'], difficile: ['route', 'echange', 'serie'] },
   code1:  { moyen: ['ordre', 'envers'],          difficile: ['envers', 'plus1'] },
-  keys:   { moyen: ['legere', 'lourde'],         difficile: ['lourde', 'legere'] },
+  keys:   { moyen: ['ensemble'],                 difficile: ['lourde', 'legere'] },   // v0.5.2 : moyen = deux clés ensemble au vert ; difficile = ordre par poids après le vert
   word:   { moyen: ['ordre', 'envers'],          difficile: ['envers', 'suivante'] },
   patch2: { moyen: ['double', 'echange'],        difficile: ['double', 'serie'] },
   code2:  { moyen: ['envers', 'rotation'],       difficile: ['envers', 'decale'] },
@@ -191,7 +201,7 @@ export function makeRun(seed) {
 
   // ---- 7. clés I, II (v0.4 : 2 serrures) : chacune « pèse » un chiffre (I = 1er, II = 2e) ; légère → lourde ou l'inverse
   const keyOrder = [0, 1].sort((a, b) => (v.keys === 'lourde' ? digits[b] - digits[a] : digits[a] - digits[b]));
-  cues[7] = [`clue_cles_${v.keys}`];
+  cues[7] = v.keys === 'ensemble' ? ['cles_intro'] : ['cles_intro', `clue_cles_${v.keys}`];
 
   // ---- mensonges (œil rouge) : faux fragments ; le reste de la pression est dans app.js (pendant chaque choix)
   const fragLies = shuffle([0, 1, 2, 3]).slice(0, hard ? 3 : 2).sort();

@@ -40,19 +40,19 @@
     @keyframes b-scan { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
     @media (prefers-reduced-motion: reduce) { .b-eye i { animation-duration: 30s; } .b-scan { animation-duration: 3s; } .b-eye b { animation: none; } }
   </style>
-  <link rel="stylesheet" href="css/app.css?v=0.5.1" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="css/app.css?v=0.5.1"></noscript>
-  <link rel="modulepreload" href="js/eye.js?v=0.5.1">
-  <link rel="modulepreload" href="js/eye-config.js?v=0.5.1">
-  <link rel="modulepreload" href="js/game.js?v=0.5.1">
-  <link rel="modulepreload" href="js/audio.js?v=0.5.1">
-  <link rel="modulepreload" href="js/sfx.js?v=0.5.1">
-  <link rel="modulepreload" href="js/voice-manifest.js?v=0.5.1">
-  <link rel="modulepreload" href="js/preload.js?v=0.5.1">
-  <link rel="modulepreload" href="js/panel-config.js?v=0.5.1">
-  <link rel="modulepreload" href="js/battery.js?v=0.5.1">
-  <link rel="modulepreload" href="js/guide.js?v=0.5.1">
-  <script type="module" src="js/app.js?v=0.5.1"></script>
+  <link rel="stylesheet" href="css/app.css?v=0.5.2" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="css/app.css?v=0.5.2"></noscript>
+  <link rel="modulepreload" href="js/eye.js?v=0.5.2">
+  <link rel="modulepreload" href="js/eye-config.js?v=0.5.2">
+  <link rel="modulepreload" href="js/game.js?v=0.5.2">
+  <link rel="modulepreload" href="js/audio.js?v=0.5.2">
+  <link rel="modulepreload" href="js/sfx.js?v=0.5.2">
+  <link rel="modulepreload" href="js/voice-manifest.js?v=0.5.2">
+  <link rel="modulepreload" href="js/preload.js?v=0.5.2">
+  <link rel="modulepreload" href="js/panel-config.js?v=0.5.2">
+  <link rel="modulepreload" href="js/battery.js?v=0.5.2">
+  <link rel="modulepreload" href="js/guide.js?v=0.5.2">
+  <script type="module" src="js/app.js?v=0.5.2"></script>
 </head>
 <body>
   <div id="boot" aria-live="polite">
@@ -228,7 +228,7 @@
               </div>
                 <div class="mod mod-joy">
                 <div class="joy" id="joy" role="group" aria-label="Joystick">
-                <div class="joy-well"><span class="joy-cap" id="joyCap"></span></div>
+                <div class="joy-well" tabindex="0" role="button" aria-label="Bouton du joystick : appuyer"><span class="joy-cap" id="joyCap"></span></div>
                 <button class="joy-dir up" type="button" data-dir="up" aria-label="Haut"></button>
                 <button class="joy-dir right" type="button" data-dir="right" aria-label="Droite"></button>
                 <button class="joy-dir down" type="button" data-dir="down" aria-label="Bas"></button>

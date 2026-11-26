@@ -42,8 +42,8 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.5.1';
-import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.5.1';
+import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.5.2';
+import { OBJECTIVE, hintCues, objectiveId } from '../js/guide.js?v=0.5.2';
 
 const require = createRequire(import.meta.url);
 function loadChromium() {
@@ -307,11 +307,11 @@ async function waitAdvance(p, from, ms = 8000) {
 }
 
 
-const SUCCESS_HEADS = new Set(['outcome_ok', 'clue_fragment', 'taunt_fini', 'taunt_couche2', 'outcome_victoire', 'depart']);
+const SUCCESS_HEADS = new Set(['outcome_ok', 'cles_ensemble', 'clue_fragment', 'taunt_fini', 'taunt_couche2', 'outcome_victoire', 'depart']);
 
 function stepHeads(run, step) {
   const ids = new Set();
-  if (OBJECTIVE[step]) ids.add(OBJECTIVE[step]);
+  { const o = objectiveId(run, step) || OBJECTIVE[step]; if (o) ids.add(o); }
   for (const id of run.cues?.[step] || []) ids.add(id);
   for (let l = 1; l <= 3; l++) {
     try { for (const id of hintCues(run, step, l, { pos: [0, 0], sabotage: false }) || []) ids.add(id); } catch { /* ignore */ }
@@ -926,6 +926,9 @@ async function playOne(b, seed, opts) {
   {
     // l'œil rouge (mensonge) fait grésiller les LED : on lit les barrettes hors mensonge (plusieurs essais)
     let hv = [];
+    // v0.5.2 difficile : les barrettes s'éteignent 5 s après la consigne ; on les garde allumées le temps de la lecture
+    // (le noir et Réécouter −5 s sont vérifiés juste après)
+    if (runInfo.tier === 'difficile') { await p.waitForFunction(() => __entiteDebug.barsStarted(), null, { timeout: 30000 }).catch(() => {}); await D(p, () => __entiteDebug.ageBars(-600000)); }
     for (let k = 0; k < 24; k++) {
       await p.waitForFunction(() => performance.now() > (__entiteDebug.state.lieUntil || 0) + 150, null, { timeout: 8000 }).catch(() => {});
       const snap = await D(p, () => { const g = __entiteDebug.state; const clean = performance.now() > (g.lieUntil || 0) + 150; const v = [...document.querySelectorAll('#jacks .stick')].flatMap((st) => { const L = [...st.querySelectorAll('i')]; return [L.slice(0, 4), L.slice(4)].map((h) => { const c = h.map((e) => (e.classList.contains('on') ? e.style.getPropertyValue('--c').trim() : '')); return c.every((x) => x && x === c[0]) ? c[0] : '?'; }); }); return { clean, v }; });
@@ -939,9 +942,49 @@ async function playOne(b, seed, opts) {
     rec(ok, 2, 2, ok ? `5 barrettes, 10 moitiés, comptes ${counts.join('/')}` : `barrettes étape 2 ${JSON.stringify({ hv, want, counts })}`);
     if (!ok) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   }
+  {
+    // v0.5.2 : difficile = noir après 5 s, Réécouter rallume (−5 s) ; moyen = toujours allumées
+    await D(p, () => __entiteDebug.ageBars(600000 + 6000));
+    await W(p, 200);
+    const lit = () => D(p, () => (__entiteDebug.stickColors() || []).filter(Boolean).length);
+    const n0 = await lit();
+    let okB = runInfo.tier === 'difficile' ? n0 === 0 : n0 === 5, why = { n0 };
+    if (okB && runInfo.tier === 'difficile') {
+      const e0 = await D(p, () => __entiteDebug.state.errors), r0 = await D(p, () => __entiteDebug.state.remaining);
+      await p.locator('#btnReplay').click({ force: true });
+      await W(p, 250);
+      const n1 = await lit(), e1 = await D(p, () => __entiteDebug.state.errors), r1 = await D(p, () => __entiteDebug.state.remaining);
+      const ob = await D(p, () => document.querySelector('#objText')?.textContent || '');
+      Object.assign(why, { n1, e0, e1, cost: r0 - r1, ob });
+      okB = n1 === 5 && e1 === e0 && r0 - r1 >= 4.9 && r0 - r1 < 7 && /−5 s/.test(ob);
+    }
+    rec(okB, 2, 2, okB ? (runInfo.tier === 'difficile' ? 'barrettes noires après 5 s, Réécouter les rallume (−5 s, sans erreur)' : 'moyen : barrettes allumées en continu') : `barrettes trappe noir/Réécouter ${JSON.stringify(why)}`);
+    if (!okB) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+    // mauvaise trappe au joystick : SG90 secoue la porte dans les limites d'Électronique, puis l'erreur
+    const wrong = 1 - answers.trap;
+    await p.tap(`#joy .joy-dir.${wrong === 0 ? 'left' : 'right'}`);
+    await W(p, 120);
+    const sel = await D(p, () => [...document.querySelectorAll('#traps .trap')].map((t) => t.classList.contains('sel')));
+    const e0 = await D(p, () => __entiteDebug.state.errors);
+    await p.tap('#joy .joy-well');
+    await W(p, 60);
+    const mid = await D(p, () => ({ shaking: __entiteDebug.shaking, e: __entiteDebug.state.errors }));
+    await p.waitForFunction(() => __entiteDebug.shakeLog().length >= 1, null, { timeout: 5000 }).catch(() => {});
+    await W(p, 150);
+    const sh = await D(p, () => __entiteDebug.shakeLog()), e1 = await D(p, () => __entiteDebug.state.errors);
+    const open = await D(p, () => [...document.querySelectorAll('#traps .trap')].map((t) => t.classList.contains('open')));
+    const S = sh[0] || {};
+    const okS = sel[wrong] && !sel[1 - wrong] && mid.shaking && mid.e === e0 && sh.length === 1 && S.i === wrong && S.deg >= 5 && S.deg <= 8 && S.cycles <= 3 && S.stepMs >= 80 && S.stepMs <= 120
+      && S.ledMax <= 0.3 && !S.speaking && !S.open && S.ms >= 650 && e1 === e0 + 1 && !open[0] && !open[1];
+    rec(okS, 2, 2, okS ? `joystick ${'AB'[wrong]} + appui : mauvaise trappe tremble (±${S.deg}°, ${S.cycles} cycles, ${S.stepMs} ms, DEL ≤ ${S.ledMax}, sans voix), puis −5 s` : `tremblement trappe ${JSON.stringify({ sel, mid, sh, e0, e1, open })}`);
+    if (!okS) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+    await W(p, 700);
+    await p.tap(`#joy .joy-dir.${answers.trap === 0 ? 'left' : 'right'}`);
+    await W(p, 80);
+  }
   const t2 = await tNow();
-  await p.tap(`.trap[data-i="${answers.trap}"] .trap-door`);
-  if (!(await expectAdvance(2, 3, `trappe ${answers.trap + 1}`, t2))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  await p.tap('#joy .joy-well');   // v0.5.2 : bonne trappe choisie au joystick (gauche = A, droite = B), appui = ouvrir
+  if (!(await expectAdvance(2, 3, `trappe ${"AB"[answers.trap]} au joystick`, t2))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   if (!(await hud(3, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
   // ---- 3 Simon : chaque tour, vérifier la série jouée (K2000), puis la reproduire aux prises
@@ -1146,22 +1189,63 @@ async function playOne(b, seed, opts) {
   if (!(await expectAdvance(6, 7, `code ${answers.code1}`, t6))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   if (!(await hud(7, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
-  // ---- 7 clés
+  // ---- 7 clés (v0.5.2 « deux clés, deux mains ») : clé I derrière la trappe A, clé II derrière la B, debout à gauche
+  {
+    const bail = async (ok, msg, okMsg) => { rec(ok, 7, 7, ok ? okMsg : msg); return ok; };
+    const geo = await D(p, () => [0, 1].map((k) => { const b = document.querySelector(`.cle-chant[data-k="${k}"]`); if (!b) return null; const t = b.closest('.trap'), r = b.querySelector('.cle-fente').getBoundingClientRect(), R = t.getBoundingClientRect(), B = b.getBoundingClientRect();
+      return { trap: +t.dataset.i, aria: b.getAttribute('aria-label'), left: r.left + r.width / 2 < R.left + R.width / 3, tall: r.height > r.width * 2, w: Math.round(B.width), h: Math.round(B.height) }; }));
+    const okG = geo.every((x, k) => x && x.trap === k && x.aria === `Prendre la clé ${['I', 'II'][k]}` && x.left && x.tall && x.w >= 44 && x.h >= 40);
+    if (!(await bail(okG, `clés dans les trappes ${JSON.stringify(geo)}`, 'clé I dans A, clé II dans B, debout sur la tranche à gauche'))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+    // serrure sans clé : rien (pas d'erreur), le bandeau dit où est la clé
+    const e0 = await D(p, () => __entiteDebug.state.errors);
+    await p.tap('.lock.key[data-key="0"] .lock-btn'); await W(p, 120);
+    const nk = { e: await D(p, () => __entiteDebug.state.errors), ob: await D(p, () => document.querySelector('#objText')?.textContent || '') };
+    if (!(await bail(nk.e === e0 && /trappe A/.test(nk.ob), `serrure sans clé ${JSON.stringify(nk)}`, 'serrure sans clé : « Prends la clé I dans la trappe A », sans erreur'))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+    for (const k of [0, 1]) { await p.tap(`.cle-chant[data-k="${k}"]`); await W(p, 80); }
+    const ins = await D(p, () => ({ keyIn: __entiteDebug.keyIn(), ins: [...document.querySelectorAll('.lock.key')].map((l) => l.classList.contains('inserted')), left: document.querySelectorAll('.cle-chant').length }));
+    if (!(await bail(ins.keyIn.join() === 'true,true' && ins.ins.join() === 'true,true' && ins.left === 0, `clés prises ${JSON.stringify(ins)}`, 'clés prises, dans les serrures I et II'))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+    // trop tôt : tourner avant le vert = −5 s, les clés reviennent
+    const k0 = await D(p, () => __entiteDebug.k7());
+    if (k0?.phase === 'wait') {
+      const e1 = await D(p, () => __entiteDebug.state.errors);
+      await p.tap(`.lock.key[data-key="${answers.keyOrder[0]}"] .lock-btn`); await W(p, 400);
+      const tt = { k: await D(p, () => __entiteDebug.k7()), e: await D(p, () => __entiteDebug.state.errors), on: await D(p, () => document.querySelectorAll('.lock.key.on').length), ob: await D(p, () => document.querySelector('#objText')?.textContent || '') };
+      if (!(await bail(tt.e === e1 + 1 && tt.k.fails.join() === 'tot' && tt.on === 0 && /Trop tôt|−5 s/.test(tt.ob), `trop tôt ${JSON.stringify(tt)}`, 'tourner avant le vert : « Trop tôt », −5 s, clés revenues'))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+    } else rec(true, 7, 7, `trop tôt non testé (signal déjà donné : ${k0?.phase})`);
+    const waitGo = () => p.waitForFunction(() => __entiteDebug.k7()?.phase === 'go', null, { timeout: 40000 }).catch(() => {});
+    await waitGo();
+    await p.waitForFunction(() => (__entiteDebug.stickColors() || []).every((c) => c && c.col === '#36f08a'), null, { timeout: 1500 }).catch(() => {});   // barrettes redessinées ~ toutes les 80 ms
+    const g1 = await D(p, () => ({ k: __entiteDebug.k7(), cols: __entiteDebug.stickColors(), maint: __entiteDebug.voiceLog.filter((v) => v.ids?.[0] === 'cles_maintenant').map((v) => !!v.lie) }));
+    const allGreen = (g1.cols || []).length === 5 && g1.cols.every((c) => c && c.col === '#36f08a' && c.n === 8);
+    const wantAlerts = runInfo.tier === 'difficile' ? 2 : 0;
+    const okGo = g1.k?.phase === 'go' && allGreen && g1.k.alerts === wantAlerts && g1.maint.length === wantAlerts && g1.maint.every(Boolean);
+    if (!(await bail(okGo, `signal vert ${JSON.stringify(g1)}`, `signal : 5 barrettes vertes + bip${wantAlerts ? ', après 2 faux « Maintenant ! » (œil rouge)' : ''}`))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+    if (runInfo.tier === 'moyen') {
+      // une seule clé, puis plus d'1 s : « Pas ensemble », −5 s, on attend un nouveau vert
+      const e2 = await D(p, () => __entiteDebug.state.errors);
+      await p.tap('.lock.key[data-key="1"] .lock-btn'); await W(p, 1500);
+      const pe = { k: await D(p, () => __entiteDebug.k7()), e: await D(p, () => __entiteDebug.state.errors) };
+      if (!(await bail(pe.e === e2 + 1 && pe.k.fails.at(-1) === 'ensemble' && pe.k.phase !== 'go', `pas ensemble ${JSON.stringify(pe)}`, 'une clé seule plus d’1 s : « Pas ensemble », −5 s'))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+      await W(p, 300); await waitGo();
+    }
+  }
   const t7 = await tNow();
   for (const k of answers.keyOrder) {
     await p.tap(`.lock.key[data-key="${k}"] .lock-btn`);
     await W(p, 70);
   }
-  if (!(await expectAdvance(7, 8, `ordre ${answers.keyOrder.join(',')}`, t7))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  if (!(await expectAdvance(7, 8, `${runInfo.tier === 'moyen' ? 'ensemble' : 'ordre'} ${answers.keyOrder.join(',')} (écart ${await D(p, () => __entiteDebug.k7()?.dt)} ms)`, t7))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   if (!(await hud(8, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
   // ---- 8 encodeurs (mot)
   if (!(await cydLetters(8))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   {
     // v0.5.1 : moyen = la barrette n s'allume à chaque lettre épelée (à l'envers : 5→1) ; difficile = rien, et Réécouter −5 s
-    await p.waitForFunction(() => (__entiteDebug.voiceLog || []).some((v) => (v.ids || []).some((id) => /^clue_mot_/.test(id))), { timeout: 8000 }).catch(() => {});
-    await W(p, 600);
+    await p.waitForFunction(() => (__entiteDebug.voiceLog || []).some((v) => (v.ids || []).some((id) => /^clue_mot_/.test(id))), { timeout: 30000 }).catch(() => {});
     const expAcc = runInfo.tier === 'moyen' ? (runInfo.v.word === 'envers' ? [4, 3, 2, 1, 0] : [0, 1, 2, 3, 4]) : [];
+    // attente par événement (QA v0.5.1, vraie voix : 1re lettre à 12,3 s) : toutes les lettres comptées et la voix finie
+    await W(p, 300);
+    await p.waitForFunction((n) => __entiteDebug.accLog().length >= n && !__entiteDebug.audio().speaking, expAcc.length, { timeout: 60000 }).catch(() => {});
     const a0 = await D(p, () => __entiteDebug.accLog());
     const okA = a0.join() === expAcc.join();
     rec(okA, 8, 8, okA ? (expAcc.length ? `barrettes du cryptex ${expAcc.map((k) => k + 1).join('-')} (${runInfo.v.word})` : 'difficile : pas de barrettes au cryptex') : `barrettes cryptex ${JSON.stringify({ a0, expAcc })}`);
@@ -1170,7 +1254,10 @@ async function playOne(b, seed, opts) {
     await p.waitForFunction(() => !document.querySelector('#btnReplay')?.disabled, { timeout: 8000 }).catch(() => {});
     await p.locator('#btnReplay').click({ force: true });
     await W(p, 900);
-    const e1 = await D(p, () => __entiteDebug.state.errors), r1 = await D(p, () => __entiteDebug.state.remaining), a1 = await D(p, () => __entiteDebug.accLog());
+    const e1 = await D(p, () => __entiteDebug.state.errors), r1 = await D(p, () => __entiteDebug.state.remaining);
+    await W(p, 300);
+    await p.waitForFunction((n) => __entiteDebug.accLog().length >= n && !__entiteDebug.audio().speaking, expAcc.length * 2, { timeout: 60000 }).catch(() => {});
+    const a1 = await D(p, () => __entiteDebug.accLog());
     const cost = r0 - r1;
     const okR = e1 === e0 && (runInfo.tier === 'difficile' ? cost >= 4.9 && cost < 7 : cost < 2) && (runInfo.tier === 'moyen' ? a1.length === 10 && a1.slice(5).join() === expAcc.join() : a1.length === 0);
     rec(okR, 8, 8, okR ? `Réécouter cryptex : ${runInfo.tier === 'difficile' ? '−5 s' : 'gratuit, barrettes rejouées'}` : `Réécouter cryptex ${JSON.stringify({ e0, e1, cost, a1 })}`);
@@ -1189,7 +1276,7 @@ async function playOne(b, seed, opts) {
 
   // ---- 10 baie 2 : v0.5.1 la barrette 1 est un chrono (moyen 30 s, difficile 20 s) ; vide → −8 s, une erreur, recharge
   {
-    await p.waitForFunction(() => __entiteDebug.patchClock()?.started, { timeout: 15000 }).catch(() => {});
+    await p.waitForFunction(() => __entiteDebug.patchClock()?.started, { timeout: 60000 })   // départ à la fin de l'indice (vraie voix seed 3 : 16,8 s).catch(() => {});
     const c0 = await D(p, () => __entiteDebug.patchClock());
     const tot = runInfo.tier === 'moyen' ? 30000 : 20000;
     const e0 = await D(p, () => __entiteDebug.state.errors), r0 = await D(p, () => __entiteDebug.state.remaining);

@@ -799,3 +799,20 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
   .batt-txt { gap: 1px; letter-spacing: -.02em; }
   .batt-txt small { font-size: 6px; }
 }
+
+/* ---------- v0.5.2 : trappes au joystick (sélection), tremblement SG90, clé debout sur la tranche à gauche, serrures ---------- */
+.trap.sel:not(.open) { box-shadow: inset 0 0 0 2px var(--rim), 0 0 0 2px #62d6ff, 0 0 14px rgb(98 214 255 / .55), inset 0 4px 10px #000; }
+.trap.sel:not(.open) .trap-n { color: #dff6ff; }
+.trap.shaking .trap-door { transition: none; }
+.trap-well:has(.cle-chant) { padding: 0; }
+.cle-chant { position: absolute; inset: 0; border: 0; padding: 0 0 0 6px; background: transparent; display: flex; align-items: center; gap: 6px; cursor: pointer; min-width: 44px; min-height: 44px; }
+.cle-chant:focus-visible { outline: 2px solid #62d6ff; outline-offset: -2px; }
+.cle-fente { position: relative; display: block; width: 10px; height: 78%; max-height: 40px; border-radius: 2px; background: #000; box-shadow: inset 0 0 0 1px #2a2e32; }
+.trap-well > .cle-fente { position: absolute; left: 6px; top: 11%; height: 78%; }
+.cle { position: absolute; left: 2px; right: 2px; top: -4px; bottom: 3px; border-radius: 3px 3px 1px 1px; background: linear-gradient(90deg, #8f969d, #e9ecee, #8f969d); box-shadow: 0 0 6px rgb(255 255 255 / .25); }
+.cle::before { content: ''; position: absolute; left: -3px; right: -3px; top: -2px; height: 9px; border-radius: 50%; background: radial-gradient(circle, #1a1d20 28%, #c9ced2 32%, #8f969d 70%); }
+.cle-n { font: 700 9px/1 var(--f-tech); color: var(--silk); letter-spacing: .08em; }
+.lock.inserted .lock-slot { background: linear-gradient(90deg, #8f969d, #e9ecee, #8f969d); box-shadow: 0 0 0 2px #9ca3a9, 0 0 6px rgb(255 255 255 / .35); }
+.joy.pressed .joy-cap { animation: joyPress .18s; }
+@keyframes joyPress { 50% { scale: .9; } }
+.joy-well:focus-visible { outline: 2px solid #62d6ff; outline-offset: 2px; }

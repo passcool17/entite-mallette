@@ -1,5 +1,5 @@
 // sfx.js : effets procéduraux WebAudio (aucun fichier). Branchés sur le bus d'effets d'audio.js (donc coupés par le bouton son).
-import { bus } from './audio.js?v=0.5.1';
+import { bus } from './audio.js?v=0.5.2';
 
 let noiseBuf = null;
 function ctx() { return bus(); }
@@ -49,6 +49,10 @@ export const sfx = {
   simon(c) { const f = typeof c === 'number' ? NOTES[c] : SIMON[c]; tone(f || 440, 0.26, { type: 'triangle', vol: 0.13 }); tone((f || 440) * 2, 0.12, { type: 'sine', vol: 0.03 }); },
   // v0.5.1 : mauvaise fiche à l'étape 4/10 : zap électrique (bruit aigu + scie qui chute)
   zap() { noise(0.09, { vol: 0.35, lp: 9000, hp: 2500 }); tone(1400, 0.16, { type: 'sawtooth', vol: 0.07, slide: 0.12 }); },
+  // v0.5.2 : tremblement SG90 (petits clics du servo, doux : jamais un son fort pendant le tremblement)
+  jitter(cycles = 3, stepMs = 100) { for (let k = 0; k < cycles * 2; k++) { noise(0.025, { vol: 0.12, lp: 2600, hp: 700, at: k * stepMs / 1000 }); tone(k % 2 ? 150 : 170, 0.03, { type: 'square', vol: 0.025, at: k * stepMs / 1000 }); } },
+  // v0.5.2 : bip du vrai signal de l'étape 7 (les 5 barrettes passent au vert)
+  bip() { tone(1046.5, 0.12, { type: 'square', vol: 0.07 }); tone(1046.5, 0.12, { type: 'sine', vol: 0.08, at: 0.14 }); },
   rfPulse() { tone(13560 / 10, 0.05, { type: 'sine', vol: 0.05 }); tone(1760, 0.06, { type: 'square', vol: 0.04, at: 0.12 }); tone(2640, 0.12, { type: 'square', vol: 0.05, at: 0.2 }); },
   joy() { tone(900, 0.02, { type: 'square', vol: 0.03 }); },
   wall() { tone(110, 0.08, { type: 'square', vol: 0.07 }); },
