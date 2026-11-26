@@ -1,5 +1,5 @@
 // sfx.js : effets procéduraux WebAudio (aucun fichier). Branchés sur le bus d'effets d'audio.js (donc coupés par le bouton son).
-import { bus } from './audio.js?v=0.5.2';
+import { bus } from './audio.js?v=0.5.2.1';
 
 let noiseBuf = null;
 function ctx() { return bus(); }

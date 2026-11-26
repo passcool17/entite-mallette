@@ -18,9 +18,25 @@ Archive figée de la v0.4.0 (commit d7c1ba2, plan v0.8, n° de série à lettres
 Archive figée de la v0.3.2 (commit 5e9d940, avant la refonte : trois trappes, trois serrures) : https://passcool17.github.io/entite-mallette-v032/
 (dépôt passcool17/entite-mallette-v032, cache séparé `entite-mallette-v032-0.3.2`).
 
+## Version 0.5.2.1 (26 nov. 2026) — correctifs QA de la 0.5.2
+
+État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.5.2.1`, imports `?v=0.5.2.1`).
+Rien de nouveau dans le jeu ; seulement les 4 retours du Testeur QA (rapport `rapport-2026-11-26-v0.5.2.md`) :
+
+- **Tremblement de la trappe visible** : l'easing « steps » était posé sur tout l'effet (la porte restait à 0°) ; il est
+  maintenant sur chaque image clé. La porte bascule bien de −6° à +6°, 3 cycles, 100 ms par pas.
+- **Appui du joystick ≥ 44 px** : à l'étape 2, une zone d'appui de 44 px de large couvre le chapeau sur toute la hauteur
+  (haut et bas ne servent pas à cette étape) ; les flèches gauche et droite gardent 44 × 44 juste à côté. Zones de
+  toucher seulement : aucune pièce ne bouge.
+- **L'Entité ne coupe plus une longue consigne** : la réplique d'hésitation (15 s sans geste) attend la fin de la voix ;
+  les 15 s comptent depuis la fin de la consigne (le chrono de l'étape 10 et les barrettes du cryptex ne repartent plus).
+- **`tests/fullrun.mjs`** : options de `waitForFunction` en 3e argument (6 attentes), `.catch` sorti d'un commentaire,
+  Réécouter du cryptex vérifié sur la consigne rejouée ; nouveaux contrôles : angle réel de la porte pendant le
+  tremblement (transform calculé) et zones de toucher du joystick.
+
 ## Version 0.5.2 (26 nov. 2026) — trappes qui tremblent, « deux clés, deux mains »
 
-État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.5.2`, imports `?v=0.5.2`).
+État : publiée (commit 975a46c) ; QA FAIL corrigé en 0.5.2.1.
 Plan : `revision-jeux-proposition.md` §11, point 3. Aucune pièce du plan v0.8 déplacée.
 
 - **Trappes (étape 2)** : on choisit au **joystick** (gauche = A, droite = B ; la trappe choisie s'entoure de bleu) et on

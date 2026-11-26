@@ -42,8 +42,8 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.5.2';
-import { OBJECTIVE, hintCues, objectiveId } from '../js/guide.js?v=0.5.2';
+import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.5.2.1';
+import { OBJECTIVE, hintCues, objectiveId } from '../js/guide.js?v=0.5.2.1';
 
 const require = createRequire(import.meta.url);
 function loadChromium() {
@@ -843,7 +843,7 @@ async function playOne(b, seed, opts) {
   if (!(await checkHits(p, rec, 1, { leversOpen: true }))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   await p.setViewportSize(view0); await W(p, 250);
   await p.tap('#coverTx'); await W(p, 80);
-  await p.waitForFunction(() => (document.querySelector('#cyd2Big')?.textContent || '').trim().length === 5, { timeout: 4000 }).catch(() => {});
+  await p.waitForFunction(() => (document.querySelector('#cyd2Big')?.textContent || '').trim().length === 5, null, { timeout: 4000 }).catch(() => {});
 
   const answers = await D(p, () => {
     const r = __entiteDebug.run, RING = __entiteDebug.RING;
@@ -965,25 +965,45 @@ async function playOne(b, seed, opts) {
     await p.tap(`#joy .joy-dir.${wrong === 0 ? 'left' : 'right'}`);
     await W(p, 120);
     const sel = await D(p, () => [...document.querySelectorAll('#traps .trap')].map((t) => t.classList.contains('sel')));
+    // v0.5.2.1 (QA) : zone d'appui ≥ 44×44 (carré central entièrement touchable), flèches gauche/droite ≥ 44×44 aussi
+    const hit = await D(p, () => {
+      const grid = (cx, cy, test) => { let ok = 0, n = 0; for (let x = -21; x <= 21; x += 3) for (let y = -21; y <= 21; y += 3) { n++; if (test(document.elementFromPoint(cx + x, cy + y))) ok++; } return { ok, n }; };
+      const ctr = (el) => { const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+      const press = document.querySelector('#joy .joy-press');
+      return { press: grid(...ctr(document.querySelector('#joy')), (e) => e === press),   // centre du joystick (le chapeau peut être encore décalé par la flèche)
+        left: grid(...ctr(document.querySelector('#joy .joy-dir.left')), (e) => !!e?.classList?.contains('left')),
+        right: grid(...ctr(document.querySelector('#joy .joy-dir.right')), (e) => !!e?.classList?.contains('right')) };
+    });
+    const okH = hit.press.ok === hit.press.n && hit.left.ok === hit.left.n && hit.right.ok === hit.right.n;
+    rec(okH, 2, 2, okH ? `appui joystick : carré 44×44 autour du chapeau entièrement actif ; flèches ◀ ▶ 44×44 (${VIEW.width}×${VIEW.height})` : `zones joystick ${JSON.stringify(hit)}`);
+    if (!okH) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
     const e0 = await D(p, () => __entiteDebug.state.errors);
-    await p.tap('#joy .joy-well');
+    // angle réel de la porte pendant le tremblement (transform calculé, pas seulement shakeLog)
+    await D(p, (i) => { const d = document.querySelector(`.trap[data-i="${i}"] .trap-door`); window.__doorAng = []; const t0 = performance.now();
+      const f = () => { const m = getComputedStyle(d).transform; let a = 0; if (m && m.startsWith('matrix3d(')) { const v = m.slice(9, -1).split(',').map(Number); a = Math.round(Math.asin(Math.max(-1, Math.min(1, v[6]))) * 1800 / Math.PI) / 10; } window.__doorAng.push(a); if (performance.now() - t0 < 1400) requestAnimationFrame(f); };
+      requestAnimationFrame(f); }, wrong);
+    await p.tap('#joy .joy-press');
     await W(p, 60);
     const mid = await D(p, () => ({ shaking: __entiteDebug.shaking, e: __entiteDebug.state.errors }));
     await p.waitForFunction(() => __entiteDebug.shakeLog().length >= 1, null, { timeout: 5000 }).catch(() => {});
     await W(p, 150);
     const sh = await D(p, () => __entiteDebug.shakeLog()), e1 = await D(p, () => __entiteDebug.state.errors);
     const open = await D(p, () => [...document.querySelectorAll('#traps .trap')].map((t) => t.classList.contains('open')));
+    await W(p, 500);
+    const ang = await D(p, () => window.__doorAng.slice());
+    const aMax = Math.max(...ang), aMin = Math.min(...ang);
     const S = sh[0] || {};
     const okS = sel[wrong] && !sel[1 - wrong] && mid.shaking && mid.e === e0 && sh.length === 1 && S.i === wrong && S.deg >= 5 && S.deg <= 8 && S.cycles <= 3 && S.stepMs >= 80 && S.stepMs <= 120
-      && S.ledMax <= 0.3 && !S.speaking && !S.open && S.ms >= 650 && e1 === e0 + 1 && !open[0] && !open[1];
-    rec(okS, 2, 2, okS ? `joystick ${'AB'[wrong]} + appui : mauvaise trappe tremble (±${S.deg}°, ${S.cycles} cycles, ${S.stepMs} ms, DEL ≤ ${S.ledMax}, sans voix), puis −5 s` : `tremblement trappe ${JSON.stringify({ sel, mid, sh, e0, e1, open })}`);
+      && S.ledMax <= 0.3 && !S.speaking && !S.open && S.ms >= 650 && e1 === e0 + 1 && !open[0] && !open[1]
+      && Math.abs(aMax) >= 5 && Math.abs(aMax) <= 8 && Math.abs(aMin) >= 5 && Math.abs(aMin) <= 8 && Math.sign(aMax) !== Math.sign(aMin) && ang.at(-1) === 0;
+    rec(okS, 2, 2, okS ? `joystick ${'AB'[wrong]} + appui : mauvaise trappe tremble (±${S.deg}°, ${S.cycles} cycles, ${S.stepMs} ms, DEL ≤ ${S.ledMax}, sans voix), porte vue de ${aMin}° à ${aMax}°), puis −5 s` : `tremblement trappe ${JSON.stringify({ sel, mid, sh, e0, e1, open, aMin, aMax, ang: ang.filter((a, k) => k % 3 === 0) })}`);
     if (!okS) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
     await W(p, 700);
     await p.tap(`#joy .joy-dir.${answers.trap === 0 ? 'left' : 'right'}`);
     await W(p, 80);
   }
   const t2 = await tNow();
-  await p.tap('#joy .joy-well');   // v0.5.2 : bonne trappe choisie au joystick (gauche = A, droite = B), appui = ouvrir
+  await p.tap('#joy .joy-press');   // v0.5.2 : bonne trappe choisie au joystick (gauche = A, droite = B), appui = ouvrir
   if (!(await expectAdvance(2, 3, `trappe ${"AB"[answers.trap]} au joystick`, t2))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   if (!(await hud(3, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
 
@@ -1164,7 +1184,7 @@ async function playOne(b, seed, opts) {
 
   // ---- 5 labyrinthe : n° + RÉÉCOUTER restent dans le coin, bouton utilisable
   if (!(await hud(5, true))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
-  await p.waitForFunction(() => !document.querySelector('#btnReplay')?.disabled, { timeout: 8000 }).catch(() => {});
+  await p.waitForFunction(() => !document.querySelector('#btnReplay')?.disabled, null, { timeout: 8000 }).catch(() => {});
   const nVoix5 = await D(p, () => (__entiteDebug.voiceLog || []).length);
   await p.locator('#btnReplay').click({ force: true });
   await W(p, 250);
@@ -1241,7 +1261,7 @@ async function playOne(b, seed, opts) {
   if (!(await cydLetters(8))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   {
     // v0.5.1 : moyen = la barrette n s'allume à chaque lettre épelée (à l'envers : 5→1) ; difficile = rien, et Réécouter −5 s
-    await p.waitForFunction(() => (__entiteDebug.voiceLog || []).some((v) => (v.ids || []).some((id) => /^clue_mot_/.test(id))), { timeout: 30000 }).catch(() => {});
+    await p.waitForFunction(() => (__entiteDebug.voiceLog || []).some((v) => (v.ids || []).some((id) => /^clue_mot_/.test(id))), null, { timeout: 30000 }).catch(() => {});
     const expAcc = runInfo.tier === 'moyen' ? (runInfo.v.word === 'envers' ? [4, 3, 2, 1, 0] : [0, 1, 2, 3, 4]) : [];
     // attente par événement (QA v0.5.1, vraie voix : 1re lettre à 12,3 s) : toutes les lettres comptées et la voix finie
     await W(p, 300);
@@ -1251,16 +1271,20 @@ async function playOne(b, seed, opts) {
     rec(okA, 8, 8, okA ? (expAcc.length ? `barrettes du cryptex ${expAcc.map((k) => k + 1).join('-')} (${runInfo.v.word})` : 'difficile : pas de barrettes au cryptex') : `barrettes cryptex ${JSON.stringify({ a0, expAcc })}`);
     if (!okA) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
     const e0 = await D(p, () => __entiteDebug.state.errors), r0 = await D(p, () => __entiteDebug.state.remaining);
-    await p.waitForFunction(() => !document.querySelector('#btnReplay')?.disabled, { timeout: 8000 }).catch(() => {});
+    await p.waitForFunction(() => !document.querySelector('#btnReplay')?.disabled, null, { timeout: 8000 }).catch(() => {});
+    const nClue = await D(p, () => __entiteDebug.voiceLog.filter((v) => (v.ids || []).some((id) => /^clue_mot_/.test(id))).length);
     await p.locator('#btnReplay').click({ force: true });
     await W(p, 900);
     const e1 = await D(p, () => __entiteDebug.state.errors), r1 = await D(p, () => __entiteDebug.state.remaining);
+    // QA v0.5.2 : on attend la consigne rejouée (voiceLog), puis ses 5 lettres comptées et la voix finie
+    await p.waitForFunction((n) => __entiteDebug.voiceLog.filter((v) => (v.ids || []).some((id) => /^clue_mot_/.test(id))).length > n, nClue, { timeout: 30000 }).catch(() => {});
     await W(p, 300);
-    await p.waitForFunction((n) => __entiteDebug.accLog().length >= n && !__entiteDebug.audio().speaking, expAcc.length * 2, { timeout: 60000 }).catch(() => {});
+    await p.waitForFunction((n) => __entiteDebug.accLog().length >= n && !__entiteDebug.audio().speaking, a0.length + expAcc.length, { timeout: 60000 }).catch(() => {});
     const a1 = await D(p, () => __entiteDebug.accLog());
+    const replayed = await D(p, (n) => __entiteDebug.voiceLog.filter((v) => (v.ids || []).some((id) => /^clue_mot_/.test(id))).length > n, nClue);
     const cost = r0 - r1;
-    const okR = e1 === e0 && (runInfo.tier === 'difficile' ? cost >= 4.9 && cost < 7 : cost < 2) && (runInfo.tier === 'moyen' ? a1.length === 10 && a1.slice(5).join() === expAcc.join() : a1.length === 0);
-    rec(okR, 8, 8, okR ? `Réécouter cryptex : ${runInfo.tier === 'difficile' ? '−5 s' : 'gratuit, barrettes rejouées'}` : `Réécouter cryptex ${JSON.stringify({ e0, e1, cost, a1 })}`);
+    const okR = replayed && e1 === e0 && (runInfo.tier === 'difficile' ? cost >= 4.9 && cost < 7 : cost < 2) && (runInfo.tier === 'moyen' ? a1.length === a0.length + 5 && a1.slice(-5).join() === expAcc.join() : a1.length === 0);
+    rec(okR, 8, 8, okR ? `Réécouter cryptex : ${runInfo.tier === 'difficile' ? '−5 s' : 'gratuit, barrettes rejouées'}` : `Réécouter cryptex ${JSON.stringify({ replayed, e0, e1, cost, a0, a1 })}`);
     if (!okR) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   }
   const t8 = await tNow();
@@ -1276,7 +1300,8 @@ async function playOne(b, seed, opts) {
 
   // ---- 10 baie 2 : v0.5.1 la barrette 1 est un chrono (moyen 30 s, difficile 20 s) ; vide → −8 s, une erreur, recharge
   {
-    await p.waitForFunction(() => __entiteDebug.patchClock()?.started, { timeout: 60000 })   // départ à la fin de l'indice (vraie voix seed 3 : 16,8 s).catch(() => {});
+    // départ à la fin de l'indice (vraie voix seed 3 : 16,8 s) ; QA v0.5.2 : options en 3e argument, .catch hors commentaire
+    await p.waitForFunction(() => __entiteDebug.patchClock()?.started, null, { timeout: 90000 }).catch(() => {});
     const c0 = await D(p, () => __entiteDebug.patchClock());
     const tot = runInfo.tier === 'moyen' ? 30000 : 20000;
     const e0 = await D(p, () => __entiteDebug.state.errors), r0 = await D(p, () => __entiteDebug.state.remaining);

@@ -8,17 +8,17 @@
 // Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 // v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 2, variantes d'énigmes
 // tirées par étape (deux parties de suite ne se ressemblent pas : signature de la partie précédente dans localStorage).
-import { createEye } from './eye.js?v=0.5.2';
-import { EYE, deepMerge } from './eye-config.js?v=0.5.2';
-import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS, NENC, SIMON, STICK_COLORS, STICK_NAMES, simonTiming, beatMs, scannerFrame, PATCH_CLOCK, CRYPTEX_REPLAY_COST_S, SERVO_SHAKE, TRAP_BARS, KEYS7 } from './game.js?v=0.5.2';
-import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.5.2';
-import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable, setCueHook, isSpeaking, preloadJingle, playJingle, stopJingle, jingleStats } from './audio.js?v=0.5.2';
-import { sfx } from './sfx.js?v=0.5.2';
-import { preloadAll } from './preload.js?v=0.5.2';
-import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds, objectiveId } from './guide.js?v=0.5.2';
-import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.5.2';
+import { createEye } from './eye.js?v=0.5.2.1';
+import { EYE, deepMerge } from './eye-config.js?v=0.5.2.1';
+import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS, NENC, SIMON, STICK_COLORS, STICK_NAMES, simonTiming, beatMs, scannerFrame, PATCH_CLOCK, CRYPTEX_REPLAY_COST_S, SERVO_SHAKE, TRAP_BARS, KEYS7 } from './game.js?v=0.5.2.1';
+import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.5.2.1';
+import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable, setCueHook, isSpeaking, preloadJingle, playJingle, stopJingle, jingleStats } from './audio.js?v=0.5.2.1';
+import { sfx } from './sfx.js?v=0.5.2.1';
+import { preloadAll } from './preload.js?v=0.5.2.1';
+import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds, objectiveId } from './guide.js?v=0.5.2.1';
+import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.5.2.1';
 
-const VERSION = '0.5.2';
+const VERSION = '0.5.2.1';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -433,7 +433,7 @@ function showTime(s) {
   $('.tm[role="timer"]').setAttribute('aria-label', `Temps restant ${m} min ${sec} s`);
 }
 function showProb() { $('#prob').textContent = fmtPct(g.prob); }
-function showStep() { $('#stepNo').textContent = g.phase === 'play' ? `${String(g.step).padStart(2, '0')}/${NSTEPS}` : g.phase.startsWith('arm') ? 'ARM' : '—'; }
+function showStep() { trapSelUi(); $('#stepNo').textContent = g.phase === 'play' ? `${String(g.step).padStart(2, '0')}/${NSTEPS}` : g.phase.startsWith('arm') ? 'ARM' : '—'; }
 
 // v0.3 : plus d'OLED. Le CYD 2 montre en grand, sous le n° de série : les 5 lettres COURANTES des molettes (étapes 1 et 8,
 // jamais la réponse), la saisie masquée du code (étapes 6 et 11), ou le tour Simon (étape 3, « SIMON 2/4 »).
@@ -991,6 +991,13 @@ function wire() {
     if (!jfired && Math.hypot(dx, dy) > 22) { jfired = true; stick(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up')); }
   });
   const release = () => { cap.style.transform = ''; };
+  // v0.5.2.1 (QA) : à l'étape 2, zone d'appui 44 px de large sur toute la hauteur (haut/bas ne servent pas) ; glisser = A/B
+  {
+    const jp = $('.joy-press', joy); let px = 0, py = 0;
+    jp.addEventListener('pointerdown', (e) => { px = e.clientX; py = e.clientY; e.currentTarget.setPointerCapture(e.pointerId); });
+    jp.addEventListener('pointerup', (e) => { const dx = e.clientX - px, dy = e.clientY - py; if (Math.abs(dx) > 22 && Math.abs(dx) > Math.abs(dy)) stick(dx > 0 ? 'right' : 'left'); else if (Math.hypot(dx, dy) < 14) joyPress(); });
+    jp.addEventListener('click', (e) => { if (e.detail === 0) joyPress(); });   // clavier / lecteur d'écran
+  }
   // v0.5.2 : appui sur le chapeau (bouton SW du KY-023, actif bas) = toucher sans glisser
   $('.joy-well', joy).addEventListener('pointerup', (e) => { if (!jfired && Math.hypot(e.clientX - jx, e.clientY - jy) < 10) joyPress(); });
   $('.joy-well', joy).addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); joyPress(); } });
@@ -1041,7 +1048,8 @@ function openTrap(i) {
     : `<button class="cle-chant" type="button" data-k="${k}" aria-label="Prendre la clé ${ROMAN[k]}"><span class="cle-fente"><i class="cle"></i></span><span class="cle-n">${ROMAN[k]}</span></button>`;
 }
 const ROMAN = ['I', 'II'];
-function trapSelUi() { $$('.trap').forEach((t) => t.classList.toggle('sel', g.phase === 'play' && g.step === 2 && +t.dataset.i === g.trapSel && !t.classList.contains('open'))); }
+function trapSelUi() { $('#joy')?.classList.toggle('press-mode', g.phase === 'play' && g.step === 2); trapSelUi2(); }
+function trapSelUi2() { $$('.trap').forEach((t) => t.classList.toggle('sel', g.phase === 'play' && g.step === 2 && +t.dataset.i === g.trapSel && !t.classList.contains('open'))); }
 function joyPress() {
   input(); if (g.phase !== 'play') return;
   sfx.push(); $('#joy').classList.remove('pressed'); void $('#joy').offsetWidth; $('#joy').classList.add('pressed');
@@ -1060,7 +1068,9 @@ function trapShake(i) {
   clearVoice(); g.trapSel = i; trapSelUi();
   g.shake = { i, t0: performance.now(), ledMax: 0, speaking: false };
   const kf = [0]; for (let c = 0; c < S.cycles; c++) kf.push(S.deg, -S.deg); kf.push(0);
-  door.animate(kf.map((d, k) => ({ transform: `perspective(200px) rotateX(${d}deg)`, offset: k / (kf.length - 1) })), { duration: (kf.length - 1) * S.stepMs, easing: 'steps(1, end)' });
+  // v0.5.2.1 (QA) : l'easing « steps » va sur CHAQUE image clé (pas sur tout l'effet, sinon la porte reste à 0°)
+  door.animate(kf.map((d, k) => ({ transform: `perspective(200px) rotateX(${d}deg) translateY(${d / 3}px)`,   // ±2 px : vu de dessus, 6° se voit à peine
+     offset: k / (kf.length - 1), easing: 'step-end' })), { duration: (kf.length - 1) * S.stepMs, easing: 'linear' });
   t.classList.add('shaking'); sfx.jitter(S.cycles, S.stepMs);
   setTimeout(() => {
     const sh = g.shake; g.shake = null; t.classList.remove('shaking');
@@ -1327,7 +1337,9 @@ function loop(now) {
     // indice 1 automatique après 45 s sans progrès sur l'étape (gratuit)
     if (g.hint === 0 && g.step !== 3 && now - g.progressT > AUTO_HINT_MS) giveHint(1, true);
     // hésitation : 15 s sans geste → le temps accélère jusqu'au prochain geste
-    if (!g.hesitating && now - g.lastInput > 15000) { g.hesitating = true; g.rate = 1.6; document.body.classList.add('hesitate'); voice('taunt_hesite', { now: true }); }
+    // v0.5.2.1 (QA) : jamais pendant une voix (consigne longue) ; les 15 s comptent depuis la fin de la voix
+    if (isSpeaking() || vqBusy || vqItems.length) g.quietAt = now;
+    if (!g.hesitating && now - Math.max(g.lastInput, g.quietAt || 0) > 15000) { g.hesitating = true; g.rate = 1.6; document.body.classList.add('hesitate'); voice('taunt_hesite', { now: true }); }
     // sabotage du joystick (étape 9) : fenêtres de 5,5 s, axes inversés, œil rouge
     if (g.step === 9) {
       if (!g.sabotage && now > g.sabT) startSabotage();
@@ -1475,7 +1487,7 @@ function init() {
       get run() { return run; }, get state() { return g; }, get face() { return face; },
       voiceLog, voiceStats, musicStats, ttsAvailable,
       forceSabotage(on) { if (on) startSabotage(); else endSabotage(); },
-      idle(ms) { g.lastInput = performance.now() - ms; },
+      idle(ms) { g.lastInput = performance.now() - ms; g.quietAt = performance.now() - ms; },
       turn(i, s) { turn(i, s); }, pushEnc(i) { pushEnc(i); }, press(k) { press(k); }, stick(d) { stick(d); },
       audio: () => audioGraph(), DUCK, setVolume, getVolume, speak: (ids) => voice(ids, { now: true }),
       battery: () => ({ warnings: battTick.warnings || 0, pct: +batt.pct.toFixed(2), volts: +batt.volts.toFixed(2), level: batt.level, low: batt.low, why: batt.why, pack: PACK.name }), setBattery(p) { batt.set(p); battShow(true); }, battDip(k) { batt.dip(k); battShow(true); },
