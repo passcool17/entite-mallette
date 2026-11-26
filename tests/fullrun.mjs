@@ -42,8 +42,8 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.5.2.1';
-import { OBJECTIVE, hintCues, objectiveId } from '../js/guide.js?v=0.5.2.1';
+import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.5.3';
+import { OBJECTIVE, hintCues, objectiveId } from '../js/guide.js?v=0.5.3';
 
 const require = createRequire(import.meta.url);
 function loadChromium() {
@@ -420,12 +420,33 @@ function firstMove(walls, n, pos, goal) {
   return null;
 }
 
+// v0.5.3 : zones de toucher du joystick à l'étape 9 : appui 44×44 au centre + 4 flèches 44×44 (carrés entièrement touchables)
+const joyZones = (p) => D(p, () => {
+  const grid = (el, test) => { const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2; let ok = 0, n = 0; for (let x = -21; x <= 21; x += 3) for (let y = -21; y <= 21; y += 3) { n++; if (test(document.elementFromPoint(cx + x, cy + y))) ok++; } return { ok, n, w: Math.round(r.width), h: Math.round(r.height) }; };
+  const press = document.querySelector('#joy .joy-press'), out = { press: grid(press, (e) => e === press) };
+  for (const d of ['up', 'down', 'left', 'right']) out[d] = grid(document.querySelector(`#joy .joy-dir.${d}`), (e) => !!e?.classList?.contains(d));
+  return out;
+});
+// v0.5.3 : ink des murs lu sur le canvas du CYD 2 (cases cachées : aucun mur ; cases visibles : tous)
+const darkProbe = (p) => D(p, () => {
+  const G = __entiteDebug.mazeGeom(), st = __entiteDebug.state, run = __entiteDebug.run, m = run.maze2, n = m.n, [px, py] = st.pos;
+  const cv = document.querySelector('#cyd2'), c = cv.getContext('2d');
+  const inkAt = (x, y) => { const d = c.getImageData(Math.round(x) - 1, Math.round(y) - 1, 3, 3).data; let mx = 0; for (let i = 0; i < d.length; i += 4) mx = Math.max(mx, d[i] + d[i + 1] + d[i + 2]); return mx > 330; };
+  const hid = (x, y) => run.tier === 'difficile' ? Math.abs(x - px) + Math.abs(y - py) > 1 : Math.max(Math.abs(x - px), Math.abs(y - py)) > 1;
+  const o = { hiddenInk: 0, hiddenN: 0, visInk: 0, visN: 0 };
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const w = m.walls[y][x];
+    if (y > 0 && (w & 1)) { const k = hid(x, y) && hid(x, y - 1) ? 'hidden' : 'vis'; o[k + 'N']++; if (inkAt(G.ox + x * G.cs + G.cs / 2, G.oy + y * G.cs)) o[k + 'Ink']++; }
+    if (x > 0 && (w & 8)) { const k = hid(x, y) && hid(x - 1, y) ? 'hidden' : 'vis'; o[k + 'N']++; if (inkAt(G.ox + x * G.cs, G.oy + y * G.cs + G.cs / 2)) o[k + 'Ink']++; }
+  }
+  return o;
+});
 async function doMaze(p, { waitSab = false } = {}) {
   const inv = { up: 'down', down: 'up', left: 'right', right: 'left' };
   const startStep = (await snap(p)).step;
   if (waitSab && startStep === 9) {
     const t0 = Date.now();
-    while (Date.now() - t0 < 6500) {
+    while (Date.now() - t0 < 60000) {   // v0.5.3 : le sabotage attend la fin de la consigne et de « Je coupe la lumière. »
       if (await D(p, () => __entiteDebug.state.sabotage || __entiteDebug.state.step !== 9)) break;
       await W(p, 80);
     }
@@ -1035,6 +1056,15 @@ async function playOne(b, seed, opts) {
   };
   const errorsNow = () => D(p, () => __entiteDebug.state.errors);
   const remainingNow = () => D(p, () => __entiteDebug.state.remaining);
+  // v0.5.3 (seed 18, run 053) : le filet de lecture ne doit JAMAIS se déclencher sur un à-coup normal (150–300 ms), seulement sur un minuteur perdu ;
+  // et la fin de lecture est idempotente (une 2e fin ne rouvre rien, la moquerie n'est programmée qu'une fois)
+  {
+    const w0 = await waitSimon(p, (s) => s.phase === 'input', 40000);
+    const dog = await D(p, () => __entiteDebug.simonDog());
+    const dogOk = !!dog && dog.margin >= 400 && !dog.at150 && !dog.at300 && dog.atMargin && dog.endAgain === false && dog.taunted === true && dog.phase === 'input';
+    rec(dogOk, 3, 3, dogOk ? `filet Simon : marge ${dog.margin} ms, muet à +150/+300 ms de retard, fin de lecture idempotente` : `filet Simon fragile ${JSON.stringify(dog)} ${JSON.stringify(w0.s ? { phase: w0.s.phase } : w0)}`);
+    if (!dogOk) return simonFail('filet Simon fragile');
+  }
   for (let r = 0; r < rounds; r++) {
     let cp = await checkPlay(r, 1, `tour ${r + 1}`);
     if (!cp.ok) { const tr = await D(p, () => (window.__simonTrace || []).slice(-25)); return simonFail(cp.why + ' trace=' + JSON.stringify(tr)); }
@@ -1195,6 +1225,28 @@ async function playOne(b, seed, opts) {
   rec(!!mazeReplay5, 5, 5, mazeReplay5 ? 'Réécouter pendant le labyrinthe' : `Réécouter labyrinthe muet  log=${JSON.stringify(await D(p, (n) => (__entiteDebug.voiceLog || []).slice(n).map((v) => v.ids), nVoix5))}`);
   if (!mazeReplay5) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   if (!(await hud(5, true))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  {
+    // v0.5.3 : difficile = un mur apparaît et un autre disparaît 8 s après la consigne (résoluble de toute case) ; moyen = labyrinthe fixe
+    const w0 = await D(p, () => JSON.stringify(__entiteDebug.run.maze1.walls));
+    if (runInfo.tier === 'difficile') {
+      await p.waitForFunction(() => __entiteDebug.swapDone(), null, { timeout: 120000 }).catch(() => {});
+      const r = await D(p, () => {
+        const m = __entiteDebug.run.maze1, D4 = { up: [0, -1, 1], right: [1, 0, 2], down: [0, 1, 4], left: [-1, 0, 8] }, seen = new Set(['0,4']), q = [[0, 4]];
+        while (q.length) { const c = q.shift(); for (const [dx, dy, b] of Object.values(D4)) { const x = c[0] + dx, y = c[1] + dy; if (x < 0 || y < 0 || x > 4 || y > 4 || (m.walls[c[1]][c[0]] & b) || seen.has(x + ',' + y)) continue; seen.add(x + ',' + y); q.push([x, y]); } }
+        return { done: __entiteDebug.swapDone(), walls: JSON.stringify(m.walls), reach: seen.size, glitch: __entiteDebug.state.glitchUntil > 0, step: __entiteDebug.state.step };
+      });
+      const a = JSON.parse(w0), b2 = JSON.parse(r.walls); let diff = 0, openA = 0, openB = 0;
+      for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++) { for (let v = a[y][x] ^ b2[y][x]; v; v &= v - 1) diff++; for (const bit of [2, 4]) { if (!(a[y][x] & bit)) openA++; if (!(b2[y][x] & bit)) openB++; } }
+      const okM = r.done && r.step === 5 && r.glitch && diff === 4 && openA === openB && r.reach === 25;
+      rec(okM, 5, 5, okM ? 'difficile : un mur apparaît, un autre disparaît (glitch), 25 cases encore reliées' : `mur mobile ${JSON.stringify({ r, diff, openA, openB })}`);
+      if (!okM) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+    } else {
+      const r = await D(p, () => ({ swap: __entiteDebug.run.swap5, done: __entiteDebug.swapDone(), walls: JSON.stringify(__entiteDebug.run.maze1.walls) }));
+      const okM = !r.swap && !r.done && r.walls === w0;
+      rec(okM, 5, 5, okM ? 'moyen : labyrinthe fixe, aucun mur ne bouge' : `moyen mur mobile ${JSON.stringify(r)}`);
+      if (!okM) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+    }
+  }
   const t5 = await tNow();
   if (!(await doMaze(p))) { await fail(5, 6, 'labyrinthe bloqué'); await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   if (!(await expectAdvance(5, 6, 'labyrinthe', t5))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
@@ -1203,7 +1255,7 @@ async function playOne(b, seed, opts) {
   // ---- 6 code 1
   const w6 = await wrongThenRight(p, answers.code1, 6);
   extras.wrong.push({ step: 6, ...w6 });
-  rec(w6.ok, 6, 6, w6.ok ? `faux ${w6.bad} puis bon ${w6.want}` : w6.why);
+  rec(w6.ok, 6, 6, w6.ok ? `faux ${w6.bad}, clavier bloqué 3 s (BLOQUÉ, touches ignorées, voix), puis bon ${w6.want}` : w6.why);
   if (!w6.ok) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   const t6 = w6.tRight ?? await tNow();
   if (!(await expectAdvance(6, 7, `code ${answers.code1}`, t6))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
@@ -1225,10 +1277,12 @@ async function playOne(b, seed, opts) {
     const ins = await D(p, () => ({ keyIn: __entiteDebug.keyIn(), ins: [...document.querySelectorAll('.lock.key')].map((l) => l.classList.contains('inserted')), left: document.querySelectorAll('.cle-chant').length }));
     if (!(await bail(ins.keyIn.join() === 'true,true' && ins.ins.join() === 'true,true' && ins.left === 0, `clés prises ${JSON.stringify(ins)}`, 'clés prises, dans les serrures I et II'))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
     // trop tôt : tourner avant le vert = −5 s, les clés reviennent
-    const k0 = await D(p, () => __entiteDebug.k7());
-    if (k0?.phase === 'wait') {
-      const e1 = await D(p, () => __entiteDebug.state.errors);
-      await p.tap(`.lock.key[data-key="${answers.keyOrder[0]}"] .lock-btn`); await W(p, 400);
+    // v0.5.3 (graine 24, essai 2) : lire la phase et tourner la clé en UN seul aller-retour navigateur (le signal vert peut tomber entre une
+    // lecture de phase et un tap Playwright : un tour 18 ms après le vert est un bon tour, pas un « trop tôt »). Le clic passe par le vrai gestionnaire.
+    const early = await D(p, (key) => { const K = __entiteDebug.k7(); if (K?.phase !== 'wait') return { phase: K?.phase, e1: 0 }; const e1 = __entiteDebug.state.errors; document.querySelector(`.lock.key[data-key="${key}"] .lock-btn`).click(); return { phase: 'wait', e1 }; }, answers.keyOrder[0]);
+    const k0 = { phase: early.phase };
+    if (k0.phase === 'wait') {
+      const e1 = early.e1; await W(p, 400);
       const tt = { k: await D(p, () => __entiteDebug.k7()), e: await D(p, () => __entiteDebug.state.errors), on: await D(p, () => document.querySelectorAll('.lock.key.on').length), ob: await D(p, () => document.querySelector('#objText')?.textContent || '') };
       if (!(await bail(tt.e === e1 + 1 && tt.k.fails.join() === 'tot' && tt.on === 0 && /Trop tôt|−5 s/.test(tt.ob), `trop tôt ${JSON.stringify(tt)}`, 'tourner avant le vert : « Trop tôt », −5 s, clés revenues'))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
     } else rec(true, 7, 7, `trop tôt non testé (signal déjà donné : ${k0?.phase})`);
@@ -1294,6 +1348,39 @@ async function playOne(b, seed, opts) {
   // ---- 9 labyrinthe (éventuellement attendre le sabotage)
   if (!(await hud(9, true))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   const t9 = await tNow();
+  {
+    // v0.5.3 : dans le noir. « Je coupe la lumière. » après la consigne ; seules les cases autour du point se voient ; appui = éclair (−5 s)
+    await p.waitForFunction(() => (__entiteDebug.voiceLog || []).some((v) => (v.ids || []).includes('noir_coupe')), null, { timeout: 120000 }).catch(() => {});
+    await W(p, 400);
+    const hard9 = runInfo.tier === 'difficile', nFl = hard9 ? 1 : 2;
+    const pr0 = await darkProbe(p);
+    const okD0 = pr0.hiddenN >= 3 && pr0.hiddenInk === 0 && pr0.visInk === pr0.visN;
+    const zp = await joyZones(p);
+    await p.setViewportSize({ width: 915, height: 412 }); await W(p, 400);
+    const zl = await joyZones(p);
+    await p.setViewportSize(VIEW); await W(p, 400);
+    const zok = (z) => ['press', 'up', 'down', 'left', 'right'].every((k) => z[k].ok === z[k].n && z[k].w >= 44 && z[k].h >= 44);
+    const okZ = zok(zp) && zok(zl);
+    const r0 = await D(p, () => __entiteDebug.state.remaining);
+    await p.tap('#joy .joy-press');
+    await W(p, 200);
+    const pr1 = await darkProbe(p), r1 = await D(p, () => __entiteDebug.state.remaining), di1 = await D(p, () => __entiteDebug.darkInfo());
+    const okF1 = pr1.hiddenInk === pr1.hiddenN && r0 - r1 >= 4.8 && r0 - r1 < 7 && di1.flashLog.length === 1 && di1.flashes === nFl - 1;
+    await W(p, 1000);
+    const pr2 = await darkProbe(p);
+    const okD2 = pr2.hiddenInk === 0;
+    if (!hard9) { await p.tap('#joy .joy-press'); await W(p, 150); }
+    await W(p, 1100);
+    const r2 = await D(p, () => __entiteDebug.state.remaining);
+    await p.tap('#joy .joy-press'); await W(p, 200);   // plus d'éclair : aucun coût, rien ne s'allume
+    const pr3 = await darkProbe(p), r3 = await D(p, () => __entiteDebug.state.remaining), di3 = await D(p, () => __entiteDebug.darkInfo());
+    const eclairVoix = await D(p, () => (__entiteDebug.voiceLog || []).some((v) => (v.ids || []).includes('noir_eclair')));
+    const okF3 = r2 - r3 < 1.5 && pr3.hiddenInk === 0 && di3.flashes === 0 && di3.flashLog.length === nFl && (!hard9 || eclairVoix);
+    const okS = di3.sabMs === (hard9 ? 8000 : 5500);
+    const okN = okD0 && okZ && okF1 && okD2 && okF3 && okS;
+    rec(okN, 9, 9, okN ? `dans le noir (${hard9 ? 'croix de 4 voisines, 1 éclair' : 'carré 3×3, 2 éclairs'}) : murs cachés, éclair −5 s, plus d'éclair ensuite, sabotage ${hard9 ? '8' : '5,5'} s ; joystick appui + 4 flèches 44×44 (portrait et paysage)` : `noir ${JSON.stringify({ pr0, zp, zl, pr1, r0, r1, di1, pr2, r2, r3, pr3, di3, eclairVoix })}`);
+    if (!okN) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  }
   if (!(await doMaze(p, { waitSab: opts.waitSab }))) { await fail(9, 10, 'labyrinthe 2 bloqué'); await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   if (!(await expectAdvance(9, 10, 'labyrinthe 2', t9))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   if (!(await hud(10, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
@@ -1323,11 +1410,18 @@ async function playOne(b, seed, opts) {
   // ---- 11 code 2
   const w11 = await wrongThenRight(p, answers.code2, 11);
   extras.wrong.push({ step: 11, ...w11 });
-  rec(w11.ok, 11, 11, w11.ok ? `faux ${w11.bad} puis bon ${w11.want}` : w11.why);
+  rec(w11.ok, 11, 11, w11.ok ? `faux ${w11.bad}, clavier bloqué 3 s, puis bon ${w11.want}` : w11.why);
   if (!w11.ok) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   const t11 = w11.tRight ?? await tNow();
   if (!(await expectAdvance(11, 12, `code ${answers.code2}`, t11))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
   if (!(await hud(12, false))) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  {
+    // v0.5.3 (QA) : une moquerie ne coupe jamais une consigne (elle repartait du début) ; seules les erreurs du joueur peuvent la couper
+    const cuts = await D(p, () => __entiteDebug.cutLog());
+    const badCut = cuts.filter((c) => /^(taunt_|sabotage_joystick|noir_)/.test(c.by));
+    rec(badCut.length === 0, 12, 12, badCut.length === 0 ? `aucune consigne coupée par une moquerie (${cuts.length} coupée(s) par une erreur ou le temps)` : `consigne coupée par une moquerie ${JSON.stringify(badCut)}`);
+    if (badCut.length) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  }
 
   // ---- 12 levier rouge (le capot a pu rester ouvert après la mesure des cibles à l'étape 1)
   const txOpen = await D(p, () => !!__entiteDebug.state.coverTx);
@@ -1367,6 +1461,7 @@ async function playOne(b, seed, opts) {
 async function wrongThenRight(p, want, step) {
   const bad = wrongCode(want);
   const before = await snap(p);
+  const li0 = await D(p, () => __entiteDebug.lockInfo());
   await keys(p, bad);
   await W(p, 350);
   const mid = await snap(p);
@@ -1374,10 +1469,20 @@ async function wrongThenRight(p, want, step) {
   if (!(mid.errors > before.errors) && !/Faux|−/.test(mid.label + mid.text)) {
     return { ok: false, why: `le faux code ${bad} n'a pas été refusé : ${JSON.stringify(mid)}`, bad, want };
   }
+  // v0.5.3 : après une erreur, clavier bloqué 3 s (BLOQUÉ sur le CYD 2, bip bas, touches ignorées, « Clavier bloqué. Respire. » dit)
+  const lk = await D(p, () => ({ ...__entiteDebug.lockInfo(), big: document.querySelector('#cyd2Big')?.textContent || '', cls: !!document.querySelector('#keypad')?.classList.contains('locked') }));
+  await keys(p, want);   // le bon code pendant le blocage : ignoré
+  const lk2 = await D(p, () => ({ ...__entiteDebug.lockInfo(), code: __entiteDebug.state.code, step: __entiteDebug.state.step }));
+  // la voix vient après « Faux » (vraie voix : plusieurs secondes) : attente par événement
+  await p.waitForFunction(() => (__entiteDebug.voiceLog || []).some((v) => (v.ids || []).includes('code_bloque')), null, { timeout: 15000 }).catch(() => {});
+  const spoke = await D(p, () => (__entiteDebug.voiceLog || []).some((v) => (v.ids || []).includes('code_bloque')));
+  const okL = lk.left > 1000 && lk.left <= 3000 && lk.n === li0.n + 1 && /BLOQU/.test(lk.big) && lk.cls && lk2.step === step && lk2.code === '' && lk2.blockedPresses >= li0.blockedPresses + 4 && spoke;
+  if (!okL) return { ok: false, why: `clavier bloqué 3 s ${JSON.stringify({ lk, lk2, spoke })}`, bad, want };
+  await p.waitForFunction(() => __entiteDebug.lockInfo().left <= 0, null, { timeout: 5000 });
   await W(p, 80);
   const tRight = await D(p, () => Math.round(performance.now()));
   await keys(p, want);
-  return { ok: true, bad, want, tRight };
+  return { ok: true, bad, want, tRight, locked: true };
 }
 
 const seeds = pickSeeds(ARGS);

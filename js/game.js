@@ -56,6 +56,18 @@ export const TRAP_BARS = { darkMs: 5000, REPLAY_COST_S: 5 };
 // v0.5.2 : étape 7 « deux clés, deux mains ». keyTrap[k] = trappe où dort la clé k (I → A, II → B, Impression 3D :
 // clé debout sur la tranche, à gauche, sous la porte). windowMs = écart max entre les deux clés (moyen).
 export const KEYS7 = { windowMs: 1000, falseAlerts: { moyen: 0, difficile: 2 }, keyTrap: [0, 1], PENALTY_S: 5 };
+// v0.5.3 (proposition §6, étapes 5, 6 et 9) :
+//  - étape 5, difficile : au bout de 8 s (après la consigne), un mur APPARAÎT et un autre DISPARAÎT (échange, avec glitch) ;
+//    le labyrinthe reste toujours résoluble depuis n'importe quelle case.
+//  - étape 9 « dans le noir » : on ne voit que les cases autour du point (moyen : carré 3×3, 2 éclairs ; difficile : croix de
+//    4 voisines, 1 éclair, sabotage plus long). Appui sur le joystick = éclair d'une seconde qui montre tout, −5 s.
+//  - codes 1 et 2 : après une erreur, le clavier est bloqué 3 s (bip bas).
+export const MAZE5 = { swapAfterMs: 8000 };
+export const DARK9 = {
+  moyen: { shape: 'carre', flashes: 2, sabMs: 5500 }, difficile: { shape: 'croix', flashes: 1, sabMs: 8000 },
+  flashMs: 1000, FLASH_COST_S: 5,
+};
+export const KEYPAD_LOCK_MS = 3000;
 // timing d'un tour (round = index 0..) : en difficile, ×0,88 par tour réussi, avec planchers
 export function simonTiming(tier, round) {
   const P = SIMON[tier] || SIMON.moyen, f = P.speedup ? Math.pow(SIMON.SPEEDUP, round) : 1;
@@ -191,6 +203,7 @@ export function makeRun(seed) {
 
   // ---- 5 et 9. verrous de signal : labyrinthe 5x5 visible sur le CYD 2
   const maze1 = makeMaze(5, r), maze2 = makeMaze(5, r);
+  const swap5 = hard ? wallSwap(maze1, seed) : null;     // v0.5.3 : jamais tiré avec r() (les autres tirages ne bougent pas)
 
   // ---- fragments (dictés après les étapes 1, 3, 4, 5, jamais écrits) ; codes 1 et 2 = règles tirées
   const frags = Array.from({ length: 4 }, () => int(10));
@@ -226,7 +239,7 @@ export function makeRun(seed) {
   return {
     seed: seed >>> 0, tier, v, sig, serial, lot, digits, theme, word1, scramble, encLetters,
     enc1, enc2, word, encWord, spell, bar, counts, order, trapColors, trap, simon,
-    wires, patch1, patch2, maze1, maze2, frags, code1, code2, keyOrder, lies, cues,
+    wires, patch1, patch2, maze1, maze2, swap5, frags, code1, code2, keyOrder, lies, cues,
     decoys,
   };
 }
@@ -245,6 +258,42 @@ export function makeMaze(n, r) {
     walls[y][x] &= ~b; walls[y + dy][x + dx] &= ~ob; seen[y + dy][x + dx] = true; stack.push([x + dx, y + dy]);
   }
   return { n, walls, start: [0, n - 1], goal: [n - 1, 0], path: solveMaze(walls, n, [0, n - 1], [n - 1, 0]) };
+}
+// v0.5.3 : échange de mur (étape 5, difficile). Ferme un passage de la solution, en ouvre un autre qui reconnecte les deux
+// moitiés : l'arbre reste connexe, donc résoluble de toute case. Tirage déterministe par la graine, sans toucher à r().
+export function wallSwap(maze, seed) {
+  const n = maze.n, rr = mulberry32(((seed >>> 0) ^ 0x5a17c3) >>> 0);
+  const cells = [maze.start.slice()];
+  for (const d of maze.path) { const c = cells[cells.length - 1]; cells.push([c[0] + DIRS[d][0], c[1] + DIRS[d][1]]); }
+  const cands = [];
+  for (let i = 1; i + 2 < cells.length; i++) {            // pas la 1re ni la dernière case de la route
+    const a = cells[i], b = cells[i + 1], dir = maze.path[i];
+    const side = new Set([a.join()]), q = [a];             // moitié de la route côté départ, sans passer par a-b
+    while (q.length) {
+      const c = q.shift();
+      for (const dd of Object.keys(DIRS)) {
+        if (!canMove(maze, c, dd)) continue;
+        const nb = [c[0] + DIRS[dd][0], c[1] + DIRS[dd][1]];
+        if (c[0] === a[0] && c[1] === a[1] && nb[0] === b[0] && nb[1] === b[1]) continue;
+        if (!side.has(nb.join())) { side.add(nb.join()); q.push(nb); }
+      }
+    }
+    for (const k of side) {
+      const c = k.split(',').map(Number);
+      for (const dd of Object.keys(DIRS)) {
+        const nb = [c[0] + DIRS[dd][0], c[1] + DIRS[dd][1]];
+        if (nb[0] < 0 || nb[1] < 0 || nb[0] >= n || nb[1] >= n || side.has(nb.join()) || canMove(maze, c, dd)) continue;
+        cands.push({ close: { x: a[0], y: a[1], d: dir }, open: { x: c[0], y: c[1], d: dd } });
+      }
+    }
+  }
+  return cands.length ? cands[Math.floor(rr() * cands.length)] : null;
+}
+// pose ou retire un mur (des deux côtés) ; renvoie la nouvelle route la plus courte depuis le départ
+export function setWall(maze, x, y, d, closed) {
+  const [dx, dy, b, ob] = DIRS[d];
+  if (closed) { maze.walls[y][x] |= b; maze.walls[y + dy][x + dx] |= ob; } else { maze.walls[y][x] &= ~b; maze.walls[y + dy][x + dx] &= ~ob; }
+  maze.path = solveMaze(maze.walls, maze.n, maze.start, maze.goal);
 }
 export function canMove(maze, [x, y], dir) {
   const [dx, dy, b] = DIRS[dir]; const nx = x + dx, ny = y + dy;

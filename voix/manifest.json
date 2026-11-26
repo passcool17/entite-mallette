@@ -1,5 +1,5 @@
 {
- "version": "0.5.2.1",
+ "version": "0.5.3",
  "note": "Voix de l'Entité. Chaque réplique = un id ou une suite d'ids. mp3Ready true : voix/<id>.mp3 est joué (repli synthèse française si échec). mp3Ready false : synthèse française directe, aucun fichier demandé. Pour remplacer une voix : déposer voix/<id>.mp3 puis mettre mp3Ready à true, sans toucher au code. dfplayerTrack = nom du fichier sur la microSD du DFPlayer Mini (dossier mp3/0001.mp3…).",
  "cues": [
   {
@@ -1853,6 +1853,51 @@
    "source": "tts",
    "mp3Ready": false,
    "text": "Dernier indice. Moins d'une seconde entre les deux clés."
+  },
+  {
+   "id": "noir_coupe",
+   "file": "voix/noir_coupe.mp3",
+   "dfplayerTrack": "0202",
+   "category": "sabotage",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Je coupe la lumière."
+  },
+  {
+   "id": "noir_eclair",
+   "file": "voix/noir_eclair.mp3",
+   "dfplayerTrack": "0203",
+   "category": "sabotage",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Un éclair. Une seule fois."
+  },
+  {
+   "id": "code_bloque",
+   "file": "voix/code_bloque.mp3",
+   "dfplayerTrack": "0204",
+   "category": "outcome",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Clavier bloqué. Respire."
+  },
+  {
+   "id": "obj_noir",
+   "file": "voix/obj_noir.mp3",
+   "dfplayerTrack": "0205",
+   "category": "objective",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Dans le noir : guide le point au cercle vert. Appuie sur le joystick pour un éclair."
+  },
+  {
+   "id": "hint1_noir",
+   "file": "voix/hint1_noir.mp3",
+   "dfplayerTrack": "0206",
+   "category": "hint",
+   "source": "tts",
+   "mp3Ready": false,
+   "text": "Indice : tu ne vois que les cases autour du point. Appuie sur le joystick : un éclair montre tout pendant une seconde, et coûte cinq secondes."
   }
  ]
 }

@@ -823,3 +823,21 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
 .joy.press-mode .joy-dir.left { left: calc(50% - 66px); } .joy.press-mode .joy-dir.left::after { left: calc(100% - 8px); }
 .joy.press-mode .joy-dir.right { right: auto; left: calc(50% + 22px); } .joy.press-mode .joy-dir.right::after { left: 8px; }
 .joy.press-mode .joy-cap { box-shadow: 0 6px 10px rgb(0 0 0 / .7), inset 0 1px 1px rgb(255 255 255 / .25), 0 0 0 2px rgb(98 214 255 / .45); }
+
+/* ---------- v0.5.3 : étape 9 « dans le noir » (appui = éclair), clavier bloqué 3 s ---------- */
+/* Zones de toucher seulement (le dessin du joystick ne bouge pas) : appui 44×44 au centre, 4 flèches 44×44 tout autour.
+   --pdy décale le bloc vers le haut en paysage (le bord bas de l'écran ne laisse pas 44 px sous le centre). */
+/* Le panneau découpé (clip-path) s'arrête 8 px sous le joystick : le bloc des 5 zones remonte pour que la flèche du bas y tienne
+   (--pdy ≤ 0). En haut, la flèche du haut recouvre un peu la dernière rangée du clavier, inutilisé à l'étape 9. */
+.joy { --pdy: min(0px, calc(var(--joy, 96px) / 2 - 58px)); }
+.joy.press4 .joy-press { top: calc(50% - 22px + var(--pdy)); bottom: auto; height: 44px; }
+.joy.press4 .joy-dir.left, .joy.press4 .joy-dir.right { top: calc(50% - 22px + var(--pdy)); }
+.joy.press4 .joy-dir.left::after, .joy.press4 .joy-dir.right::after { top: calc(50% - var(--pdy)); }
+.joy.press4 .joy-dir.up { top: calc(50% - 66px + var(--pdy)); left: calc(50% - 22px); }
+.joy.press4 .joy-dir.up::after { top: calc(78px - var(--joy, 96px) / 2 - var(--pdy)); }
+.joy.press4 .joy-dir.down { top: calc(50% + 22px + var(--pdy)); bottom: auto; left: calc(50% - 22px); }
+.joy.press4 .joy-dir.down::after { top: calc(var(--joy, 96px) / 2 - 34px - var(--pdy)); }
+.cyd2.big .cyd2-big.lockd { color: #ff6a5a; letter-spacing: .06em; white-space: nowrap; animation: lockBlink .5s steps(2) infinite; }
+@keyframes lockBlink { 50% { opacity: .45; } }
+.keypad.locked .kp-key, #keypad.locked .kp-key { filter: brightness(.55) saturate(.6); }
+@media (prefers-reduced-motion: reduce) { .cyd2-big.lockd { animation: none; } }

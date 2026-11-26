@@ -18,6 +18,38 @@ Archive figée de la v0.4.0 (commit d7c1ba2, plan v0.8, n° de série à lettres
 Archive figée de la v0.3.2 (commit 5e9d940, avant la refonte : trois trappes, trois serrures) : https://passcool17.github.io/entite-mallette-v032/
 (dépôt passcool17/entite-mallette-v032, cache séparé `entite-mallette-v032-0.3.2`).
 
+## Version 0.5.3 (26 nov. 2026) — labyrinthe dans le noir, mur mobile, clavier bloqué
+
+État : en ligne (cache `entite-mallette-v0.5.3`, imports `?v=0.5.3`). Plan : `revision-jeux-proposition.md` §11, point 4.
+Aucune pièce du plan v0.8 déplacée ; les molettes gardent A–V, les chiffres restent au clavier, aucune réponse à l'écran sans `?debug=1`.
+
+- **Simon : filet de lecture corrigé** (graine 18 du premier essai complet) : le minuteur de fin de lecture avait 116 ms de retard
+  (à-coup du fil principal) et le filet de la boucle, réglé à +80 ms, passait 9 ms avant lui et sautait la moquerie de saisie. Désormais
+  une seule fonction idempotente (`simonEndPlay`) sert le minuteur et le filet, et le filet n'a plus que le rôle de minuteur perdu (+600 ms).
+  Le bug existait depuis v0.5.1 (aussi en ligne) ; test déterministe `simonDog` dans `tests/fullrun.mjs`.
+- **Moqueries** : plus aucune moquerie (`taunt_*`, y compris `taunt_branche` à l'étape 10) pendant qu'une consigne ou une voix parle ; elle attend la fin + 1,5 s.
+- **Étape 9 « dans le noir »** : on ne voit que les cases autour du point (moyen : carré 3×3 ; difficile : la case et ses
+  4 voisines). Un **appui sur le joystick** (bouton SW du KY-023) fait un **éclair d'une seconde** qui montre tout le
+  labyrinthe, **−5 s** (moyen : 2 éclairs ; difficile : 1 seul). La cible reste un point vert pâle. Le sabotage (axes
+  inversés) reste, et dure **8 s** en difficile (5,5 s en moyen). Voix nouvelles (voix de l'appareil) : `obj_noir`,
+  `noir_coupe` (« Je coupe la lumière. », après la consigne), `noir_eclair` (difficile), `hint1_noir`.
+  Zones de toucher à l'étape 9 : appui 44×44 au centre et 4 flèches 44×44 tout autour (le bloc remonte de quelques px
+  parce que le panneau découpé s'arrête sous le joystick ; la flèche du haut recouvre un peu la dernière rangée du clavier,
+  inutilisé à cette étape). Rien ne bouge visuellement.
+- **Étape 5, difficile : le mur mobile** : 8 s après la fin de la consigne, un mur **apparaît** et un autre **disparaît**
+  (glitch ambre sur le CYD 2). C'est un échange (le labyrinthe reste un arbre) : toujours résoluble depuis n'importe quelle
+  case. Moyen : labyrinthe fixe. Aucune voix nouvelle.
+- **Codes 1 et 2 : clavier bloqué 3 s après une erreur** : « BLOQUÉ » sur le CYD 2, bip bas, les touches ne répondent plus,
+  le chrono tourne. Voix nouvelle : `code_bloque` (« Clavier bloqué. Respire. »).
+- **Correctif QA (v0.5.2.1, noté par le Testeur QA)** : les moqueries (`taunt_branche`, `taunt_trappe`, `taunt_cetait`,
+  `taunt_lent`, `taunt_rouge`, `taunt_regarde`…) et le début du sabotage **attendent la fin de la consigne** : plus de
+  consigne coupée puis rejouée depuis le début. Si la consigne a duré plus que le délai, la moquerie vient 1,5 s après
+  la voix.
+- **`tests/fullrun.mjs`** : contrôles nouveaux (mur échangé, résoluble ; noir lu sur les pixels du canvas ; éclair −5 s ;
+  zones joystick étape 9 en portrait et paysage ; clavier bloqué ; aucune consigne coupée par une moquerie).
+- Matériel : aucune pièce ni broche nouvelle. Le bouton SW du KY-023 (actif bas) sert aussi à l'étape 9 ; le blocage du
+  clavier est du micrologiciel (3 s sans lire la matrice 4×4).
+
 ## Version 0.5.2.1 (26 nov. 2026) — correctifs QA de la 0.5.2
 
 État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.5.2.1`, imports `?v=0.5.2.1`).

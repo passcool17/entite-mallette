@@ -1,5 +1,5 @@
 // sfx.js : effets procéduraux WebAudio (aucun fichier). Branchés sur le bus d'effets d'audio.js (donc coupés par le bouton son).
-import { bus } from './audio.js?v=0.5.2.1';
+import { bus } from './audio.js?v=0.5.3';
 
 let noiseBuf = null;
 function ctx() { return bus(); }
@@ -54,6 +54,9 @@ export const sfx = {
   // v0.5.2 : bip du vrai signal de l'étape 7 (les 5 barrettes passent au vert)
   bip() { tone(1046.5, 0.12, { type: 'square', vol: 0.07 }); tone(1046.5, 0.12, { type: 'sine', vol: 0.08, at: 0.14 }); },
   rfPulse() { tone(13560 / 10, 0.05, { type: 'sine', vol: 0.05 }); tone(1760, 0.06, { type: 'square', vol: 0.04, at: 0.12 }); tone(2640, 0.12, { type: 'square', vol: 0.05, at: 0.2 }); },
+  // v0.5.3 : éclair du labyrinthe dans le noir ; bip bas du clavier bloqué
+  flash() { noise(0.12, { vol: 0.2, lp: 9000, hp: 3000 }); tone(2200, 0.1, { type: 'sine', vol: 0.05, slide: 0.5 }); },
+  bipBas() { tone(150, 0.12, { type: 'square', vol: 0.07 }); },
   joy() { tone(900, 0.02, { type: 'square', vol: 0.03 }); },
   wall() { tone(110, 0.08, { type: 'square', vol: 0.07 }); },
   strike() { tone(160, 0.24, { type: 'sawtooth', vol: 0.16 }); tone(152, 0.24, { type: 'square', vol: 0.08, at: 0.02 }); },

@@ -63,6 +63,11 @@ Le simulateur reste dans ces limites. **Aucun numéro de GPIO n’est figé** : 
   les deux contacts doivent passer à LOW à moins de 1 s (moyen) ou dans l'ordre (difficile). Une serrure LOW **avant** le
   signal = « trop tôt » ; le firmware attend que les deux contacts soient revenus à HIGH (clés remises droites) avant le
   signal suivant.
+- **Labyrinthe dans le noir, mur mobile, clavier bloqué (v0.5.3)** : étape 9, le maître n'envoie au CYD 2 que les cases autour
+  du point (moyen : 3×3 ; difficile : croix de 5 cases) ; un appui sur SW (KY-023, actif bas) envoie tout le labyrinthe
+  pendant 1 s (−5 s ; 2 éclairs en moyen, 1 en difficile). Étape 5 (difficile) : 8 s après la fin de la consigne, le maître
+  échange un mur contre un autre (le labyrinthe reste un arbre, donc résoluble). Codes 1 et 2 : après une erreur, le maître
+  ne lit plus la matrice 4×4 pendant 3 s et joue un bip bas. Aucun matériel en plus, aucune broche nouvelle.
 - **N° de série (v0.5.0)** : 4 chiffres seulement (`47-19`) sur le CYD 2, plus un lot leurre. Les molettes ne servent
   qu’à des mots de 5 lettres.
 

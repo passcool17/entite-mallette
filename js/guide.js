@@ -3,12 +3,12 @@
 // (contour qui pulse), et 3 niveaux d'INDICES. Règle de Pascal : le bandeau dit QUOI faire et OÙ, jamais une réponse
 // calculée (aucun code, sauf ?debug=1). À l'étape 10 le bandeau reprend la consigne dictée (couleur / prise). Seul l'indice 3 DIT (à voix haute) un morceau de la réponse.
 // Logique pure (sans DOM) : testable avec node.
-import { RING, DIRS, canMove } from './game.js?v=0.5.2.1';
+import { RING, DIRS, canMove } from './game.js?v=0.5.3';
 
 // objectif : id de réplique (voix/manifest.json) ; le texte du bandeau = le texte de la réplique (même phrase)
 export const OBJECTIVE = {
   0: 'obj_armer', 1: 'obj_mot_melange', 2: 'obj_trappe_joy', 3: 'obj_simon', 4: 'obj_cables', 5: 'obj_verrou', 6: 'obj_code',
-  7: 'obj_cles', 8: 'obj_mot', 9: 'obj_verrou', 10: 'obj_cables2', 11: 'obj_code', 12: 'obj_transmit',
+  7: 'obj_cles', 8: 'obj_mot', 9: 'obj_noir', 10: 'obj_cables2', 11: 'obj_code', 12: 'obj_transmit',
 };
 // Étape 10 : le bandeau reprend la consigne dictée (couleur / prise, ou rang d'une lettre), pas le résumé vague
 // « Rebranche les câbles : nouvelle consigne. ». Ce n'est pas une réponse calculée : c'est le même indice que la voix.
@@ -30,7 +30,7 @@ export const MODULES = {
 export const HINT_COST = { 1: 0, 2: 15, 3: 30 };   // secondes retirées du chrono
 export const AUTO_HINT_MS = 45000;                  // indice 1 automatique après 45 s sans progrès
 
-const H1 = { 1: 'hint1_mot_melange', 2: 'hint1_barre', 3: 'hint1_simon', 4: 'hint1_cables', 5: 'hint1_verrou', 6: 'hint1_code', 7: 'hint1_cles', 8: 'hint1_mot', 9: 'hint1_verrou', 10: 'hint1_cables', 11: 'hint1_code', 12: 'hint1_transmit' };
+const H1 = { 1: 'hint1_mot_melange', 2: 'hint1_barre', 3: 'hint1_simon', 4: 'hint1_cables', 5: 'hint1_verrou', 6: 'hint1_code', 7: 'hint1_cles', 8: 'hint1_mot', 9: 'hint1_noir', 10: 'hint1_cables', 11: 'hint1_code', 12: 'hint1_transmit' };
 // bandeau des indices : la SOURCE d'information ou la méthode, jamais la valeur
 const RULE = 'Indice : écoute la règle, pas à pas';
 const STRIP = {
