@@ -262,7 +262,7 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
 .kp-key { min-height: var(--kp, 44px); font-size: 16px; }
 .traps { gap: 6px; width: 100%; }
 .trap { aspect-ratio: auto; height: var(--trap-h, 52px); }
-/* serrures I II III : en colonne à côté du joystick (portrait) */
+/* (v0.3) serrures : en colonne à côté du joystick (portrait) */
 .key-row { display: grid; gap: 3px; }
 .mod-keys .lock { grid-template-columns: 10px auto 6px; align-items: center; gap: 3px; }
 .mod-keys .lock .silk { order: -1; font-size: 8px; color: var(--silk); }
@@ -556,7 +556,7 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
 /* ================= v0.3 : plan retenu (24 nov., 19 h 41) =================
    Couvercle : HP rectangulaires 70×30 à l'horizontale dans les coins du haut, œil au centre ; 5 barrettes WS2812B de 8 LED
    en zigzag (1, 3, 5 en haut ; 2, 4 en bas), une prise sous chaque barrette (numéro 1 à 5 au-dessus).
-   Base : ports | [trappes A B C + 5 molettes en zigzag] [clavier 4×4] [ARM / TRANSMIT empilés] |
+   Base (v0.3, remplacée par le bloc v0.4 en fin de fichier) : ports | [trappes + 5 molettes en zigzag] [clavier 4×4] [ARM / TRANSMIT empilés] |
           [chrono TM1637 rouge au-dessus des serrures] [CYD 2] [joystick + KCD1]. Plus d'OLED, plus de pochette. */
 .app, .case { overflow-x: clip; }
 :root { --knob: 44px; --zp: 29px; --zg: 2px; --kp: 38px; --kpw: 34px; --gt-h: 74px; --gt-w: 46px; --trap-h: 42px; --joy: 86px; --cyd2-h: 96px; --stick-h: 11px; --zig: 26px; --spk-w: 96px; }
@@ -728,3 +728,46 @@ body.lying .spk-cone { box-shadow: inset 0 0 0 3px #2a2d31, inset 0 4px 10px #00
 .mod-keys .lock-btn::after { left: 50%; top: -4px; width: calc(100% + 4px); height: 44px; transform: translateX(-50%); }
 /* sérigraphie molettes : tenait pas (205 px de texte dans 162, coupée à « TOURN… ») */
 .mod-enc > .silk { white-space: normal; overflow: visible; text-overflow: unset; font-size: 10px; line-height: 1.15; text-align: center; max-width: 100%; letter-spacing: .02em; }
+
+/* ---------- v0.4 : base = plan d'impression v0.8 (2 trappes A B, 2 serrures I II) ----------
+   Haut : ports B1–B5 | molettes E1–E5 en ligne | KCD1. Puis 3 colonnes : [ARM + TRANSMIT côte à côte ; TM1637 + serrures]
+   [trappes A B ; CYD 2] [clavier 4×4 ; joystick dessous]. En portrait, E1–E5 passe sous B1–B5 (10 cibles ≥ 44 px ne tiennent pas sur une ligne). */
+#face-mallette .base-panel { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding-left: 8px; }
+.b4-r1 { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; min-width: 0; }
+.b4-r1 .ports { grid-area: auto; position: relative; left: auto; top: auto; bottom: auto; display: grid; grid-template-columns: repeat(5, 44px); gap: 1px; width: auto; height: 44px; margin: 0; flex: none; }
+.b4-r1 .port-btn { position: relative; width: 44px; min-width: 44px; height: 44px; }
+.b4-r1 .port-hole { left: 16px; top: 8px; bottom: auto; width: 12px; height: 12px; }
+.b4-r1 .mod-enc { flex: 1 1 0; min-width: 0; order: 3; flex-basis: 100%; gap: 2px; }
+.b4-r1 .kcd1 { order: 2; margin-left: auto; }
+.enc-row.line { display: flex; justify-content: space-evenly; align-items: center; gap: 2px; width: 100%; height: auto; position: static; }
+.enc-row.line .enc { position: relative; display: grid; }
+.enc-row.line .enc .silk { display: none; }
+.b4-main { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; align-items: stretch; min-width: 0; }
+.b4-col { display: flex; flex-direction: column; justify-content: space-between; gap: 6px; min-width: 0; }
+.b4-c1 { align-items: center; }
+.b4-c1 .mod-toggles { display: flex; flex-direction: row; gap: 4px; justify-content: center; align-self: center; }
+.b4-c1 .mod-keys { align-self: center; }
+.b4-c1 .key-row { grid-auto-flow: column; gap: 4px; justify-content: center; }
+.b4-c2 .traps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.b4-c2 .mod-signal { flex: 1 1 auto; }
+.b4-c3 { align-items: center; }
+.b4-c3 .mod-joy { justify-content: center; }
+@media (orientation: landscape) and (max-height: 520px), (min-width: 1000px) and (min-height: 600px) {
+  #face-mallette .base-panel { padding-left: 10px; }
+  .b4-r1 { flex-wrap: nowrap; }
+  .b4-r1 .ports { position: relative; left: auto; top: auto; bottom: auto; width: auto; height: 44px; display: grid; flex-direction: row; }
+  .b4-r1 .port-hole { left: 16px; top: 8px; bottom: auto; width: 12px; height: 12px; }
+  .b4-r1 .mod-enc { order: 0; flex-basis: 0; }
+  .b4-r1 .kcd1 { order: 0; margin-left: 0; }
+  .b4-main { flex: 1 1 auto; }
+  :root { --trap-h: 48px; }
+  .b4-c2 .traps { grid-template-columns: repeat(2, minmax(0, 104px)); justify-content: center; gap: 10px; }
+  .b4-c1 .key-row { gap: 6px; }
+  .b4-c1 .mod-keys .lock-btn { width: 40px; height: 40px; }
+}
+@media (orientation: portrait) and (max-width: 999px) {
+  :root { --kp: 46px; --trap-h: 54px; --joy: 96px; --cyd2-h: 132px; }
+  .b4-c1 .mod-keys .lock-btn { width: 42px; height: 42px; }
+  .b4-c1 .mod-keys .lock-face { width: 28px; height: 28px; }
+  .b4-main { gap: 5px; }
+}

@@ -64,7 +64,7 @@ Les rotatifs ne parlent plus jamais de chiffres (lettres seulement, `lettre_a` �
 | `badge` | (réserve) | Tu cherches Podkova. Mon code source. Présente-le. |
 | `badgeOk` | Badge Podkova lu | Podkova. Tu ne devrais pas avoir ça. Lis vite, la vérité change. |
 | `mensonge` | (réserve, moments de faux texte) | Ce que tu lis est faux. Ou vrai. Je décide. |
-| `ordreFaux` | Mauvais ordre (interrupteurs ou clés I-III) | Mauvais ordre. Je t'ai menti. Dix secondes de moins. |
+| `ordreFaux` | Mauvais ordre (interrupteurs ou clés I-II) | Mauvais ordre. Je t'ai menti. Dix secondes de moins. |
 | `fils` | Écran des fils affiché | Cinq fils. Une seule règle. Je la connais, toi non. |
 | `filOk` | (réserve) | Fil coupé. Tu crois avancer. |
 | `pilule` | Bon fil coupé | La pilule empoisonnée. Tape le code. Tu n'oseras pas. |

@@ -99,7 +99,7 @@ La couverture se calcule sur **l’ensemble des parties du run**, pas graine par
 | 4 | Baie banane (1re couche) | Vraie baie 5×5. Brancher selon la consigne dictée (pas de réponse écrite à l’écran). |
 | 5 | Labyrinthe, CYD 2 + joystick | Rejoindre le but. Le labyrinthe prend l’écran ; le n° de série reste visible en petit dans un coin (≥ 11 px en paysage), avec RÉÉCOUTER (≥ 44 px réels), sans chevaucher ni la jauge batterie ni la grille du labyrinthe (412×915 et 915×412). Le bouton reste utilisable. Pas de plaque rivetée sur le couvercle, pas d’ECG. |
 | 6 | Code 1, clavier 4×4 | Saisir le code. Faux code refusé ; le bon avance tout de suite (voix `taunt_fini` / suite). |
-| 7 | Clés I, II, III | Les presser dans l’ordre dicté. |
+| 7 | Clés I, II | Les presser dans l’ordre dicté. |
 | 8 | Encodeurs, mot (cryptex) | Mot de 4 lettres sur les anneaux (A–V), validation au centre. |
 | 9 | Labyrinthe 2, CYD 2 | Rejoindre le but. Le joystick peut être inversé (sabotage). Comme à l’étape 5 : n° + RÉÉCOUTER visibles, sans chevaucher la grille. |
 | 10 | Baie banane (2e couche) | Même baie 5×5, deuxième consigne. Le bandeau reprend la consigne dictée. |

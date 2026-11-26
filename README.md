@@ -12,9 +12,34 @@ Archive figée de la v0.1.5 (commit db2b57ad) : https://passcool17.github.io/ent
 Archive figée de la v0.2.6a (commit 7d2ea7b) : https://passcool17.github.io/entite-mallette-v026a/
 (dépôt passcool17/entite-mallette-v026a, cache séparé `entite-mallette-v026a-0.2.6a`).
 
+Archive figée de la v0.3.2 (commit 5e9d940, avant la refonte : trois trappes, trois serrures) : https://passcool17.github.io/entite-mallette-v032/
+(dépôt passcool17/entite-mallette-v032, cache séparé `entite-mallette-v032-0.3.2`).
+
+## Version 0.4.0 (25 nov. 2026) — « comme la mallette qu’on va imprimer »
+
+État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.4.0`, imports `?v=0.4.0`).
+Source : plan d’impression **v0.8** (Impression 3D · Bambu P1S, approuvé par Pascal le 25 nov. à 07:32 ; noms 20:28),
+cotes dans `js/panel-config.js` (`LAYOUT`) et [`HARDWARE.md`](HARDWARE.md).
+
+- **2 trappes (A, B)** au lieu de 3 : les barrettes gardent 3 couleurs (comptes 5/3/2, 6/3/1, 5/4/1) ; une trappe porte la
+  couleur réponse, l’autre un leurre, dans un ordre tiré au hasard. Les 4 règles (plus présente, plus rare, ni l’une ni
+  l’autre, barrette tout à gauche) et leurs voix restent justes.
+- **2 serrures (I, II)** au lieu de 3 : I pèse le 1er chiffre du n° de série, II le 2e ; de la plus légère à la plus lourde ou
+  l’inverse. Étape 7 = « Clés I · II ».
+- **Base au plan v0.8** : en haut ports B1–B5, molettes E1–E5 **en ligne** (plus de zigzag), KCD1 à droite ; à gauche ARM +
+  TRANSMIT **côte à côte** sous les ports, puis TM1637 et les serrures I II en bas à gauche ; au centre les trappes A B puis
+  CYD 2 ; à droite le clavier 4×4 et le joystick dessous. En portrait, E1–E5 passent sur leur propre ligne sous B1–B5
+  (10 cibles de 44 px ne tiennent pas sur 390 px). Le couvercle ne change pas (même zigzag que la v0.3).
+- **Voix** : aucun nouvel enregistrement. 8 répliques dont l’audio dit encore « trois serrures » ou l’ancienne place des
+  leviers sont dites en synthèse du navigateur (`mp3Ready: false`, nouveau texte) : `clue_cles_legere`, `clue_cles_lourde`,
+  `obj_cles`, `hint1_cles`, `hint2_cles_legere`, `hint2_cles_lourde`, `hint1_armer`, `hint1_transmit`.
+- Cibles de toucher : molettes, trappes, serrures, capots, leviers et Réécouter ≥ 44 px dans les deux orientations ;
+  clavier au milieu de l’écart (vérifié par le test complet).
+- Le service worker garde aussi le cache de l’archive `entite-mallette-v032-`.
+
 ## Version 0.3.2 (25 nov. 2026)
 
-État : en ligne sur https://passcool17.github.io/entite-mallette/ (cache `entite-mallette-v0.3.2`, imports `?v=0.3.2`).
+État : publiée (commit `5e9d940`), remplacée par la 0.4.0 ; archive figée https://passcool17.github.io/entite-mallette-v032/.
 
 - **25 voix v0.3** : les enregistrements ElevenLabs (The Curator, eleven_v4) remplacent la synthèse du navigateur pour les 6 répliques Simon nouvelles et les 19 répliques réécrites (cinq encodeurs, cinq barrettes). Fichiers `voix/<id>.mp3`, `mp3Ready: true`.
 
@@ -251,7 +276,7 @@ Le jeu démarre directement mallette ouverte.
   - Pochette fine (note tactique). Le n° de série et « RÉÉCOUTER » sont sur le CYD 2, plus sur le couvercle.
   - Baie de 5 fiches banane Keadic (rouge, noir, bleu, jaune, vert).
 - **Base (83 mm)** : TM1637 + OLED, 4 encodeurs KY-040, CYD 2 + joystick (labyrinthe ; l’Entité peut inverser les axes),
-  clavier membrane 4×4 seul, 3 trappes SG90 (A, B, C), 3 serrures à clé Gebildet (I, II, III),
+  clavier membrane 4×4 seul, 2 trappes SG90 (A, B), 2 serrures à clé Gebildet (I, II) (v0.4),
   et deux **leviers à capot** : bleu `ARM` (armement) et rouge `TRANSMIT` (fin de partie).
   Il n’y a plus de bouton rond TRANSMIT ni de haut-parleur dans la base.
 
@@ -288,7 +313,7 @@ Armement : lever le capot bleu puis basculer le levier ARM. Le chrono part.
 
 1. Molettes (fragment 1) · 2. Trappe (5 barrettes) · 3. Simon sur les barrettes et les prises (fragment 2) ·
 4. Fiches banane (fragment 3) · 5. Labyrinthe (fragment 4) · 6. Code 1 au clavier — une trappe libère les clés ·
-7. Serrures à clé (I, II, III), dans le bon ordre · 8. Cryptex : mot de 5 lettres épelé · 9. Labyrinthe saboté (axes inversés par moments) ·
+7. Serrures à clé (I, II), dans le bon ordre · 8. Cryptex : mot de 5 lettres épelé · 9. Labyrinthe saboté (axes inversés par moments) ·
 10. Câbles, couche 2 · 11. Code 2 · 12. Lever le capot rouge et basculer le levier TRANSMIT.
 
 Erreur : −5 s ou −8 s et +3,2 % d’échec. Avertissements à 30 s et 10 s ; à zéro, la mallette saute.

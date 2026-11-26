@@ -42,8 +42,8 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.3.2';
-import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.3.2';
+import { makeRun, RING, DETENTS, POOLS, SLOTS, TIERS, NENC, SIMON } from '../js/game.js?v=0.4.0';
+import { OBJECTIVE, hintCues } from '../js/guide.js?v=0.4.0';
 
 const require = createRequire(import.meta.url);
 function loadChromium() {
@@ -854,6 +854,22 @@ async function playOne(b, seed, opts) {
     };
   });
 
+  // v0.4 (plan v0.8) : exactement 2 trappes A B et 2 serrures I II, rien d'autre sur la base
+  {
+    const pc = await D(p, () => ({
+      traps: [...document.querySelectorAll('#traps .trap')].map((t) => t.querySelector('.trap-n')?.textContent.trim()),
+      trapAria: [...document.querySelectorAll('#traps .trap-door')].map((b) => b.getAttribute('aria-label').split(',')[0]),
+      locks: [...document.querySelectorAll('#keyRow .lock.key')].map((l) => l.querySelector('.silk')?.textContent.trim()),
+      lockAria: [...document.querySelectorAll('#keyRow .lock-btn')].map((b) => b.getAttribute('aria-label')),
+      encs: document.querySelectorAll('#encRow .enc').length,
+      stepKeys: __entiteDebug.STEPS ? __entiteDebug.STEPS[7]?.title : null,
+    }));
+    const pok = pc.traps.join() === 'A,B' && pc.trapAria.join() === 'Trappe A,Trappe B' && pc.locks.join() === 'I,II' && pc.lockAria.join() === 'Serrure I,Serrure II'
+      && pc.encs === 5 && (answers.trap === 0 || answers.trap === 1) && answers.keyOrder.length === 2 && [...answers.keyOrder].sort().join() === '0,1'
+      && (pc.stepKeys === null || pc.stepKeys === 'Clés I · II');
+    rec(pok, 0, 0, pok ? 'pièces v0.4 : trappes A B, serrures I II, 5 molettes' : `pièces v0.4 ${JSON.stringify({ pc, trap: answers.trap, keyOrder: answers.keyOrder })}`);
+    if (!pok) { await ctx.close(); return { seed, tier: runInfo.tier, v: runInfo.v, ver, ok: false, log, errs, extras }; }
+  }
 
   // ---- 1 encodeurs (+ indice sur une partie sur deux)
   if (opts.hintOther) {

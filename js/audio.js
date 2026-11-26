@@ -1,7 +1,7 @@
 // audio.js (v0.2.5) : graphe WebAudio unique (voix / musique / effets, limiteur, L/R), musique de tension, voix de l'Entité (manifeste voix/manifest.json : mp3 si prêt, sinon synthèse française),
 // routée dans un AnalyserNode pour animer l'œil.
-import { loadManifest, sentence, fileOf, cue } from './voice-manifest.js?v=0.3.2';
-import { takePreloaded, MUSIC_URL } from './preload.js?v=0.3.2';
+import { loadManifest, sentence, fileOf, cue } from './voice-manifest.js?v=0.4.0';
+import { takePreloaded, MUSIC_URL } from './preload.js?v=0.4.0';
 
 let ac = null, master, limiter, sfxBus, voiceBus, analyser, data, muted = false, volume = 0.9;
 let musicBus, musicDuck, musicLP, music = null, musicBuf = null, musicLoad = null;
@@ -323,7 +323,7 @@ export function stopMusic(kind = 'fade', silent = false) {
 // ---------- jingle de victoire (v0.3, Suno « victoire v2 », 14,8 s, 112 kb/s) ----------
 // Chargé tard (pendant la partie, jamais au démarrage), joué une fois par victoire, par le bus effets
 // → master : le bouton son et le volume s'appliquent. Le contexte audio est déjà débloqué par le geste d'armement.
-export const JINGLE_URL = 'audio/victoire.mp3?v=0.3.2';
+export const JINGLE_URL = 'audio/victoire.mp3?v=0.4.0';
 export const jingleStats = { demandes: 0, lances: 0, charge: false, erreur: '', t: 0 };
 let jingleBuf = null, jingleLoad = null, jingleSrc = null;
 export function preloadJingle() {

@@ -8,17 +8,17 @@
 // Paliers cachés ~50/50 (moyen / difficile), ?seed=N reproductible, ?debug=1 expose window.__entiteDebug.
 // v0.2.4 : voix PAR-DESSUS la musique (−8 dB sous la voix), jauge de batterie 3S sur le CYD 2, variantes d'énigmes
 // tirées par étape (deux parties de suite ne se ressemblent pas : signature de la partie précédente dans localStorage).
-import { createEye } from './eye.js?v=0.3.2';
-import { EYE, deepMerge } from './eye-config.js?v=0.3.2';
-import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS, NENC, SIMON, STICK_COLORS, STICK_NAMES, simonTiming, beatMs, scannerFrame } from './game.js?v=0.3.2';
-import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.3.2';
-import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable, preloadJingle, playJingle, stopJingle, jingleStats } from './audio.js?v=0.3.2';
-import { sfx } from './sfx.js?v=0.3.2';
-import { preloadAll } from './preload.js?v=0.3.2';
-import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.3.2';
-import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.3.2';
+import { createEye } from './eye.js?v=0.4.0';
+import { EYE, deepMerge } from './eye-config.js?v=0.4.0';
+import { makeRun, sigDiff, TIME_S, NSTEPS, STEPS, canMove, DIRS, RING, DETENTS, NENC, SIMON, STICK_COLORS, STICK_NAMES, simonTiming, beatMs, scannerFrame } from './game.js?v=0.4.0';
+import { openBattery, LOW as BATT_LOW, PACK } from './battery.js?v=0.4.0';
+import { setVoiceFast, initAudio, speak, stopVoice, voiceLevel, setMuted, isMuted, setVolume, getVolume, audioGraph, DUCK, setCaptionHandler, startMusic, setMusicIntensity, stopMusic, voiceLog, voiceStats, musicStats, ttsAvailable, preloadJingle, playJingle, stopJingle, jingleStats } from './audio.js?v=0.4.0';
+import { sfx } from './sfx.js?v=0.4.0';
+import { preloadAll } from './preload.js?v=0.4.0';
+import { OBJECTIVE, MODULES, HINT_COST, AUTO_HINT_MS, hintCues, hintStrip, objectiveIds } from './guide.js?v=0.4.0';
+import { cue, loadManifest, sentence } from './voice-manifest.js?v=0.4.0';
 
-const VERSION = '0.3.2';
+const VERSION = '0.4.0';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const q = new URLSearchParams(location.search);
@@ -54,7 +54,7 @@ function resetState(remember = false) {
     endAt: 0, remaining: TIME_S, rate: 1, lastTick: 0, lastSec: null,
     prob: 99.7, errors: 0, lieUntil: 0, lies: 0,
     coverArm: false, coverTx: false, armed: false, txOn: false,
-    enc: Array(NENC).fill(0), encRaw: Array(NENC).fill(0), encMode: 'alpha', trapOpen: [false, false, false], simon: null,
+    enc: Array(NENC).fill(0), encRaw: Array(NENC).fill(0), encMode: 'alpha', trapOpen: [false, false], simon: null,
     cables: run.wires.map((color, i) => ({ color, socket: i })), sel: null, patchTok: 0, // câble c (port c de la base) → prise 0..4 ou null
     pos: null, code: '', keysTurned: [], hesitating: false, lastInput: 0,
     sabotage: false, sabT: 0, said30: false, said10: false,
@@ -151,7 +151,7 @@ function buildParts() {
   const tr = $('#traps'); tr.textContent = '';
   run.trapColors.forEach((c, i) => {
     const t = document.createElement('div'); t.className = 'trap'; t.dataset.i = i; t.style.setProperty('--rim', WIRE[c] === WIRE.noir ? '#555' : LED[c]);
-    t.innerHTML = `<div class="trap-well"></div><button class="trap-door" type="button" aria-label="Trappe ${"ABC"[i]}, liseré ${c}"><span class="trap-screw"></span><span class="trap-screw"></span><span class="trap-n">${"ABC"[i]}</span></button>`;
+    t.innerHTML = `<div class="trap-well"></div><button class="trap-door" type="button" aria-label="Trappe ${"AB"[i]}, liseré ${c}"><span class="trap-screw"></span><span class="trap-screw"></span><span class="trap-n">${"AB"[i]}</span></button>`;
     tr.append(t);
   });
   // fiches banane
@@ -556,7 +556,7 @@ function nextStep(n, { holdStrip = 0 } = {}) {
     case 1: setEncMode('alpha');
       voice(C[1], { clue: true }); pressureEnc(); break;
     case 2: voice(C[2], { clue: true });
-      pressure(5500, () => { const w = (run.trap + 1) % 3; decoy('trap', w); voice(['taunt_trappe', color(run.trapColors[w])], { lie: true, now: true }); }); break;
+      pressure(5500, () => { const w = (run.trap + 1) % 2; decoy('trap', w); voice(['taunt_trappe', color(run.trapColors[w])], { lie: true, now: true }); }); break;
     case 3: g.code = ''; startSimon(voice(C[3], { clue: true })); break;
     case 4: voice(C[4], { clue: true });
       pressure(6000, () => { const w = run.decoys.wire1; decoy('wire', w); voice(['taunt_branche', cableCue(w.cable), prise(w.socket)], { lie: true, now: true }); }); break;
@@ -869,7 +869,7 @@ function wire() {
   $('#btnSon').addEventListener('click', () => { setMuted(!isMuted()); sonUi(); });
   sonUi(); // état du bouton son gardé d'une session à l'autre (localStorage entite-son)
 
-  // serrures Gebildet I, II, III (couvercle intérieur)
+  // serrures Gebildet I, II (v0.4 : 2 serrures, base en bas à gauche sous le TM1637)
   $$('.lock.key').forEach((l) => $('.lock-btn', l).addEventListener('click', (e) => {
     input(); if (g.step !== 7) return;
     const k = +l.dataset.key; if (g.keysTurned.includes(k)) return;
@@ -879,7 +879,7 @@ function wire() {
       bad(5); g.keysTurned = []; $$('.lock.key').forEach((x) => { x.classList.remove('on'); $('.lock-btn', x).setAttribute('aria-pressed', 'false'); }); return;
     }
     g.keysTurned.push(k); l.classList.add('on'); e.currentTarget.setAttribute('aria-pressed', 'true'); progress();
-    if (g.keysTurned.length === 3) good(8);
+    if (g.keysTurned.length === run.keyOrder.length) good(8);
   }));
 
   // leviers à capot (base) : bleu = armement, rouge = TRANSMIT
@@ -1003,7 +1003,7 @@ function openTrap(i, what) {
   g.trapOpen[i] = true; sfx.servo(); batt?.dip('trap');
   const t = $(`.trap[data-i="${i}"]`); t.classList.add('open');
   const well = $('.trap-well', t);
-  well.innerHTML = what === 'keys' ? '<span class="keyset" role="img" aria-label="Clés I, II, III"><i></i><i></i><i></i></span>' : '<span class="trap-led" role="img" aria-label="Trappe ouverte"></span>';
+  well.innerHTML = what === 'keys' ? '<span class="keyset" role="img" aria-label="Clés I, II"><i></i><i></i></span>' : '<span class="trap-led" role="img" aria-label="Trappe ouverte"></span>';
 }
 // ================= Simon (étape 3, v0.3) =================
 // Série de barrettes tirée par graine (run.simon.seq). Tours : moyen 2→5, difficile 3→6 (plus rapide à chaque tour).
@@ -1107,7 +1107,7 @@ function press(k) {
       g.lastGoodAt = performance.now();
       sfx.confirm(); g.prob = Math.max(0.3, g.prob - 7.9); showProb(); flashModules('ok'); setStrip(`Étape 6/${NSTEPS} franchie`, 'Bien.', 'ok', 900);
       voice('taunt_fini', { lie: true, now: true }); voice('taunt_couche2');
-      openTrap((run.trap + 1) % 3, 'keys');
+      openTrap((run.trap + 1) % 2, 'keys');
       nextStep(7, { holdStrip: 900 });
     } else good(12);
   } else { g.code = ''; setTimeout(drawCydBig, 250); bad(8); }

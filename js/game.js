@@ -1,4 +1,6 @@
-// game.js : tirage d'une partie v0.3 (logique pure, sans DOM). Même graine = même partie.
+// game.js : tirage d'une partie v0.4 (logique pure, sans DOM). Même graine = même partie.
+// v0.4 (plan d'impression v0.8) : 2 trappes (A, B) et 2 serrures (I, II). Les barrettes gardent 3 couleurs ; les 2 trappes
+// montrent la couleur réponse et un leurre, donc les 4 variantes de trappe restent justes.
 // v0.3 : 5 molettes (mots de 5 lettres), n° de série à 5 lettres, étape 3 = Simon sur 5 barrettes, trappe sur 10 demi-barrettes.
 // Paliers cachés ~50/50 : 'moyen' et 'difficile' (choix de Pascal : moyen à difficile, au hasard). Pas de mode facile.
 // Tout se déduit de la mallette elle-même (plaque du n° de série, écrans, barre DEL) : aucun manuel externe.
@@ -15,7 +17,7 @@ const SERIAL_LETTERS = 'ABCDEFGHJLMNPRSTUV';     // lettres de l'anneau sans I n
 // Anneau cryptex des KY-040 : 20 crans = 1 tour = 20 lettres (sans K, Q, W, X, Y, Z)
 export const RING = 'ABCDEFGHIJLMNOPRSTUV';
 export const DETENTS = 20;
-export const NENC = 5;               // v0.3 : 5 molettes KY-040 en zigzag
+export const NENC = 5;               // 5 molettes KY-040 (v0.4 / plan v0.8 : en ligne E1–E5)
 // Mots de 5 lettres français, toutes leurs lettres sur l'anneau (jamais K, Q, W, X, Y, Z)
 export const WORDS = ['SIGNE', 'PORTE', 'CABLE', 'ROUGE', 'LAMPE', 'CODES', 'VERRE', 'TIGRE', 'SABLE', 'ORAGE', 'PLUME', 'RADIO', 'BOMBE', 'SONDE', 'PANNE', 'FUSIL', 'NUAGE', 'OMBRE', 'GLACE', 'TEMPS', 'VAGUE', 'PIANO', 'FLEUR', 'ROBOT', 'ACIER', 'AGENT', 'TABLE', 'LIGNE', 'FORGE', 'PISTE', 'ARBRE', 'CORDE', 'TRAIN', 'PHARE'];
 // Simon (étape 3) : 5 barrettes de 8 LED, une couleur par barrette (barrette 1 = câble noir, pulse violet)
@@ -54,7 +56,7 @@ export const STEPS = [
   { face: 'base',   part: 'wires',  title: 'Baie banane · brancher' },
   { face: 'base',   part: 'cyd2',   title: 'Verrou de signal' },
   { face: 'base',   part: 'keypad', title: 'Code 1' },
-  { face: 'base',   part: 'keys',   title: 'Clés I · II · III' },
+  { face: 'base',   part: 'keys',   title: 'Clés I · II' },
   { face: 'base',   part: 'enc',    title: 'Signal 2 · mot (cryptex)' },
   { face: 'base',   part: 'cyd2',   title: 'Verrou saboté' },
   { face: 'base',   part: 'wires',  title: 'Baie banane · 2e couche' },
@@ -117,9 +119,10 @@ export function makeRun(seed) {
   const order = shuffle(TRAP_COLORS);                      // order[0] = la plus présente … order[2] = la plus rare
   let bar = []; order.forEach((c, i) => { for (let k = 0; k < counts[i]; k++) bar.push(c); });
   bar = shuffle(bar);
-  const trapColors = shuffle(TRAP_COLORS);                 // couleur du liseré de T1, T2, T3
   const trapColor = { frequente: order[0], moyenne: order[1], rare: order[2], gauche: bar[0] }[v.trap];
-  const trap = trapColors.indexOf(trapColor);              // index 0..2
+  // v0.4 : 2 trappes (A, B) : la couleur réponse + une autre couleur des barrettes, ordre tiré au hasard
+  const trapColors = shuffle([trapColor, pick(TRAP_COLORS.filter((c) => c !== trapColor))]);
+  const trap = trapColors.indexOf(trapColor);              // index 0..1
   cues[2] = [`clue_trappe_${v.trap}`];
 
   // ---- 3. Simon (v0.3) : série de barrettes 0..4 (répétitions permises, même de suite). On la reproduit en touchant
@@ -163,8 +166,8 @@ export function makeRun(seed) {
   const code2 = (v.code2 === 'rotation' ? [frags[2], frags[3], frags[0], frags[1]] : v.code2 === 'decale' ? frags.map((f) => (f + last) % 10) : frags.slice().reverse()).join('');
   cues[6] = [v.code1 === 'ordre' ? 'clue_code1' : `clue_code1_${v.code1}`]; cues[11] = [`clue_code2_${v.code2}`];
 
-  // ---- 7. clés I, II, III : chacune « pèse » un chiffre (I = 1er, II = 2e, III = 3e) ; légère → lourde ou l'inverse
-  const keyOrder = [0, 1, 2].sort((a, b) => (v.keys === 'lourde' ? digits[b] - digits[a] : digits[a] - digits[b]));
+  // ---- 7. clés I, II (v0.4 : 2 serrures) : chacune « pèse » un chiffre (I = 1er, II = 2e) ; légère → lourde ou l'inverse
+  const keyOrder = [0, 1].sort((a, b) => (v.keys === 'lourde' ? digits[b] - digits[a] : digits[a] - digits[b]));
   cues[7] = [`clue_cles_${v.keys}`];
 
   // ---- mensonges (œil rouge) : faux fragments ; le reste de la pression est dans app.js (pendant chaque choix)

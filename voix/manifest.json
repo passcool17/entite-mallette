@@ -1,5 +1,5 @@
 {
- "version": "0.3.2",
+ "version": "0.4.0",
  "note": "Voix de l'Entité. Chaque réplique = un id ou une suite d'ids. mp3Ready true : voix/<id>.mp3 est joué (repli synthèse française si échec). mp3Ready false : synthèse française directe, aucun fichier demandé. Pour remplacer une voix : déposer voix/<id>.mp3 puis mettre mp3Ready à true, sans toucher au code. dfplayerTrack = nom du fichier sur la microSD du DFPlayer Mini (dossier mp3/0001.mp3…).",
  "cues": [
   {
@@ -279,8 +279,8 @@
    "dfplayerTrack": "0031",
    "category": "clue",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Trois serrures dans le couvercle. Chacune pèse un chiffre du numéro : la première, la deuxième, la troisième. De la plus légère à la plus lourde."
+   "mp3Ready": false,
+   "text": "Deux serrures, en bas à gauche. Chacune pèse un chiffre du numéro : la première, la deuxième. De la plus légère à la plus lourde."
   },
   {
    "id": "clue_cles_lourde",
@@ -288,8 +288,8 @@
    "dfplayerTrack": "0032",
    "category": "clue",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Trois serrures dans le couvercle. Chacune pèse un chiffre du numéro : la première, la deuxième, la troisième. De la plus lourde à la plus légère."
+   "mp3Ready": false,
+   "text": "Deux serrures, en bas à gauche. Chacune pèse un chiffre du numéro : la première, la deuxième. De la plus lourde à la plus légère."
   },
   {
    "id": "clue_mot_ordre",
@@ -1076,8 +1076,8 @@
    "dfplayerTrack": "0118",
    "category": "objective",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Tourne les trois serrures dans le bon ordre."
+   "mp3Ready": false,
+   "text": "Tourne les deux serrures dans le bon ordre."
   },
   {
    "id": "obj_mot",
@@ -1112,8 +1112,8 @@
    "dfplayerTrack": "0122",
    "category": "hint",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Indice : le levier bleu, en bas à gauche. Touche son capot pour le lever, puis touche le levier."
+   "mp3Ready": false,
+   "text": "Indice : le levier bleu, en haut à gauche, sous les prises des câbles. Touche son capot pour le lever, puis touche le levier."
   },
   {
    "id": "hint2_armer",
@@ -1189,8 +1189,8 @@
    "dfplayerTrack": "0130",
    "category": "hint",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Indice : la serrure un pèse le premier chiffre du numéro de série, la deux le deuxième, la trois le troisième."
+   "mp3Ready": false,
+   "text": "Indice : la serrure un pèse le premier chiffre du numéro de série, la deux le deuxième."
   },
   {
    "id": "hint1_mot",
@@ -1209,8 +1209,8 @@
    "dfplayerTrack": "0132",
    "category": "hint",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Indice : le levier rouge, en bas à droite. Touche son capot pour le lever, puis touche le levier."
+   "mp3Ready": false,
+   "text": "Indice : le levier rouge, en haut à gauche, à côté du bleu. Touche son capot pour le lever, puis touche le levier."
   },
   {
    "id": "hint2_verrou",
@@ -1458,8 +1458,8 @@
    "dfplayerTrack": "0158",
    "category": "hint",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Tourne d'abord la serrure au plus petit chiffre, puis la moyenne, puis la plus grande."
+   "mp3Ready": false,
+   "text": "Tourne d'abord la serrure au plus petit chiffre, puis l'autre."
   },
   {
    "id": "hint2_cles_lourde",
@@ -1467,8 +1467,8 @@
    "dfplayerTrack": "0159",
    "category": "hint",
    "source": "elevenlabs",
-   "mp3Ready": true,
-   "text": "Tourne d'abord la serrure au plus grand chiffre, puis la moyenne, puis la plus petite."
+   "mp3Ready": false,
+   "text": "Tourne d'abord la serrure au plus grand chiffre, puis l'autre."
   },
   {
    "id": "hint2_mot_ordre",
