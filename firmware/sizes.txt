@@ -1,0 +1,8 @@
+entite_hub: Sketch uses 1122491 bytes (35%) of program storage space. Maximum is 3145728 bytes.
+entite_hub: Global variables use 47860 bytes (14%) of dynamic memory, leaving 279820 bytes for local variables. Maximum is 327680 bytes.
+entite_s3b: Sketch uses 899042 bytes (28%) of program storage space. Maximum is 3145728 bytes.
+entite_s3b: Global variables use 46180 bytes (14%) of dynamic memory, leaving 281500 bytes for local variables. Maximum is 327680 bytes.
+entite_cyd1: Sketch uses 941223 bytes (71%) of program storage space. Maximum is 1310720 bytes.
+entite_cyd1: Global variables use 48176 bytes (14%) of dynamic memory, leaving 279504 bytes for local variables. Maximum is 327680 bytes.
+entite_cyd2: Sketch uses 938568 bytes (71%) of program storage space. Maximum is 1310720 bytes.
+entite_cyd2: Global variables use 48208 bytes (14%) of dynamic memory, leaving 279472 bytes for local variables. Maximum is 327680 bytes.
